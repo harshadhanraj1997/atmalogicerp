@@ -1,7 +1,6 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { join } from 'path';
 
 // Define __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -9,30 +8,35 @@ const __dirname = path.dirname(__filename);
 
 let mainWindow;
 
-// Replace this with your hosted backend URL
-const BACKEND_URL = 'https://needha-erp-server.onrender.com'; // Change to your backend's URL
+// Backend API URL
+const BACKEND_URL = 'https://needha-erp-server.onrender.com';
 
 // Function to create the main application window
 function createMainWindow() {
   try {
     console.log('[DEBUG] Creating main window...');
+
     mainWindow = new BrowserWindow({
       width: 1200,
       height: 800,
       webPreferences: {
-        preload: path.join(__dirname, 'preload.cjs'), // Preload script for secure communication
+        preload: path.join(__dirname, 'preload.cjs'), // Ensure this file exists
+        nodeIntegration: false, // Enforce security best practices
+        contextIsolation: true, // Enforce security
+        enableRemoteModule: false, // Disable remote module for security
       },
     });
 
+    // Set default zoom level
+    mainWindow.webContents.setZoomFactor(0.7);
+
     if (app.isPackaged) {
       console.log('[DEBUG] Loading packaged Next.js app...');
-      // In packaged mode, load the static build from the `out/` folder
-      mainWindow.loadURL('app://-/page.tsx');
+      mainWindow.loadURL(`file://${path.join(__dirname, '../out/index.html')}`);
     } else {
       console.log('[DEBUG] Loading Next.js from localhost:3000...');
-      // In development, load the Next.js app from localhost
       mainWindow.loadURL('http://localhost:3000');
-      mainWindow.webContents.openDevTools();
+      mainWindow.webContents.openDevTools(); // Keep DevTools open in dev mode
     }
 
     // Handle the window close event
@@ -74,7 +78,7 @@ ipcMain.handle('login', async (event, credentials) => {
   try {
     console.log('[DEBUG] Handling login request from renderer:', credentials);
 
-    // Send login request to the hosted backend
+    // Send login request to backend
     const response = await fetch(`${BACKEND_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -86,15 +90,17 @@ ipcMain.handle('login', async (event, credentials) => {
 
     if (result.success) {
       console.log('[DEBUG] Login successful:', result.message);
-      // Redirect to the dashboard on successful login
-      await mainWindow.loadFile('dashboard.html').catch((err) => {
-        console.error('[ERROR] Failed to load dashboard.html:', err);
-      });
+      // Load dashboard page correctly
+      if (app.isPackaged) {
+        mainWindow.loadURL(`file://${path.join(__dirname, '../out/orders.html')}`);
+      } else {
+        mainWindow.loadURL('http://localhost:3000/orders');
+      }
     } else {
       console.error('[DEBUG] Login failed:', result.error);
     }
 
-    return result; // Send the result back to the renderer process
+    return result;
   } catch (error) {
     console.error('[ERROR] Error during backend communication:', error);
     return { success: false, error: 'Failed to connect to the server' };

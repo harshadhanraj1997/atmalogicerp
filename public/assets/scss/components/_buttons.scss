@@ -1,0 +1,85 @@
+@use '../utils' as *;
+
+/*----------------------------------------*/
+/*  BUTTON CSS START
+/*----------------------------------------*/
+
+
+  .btn {
+    @apply text-[16px] font-normal transition-all duration-300 ease-linear inline-flex items-center justify-center leading-normal px-6 py-1.5 rounded-md shadow-none;
+  }
+
+  .btn-xxl { @apply px-12 py-8; }
+  .btn-xl { @apply px-10 py-5; }
+  .btn-lg { @apply px-8 py-4; }
+  .btn-md { @apply px-[18px] py-2.5; }
+  .btn-sm { @apply px-3 py-1; }
+
+  .btn i { @apply me-2; }
+  .radius-pill { @apply rounded-[50px]; }
+
+  /* Primary Button */
+  .btn-primary {
+    @apply bg-blue-600 dark:bg-blue-700 text-white border-none;
+    &:hover { @apply bg-blue-500 dark:bg-blue-600; }
+  }
+
+  /* Secondary Button */
+  .btn-secondary {
+    @apply bg-gray-600 dark:bg-gray-700 text-white border-none;
+    &:hover { @apply bg-gray-500 dark:bg-gray-600; }
+  }
+
+  /* Success Button */
+  .btn-success {
+    @apply bg-green-600 dark:bg-green-700 text-white border-none;
+    &:hover { @apply bg-green-500 dark:bg-green-600; }
+  }
+
+  /* Danger Button */
+  .btn-danger {
+    @apply bg-red-600 dark:bg-red-700 text-white border-none;
+    &:hover { @apply bg-red-500 dark:bg-red-600; }
+  }
+
+  /* Warning Button */
+  .btn-warning {
+    @apply bg-yellow-500 dark:bg-yellow-600 text-black border-none;
+    &:hover { @apply bg-yellow-400 dark:bg-yellow-500; }
+  }
+
+  /* Info Button */
+  .btn-info {
+    @apply bg-teal-600 dark:bg-teal-700 text-white border-none;
+    &:hover { @apply bg-teal-500 dark:bg-teal-600; }
+  }
+
+  /* Dark Button */
+  .btn-dark {
+    @apply bg-gray-900 dark:bg-gray-800 text-white border-none;
+    &:hover { @apply bg-gray-800 dark:bg-gray-700; }
+  }
+
+  /* Outline Buttons */
+  .btn-outline-primary {
+    @apply border border-blue-600 text-blue-600 bg-transparent;
+    &:hover { @apply bg-blue-600 text-white; }
+  }
+
+  .btn-outline-secondary {
+    @apply border border-gray-600 text-gray-600 bg-transparent;
+    &:hover { @apply bg-gray-600 text-white; }
+  }
+
+  /* Round Button */
+  .round-btn {
+    @apply h-[50px] text-[16px] px-10 inline-flex justify-center items-center transition-all duration-300 ease-in-out rounded-full;
+    &:hover { @apply bg-gray-600 text-white; }
+  }
+
+  /* Read More Button */
+  .read__more-btn {
+    @apply text-[16px] transition-all duration-300 ease-in-out text-blue-600;
+    &:hover { @apply text-gray-600; }
+  }
+

@@ -1,0 +1,918 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { degrees, PDFDocument, PDFImage, PDFPage, rgb,StandardFonts } from "pdf-lib";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+
+import COMPANY_LOGO from "@/assets/needhagoldlogo.png"
+import "./add-order.css"; // Ensure this import is present
+
+interface OrderFormModalProps {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+}
+
+interface FormData {
+  partyLedger: string;
+  subname: string;
+  product: string;
+  purity: string;
+  advanceMetal: string;
+  advanceMetalPurity: string;
+  priority: string;
+  deliveryDate: string;
+  remark: string;
+  createdBy: string;
+  category?: string;
+  wtRange?: string;
+  size?: string;
+  quantity?: string;
+  itemRemark?: string;
+}
+
+interface OrderInfo {
+  partyCode: string;
+  partyName: string;
+  orderNo: string;
+  orderDate: string;
+  category: string;
+  purity: string;
+  advanceMetal: string;
+  advanceMetalPurity: string;
+  priority: string;
+  deliveryDate: string;
+  remark: string;
+  createdBy: string;
+  status: string;
+  pdfBlob?: Blob;
+}
+
+interface OrderItem {
+  category: string;
+  weightRange: string;
+  size: string;
+  quantity: string;
+  remark: string;
+}
+
+const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
+  /* ---------------------- STATE ---------------------- */
+  const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [partyLedgers, setPartyLedgers] = useState<string[]>([]);
+  const [isOrderSaved, setIsOrderSaved] = useState(false);
+
+  /* ---------------------- FORM DATA ---------------------- */
+  const [formData, setFormData] = useState<FormData>({
+    partyLedger: "",
+    subname: "",
+    product: "",
+    purity: "",
+    advanceMetal: "",
+    advanceMetalPurity: "",
+    priority: "",
+    deliveryDate: "",
+    remark: "",
+    createdBy: "",
+    category: "",
+    wtRange: "",
+    size: "",
+    quantity: "",
+    itemRemark: "",
+  });
+
+  /* ---------------------- API ---------------------- */
+  const apiBaseUrl = "https://needha-erp-server.onrender.com";
+
+  useEffect(() => {
+    fetchPartyLedgers();
+  }, []);
+
+  const fetchPartyLedgers = async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/customer-groups`);
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setPartyLedgers(result.data.map((ledger: any) => ledger.Party_Code__c));
+      }
+    } catch (error) {
+      console.error("Error fetching party ledgers:", error);
+    }
+  };
+
+  /* ---------------------- HANDLERS ---------------------- */
+  const handleInputChange = (field: keyof FormData, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const getNextOrderNumber = async (partyCode: string) => {
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/getLastOrderNumber?partyLedgerValue=${partyCode}`
+      );
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to get order number");
+      }
+
+      let sequence = "0001";
+      if (data.lastOrderNumber) {
+        const parts = data.lastOrderNumber.split("/");
+        if (parts.length === 2 && /^\d{4}$/.test(parts[1])) {
+          sequence = (parseInt(parts[1], 10) + 1).toString().padStart(4, "0");
+        }
+      }
+
+      return `${partyCode}/${sequence}`;
+    } catch (error) {
+      console.error("Error generating order number:", error);
+      throw error;
+    }
+  };
+
+  const validateOrderInfo = (info: OrderInfo): boolean => {
+    const requiredFields: (keyof OrderInfo)[] = [
+      "partyCode",
+      "partyName",
+      "advanceMetal",
+      "advanceMetalPurity",
+      "priority",
+      "deliveryDate",
+      "createdBy",
+    ];
+    return requiredFields.every((field) => Boolean(info[field]));
+  };
+
+  const validateItem = (item: OrderItem): boolean => {
+    return Boolean(
+      item.category && item.weightRange && item.size && item.quantity
+    );
+  };
+
+  const handleSaveOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (!formData.partyLedger) {
+        throw new Error("Please select a valid Party Ledger");
+      }
+
+      const orderNo = await getNextOrderNumber(formData.partyLedger);
+      const newOrderInfo: OrderInfo = {
+        partyCode: formData.partyLedger,
+        partyName: formData.subname,
+        orderNo,
+        orderDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+        category: formData.product,
+        purity: formData.purity,
+        advanceMetal: formData.advanceMetal,
+        advanceMetalPurity: formData.advanceMetalPurity,
+        priority: formData.priority,
+        deliveryDate: formData.deliveryDate,
+        remark: formData.remark,
+        createdBy: formData.createdBy,
+        status: "Pending"
+      };
+
+      if (!validateOrderInfo(newOrderInfo)) {
+        throw new Error("Please fill in all required fields!");
+      }
+
+      setOrderInfo(newOrderInfo);
+      setIsOrderSaved(true);
+    } catch (error: any) {
+      alert(error.message);
+      console.error("Error saving order:", error);
+    }
+  };
+
+  const handleAddItem = () => {
+    if (!orderInfo) {
+      alert("Please save the order information first.");
+      return;
+    }
+    const newItem: OrderItem = {
+      category: formData.category || "",
+      weightRange: formData.wtRange || "",
+      size: formData.size || "",
+      quantity: formData.quantity || "",
+      remark: formData.itemRemark || "",
+    };
+
+    if (!validateItem(newItem)) {
+      alert("Please fill out all item fields (Category, Weight, Size, Quantity).");
+      return;
+    }
+
+    setOrderItems([...orderItems, newItem]);
+    // clear item fields
+    setFormData((prev) => ({
+      ...prev,
+      category: "",
+      wtRange: "",
+      size: "",
+      quantity: "",
+      itemRemark: "",
+    }));
+  };
+
+  const handleRemoveItem = (index: number) => {
+    const updated = [...orderItems];
+    updated.splice(index, 1);
+    setOrderItems(updated);
+  };
+
+  const handleSubmitOrder = async () => {
+    try {
+      if (!orderInfo || orderItems.length === 0) {
+        alert("Please complete the order info and items before submitting.");
+        return;
+      }
+
+      // Create form data to send both JSON and PDF
+      const formData = new FormData();
+      
+      // Add order data
+      formData.append('orderData', JSON.stringify({
+        orderInfo,
+        items: orderItems
+      }));
+
+      // Add PDF if it exists
+      if (orderInfo.pdfBlob) {
+        formData.append('pdfFile', orderInfo.pdfBlob, `Order_${orderInfo.orderNo}.pdf`);
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/orders`, {
+        method: "POST",
+        body: formData, // Send as FormData instead of JSON
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit order to server.");
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || "Order submission failed.");
+      }
+
+      // success
+      alert("Order submitted successfully!");
+      setOpen(false); // Close modal if using one
+    } catch (error: any) {
+      console.error("Error submitting order:", error.message);
+      alert(error.message);
+    }
+  };
+
+ 
+
+  const generatePDF = async () => {
+    if (!orderInfo || orderItems.length === 0) {
+      alert("Please complete the order info and items before generating PDF.");
+      return;
+    }
+  
+    try {
+      const pdfBlob = await createOrderPDF(orderInfo, orderItems);
+      const url = URL.createObjectURL(pdfBlob);
+      window.open(url, '_blank');
+      
+      setOrderInfo(prevInfo => prevInfo ? {
+        ...prevInfo,
+        pdfBlob
+      } : null);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Failed to generate PDF. Please try again.");
+    }
+  };
+  
+  async function createOrderPDF(orderInfo: OrderInfo, orderItems: OrderItem[]) {
+    // Calculate totals
+    let totalQuantity = 0;
+    let totalWeight = 0;
+    orderItems.forEach((item) => {
+      const quantity = parseInt(item.quantity) || 0;
+      totalQuantity += quantity;
+  
+      const weightRange = item.weightRange || "0";
+      let avgWeight = 0;
+      if (weightRange.includes("-")) {
+        const [min, max] = weightRange.split("-").map((w) => parseFloat(w) || 0);
+        avgWeight = (min + max) / 2;
+      } else {
+        avgWeight = parseFloat(weightRange) || 0;
+      }
+      totalWeight += avgWeight * quantity;
+    });
+  
+    // Initialize PDF document and fonts
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  
+    // Constants
+    const margin = 35;
+    const lineHeight = 20;
+    const cellPadding = 5;
+  
+    // Function to wrap text
+    function getWrappedTextAndHeight(text: string, maxWidth: number, fontSize: number) {
+      const words = text.split(" ");
+      const lines = [];
+      let currentLine = words[0];
+  
+      for (let i = 1; i < words.length; i++) {
+        const width = font.widthOfTextAtSize(currentLine + " " + words[i], fontSize);
+        if (width < maxWidth - cellPadding * 2) {
+          currentLine += " " + words[i];
+        } else {
+          lines.push(currentLine);
+          currentLine = words[i];
+        }
+      }
+      lines.push(currentLine);
+      return {
+        lines,
+        height: Math.max(lineHeight, lines.length * (fontSize + 2) + cellPadding * 2),
+      };
+    }
+  
+    // Function to draw wrapped text
+    function drawWrappedText(
+      text: string,
+      x: number,
+      y: number,
+      maxWidth: number, 
+      fontSize: number,
+      page: PDFPage,
+      isHeader = false,
+      isTotal = false
+    ) {
+      const { lines } = getWrappedTextAndHeight(text, maxWidth, fontSize);
+      let currentY = y - cellPadding;
+      lines.forEach((line) => {
+        page.drawText(line, {
+          x: x + cellPadding,
+          y: currentY - fontSize,
+          size: fontSize,
+          font: isHeader || isTotal ? boldFont : font,
+        });
+        currentY -= fontSize + 2;
+      });
+    }
+  
+    // Function to draw table cell
+    function drawTableCell(
+      x: number, 
+      y: number,
+      width: number,
+      height: number, 
+      text: string,
+      page: PDFPage,
+      isHeader = false,
+      isTotal = false
+    ) {
+      page.drawRectangle({
+        x,
+        y: y - height,
+        width,
+        height,
+        borderWidth: 1,
+        borderColor: rgb(0, 0, 0),
+        color: isHeader ? rgb(0.95, 0.95, 0.95) : isTotal ? rgb(0.9, 0.9, 1) : rgb(1, 1, 1),
+      });
+  
+      if (text) {
+        drawWrappedText(text, x, y, width, 10, page, isHeader, isTotal);
+      }
+    }
+  
+    // Function to draw watermark
+    function drawWatermark(page: PDFPage, logo?: PDFImage) {
+      const { width, height } = page.getSize();
+  
+      // Draw text watermark
+      const watermarkText = "Needha Gold";
+      const watermarkFontSize = 60;
+  
+      page.drawText(watermarkText, {
+        x: width / 2 - 150,
+        y: height / 2,
+        size: watermarkFontSize,
+        font: boldFont,
+        opacity: 0.07,
+        rotate: degrees(-45),
+      });
+  
+      // Draw logo watermark
+      if (logo) {
+        const watermarkWidth = width * 0.7;
+        const watermarkHeight = (watermarkWidth * logo.height) / logo.width;
+        page.drawImage(logo, {
+          x: (width - watermarkWidth) / 2,
+          y: (height - watermarkHeight) / 2,
+          width: watermarkWidth,
+          height: watermarkHeight,
+          opacity: 0.05,
+        });
+      }
+    }
+
+  
+    // Load and embed logo
+    const logoImageBytes = await fetch(COMPANY_LOGO.src).then((res) => res.arrayBuffer());
+    const logoImage = await pdfDoc.embedPng(logoImageBytes);
+  
+    // Create first page and add watermark
+    let page = pdfDoc.addPage([595.28, 841.89]); // A4 size
+    drawWatermark(page, logoImage);
+  
+    // Initial position and logo dimensions  
+    let y = 800;
+    const logoWidth = 60;
+    const logoHeight = (logoWidth * logoImage.height) / logoImage.width;
+  
+    // Draw header with logo
+    page.drawImage(logoImage, {
+      x: margin,
+      y: y - logoHeight + 16,
+      width: logoWidth,
+      height: logoHeight,
+    });
+  
+    page.drawText("Needha Gold Order Invoice", {
+      x: margin + logoWidth + 10,
+      y,
+      size: 16,
+      font: boldFont,
+    });
+  
+    y -= Math.max(logoHeight, 25);
+  
+    // Order details table
+    const detailsColumnWidths = [150, 350];
+    const orderDetailsTable = [
+      ["Order No:", orderInfo.orderNo || "0000"],
+      ["Customer:", orderInfo.partyName || "Unknown"],
+      ["Party Ledger:", orderInfo.partyCode || "N/A"],  
+      ["Product:", orderInfo.category || "N/A"],
+      ["Metal Purity:", orderInfo.purity || "N/A"],
+      ["Advance Metal:", orderInfo.advanceMetal || "N/A"],
+      ["Advance Metal Purity:", orderInfo.advanceMetalPurity || "N/A"],
+      ["Priority:", orderInfo.priority || "N/A"],
+      ["Delivery Date:", orderInfo.deliveryDate || "N/A"],
+      ["Created By:", orderInfo.createdBy || "N/A"],
+      ["Date:", new Date().toLocaleDateString()],
+    ];
+  
+    orderDetailsTable.forEach(([label, value]) => {
+      const height = Math.max(
+        getWrappedTextAndHeight(label, detailsColumnWidths[0], 10).height,
+        getWrappedTextAndHeight(value, detailsColumnWidths[1], 10).height
+      );
+      drawTableCell(margin, y, detailsColumnWidths[0], height, label, page, true);
+      drawTableCell(margin + detailsColumnWidths[0], y, detailsColumnWidths[1], height, value, page);
+      y -= height;
+    });
+  
+    y -= lineHeight * 2;
+  
+    // Order Items section  
+    page.drawText("Order Items", {
+      x: margin,
+      y,
+      size: 14,
+      font: boldFont,
+    });
+    y -= lineHeight * 1.5;
+  
+    // Table headers and columns
+    const headers = ["Design/Category", "Weight Range", "Size", "Quantity", "Total Weight", "Remarks"];
+    const columnWidths = [110, 90, 80, 60, 80, 100];
+      
+    // Draw headers
+    let currentX = margin;
+    headers.forEach((header, index) => {
+      drawTableCell(currentX, y, columnWidths[index], lineHeight, header, page, true);
+      currentX += columnWidths[index];
+    });
+    y -= lineHeight;
+  
+    // Draw items  
+    for (const item of orderItems) {
+      const quantity = parseInt(item.quantity) || 0;
+      const weightRange = item.weightRange || "0";
+      let itemTotalWeight = 0;
+        
+      if (weightRange.includes("-")) {
+        const [min, max] = weightRange.split("-").map((w) => parseFloat(w) || 0);
+        itemTotalWeight = ((min + max) / 2) * quantity;
+      } else {
+        itemTotalWeight = (parseFloat(weightRange) || 0) * quantity;
+      }
+        
+      const values = [
+        item.category || "N/A",
+        item.weightRange || "N/A", 
+        item.size || "N/A",
+        quantity.toString(),
+        itemTotalWeight.toFixed(2),
+        item.remark || "N/A",
+      ];
+        
+      const rowHeight = Math.max(
+        ...values.map((value, index) => getWrappedTextAndHeight(value, columnWidths[index], 10).height)  
+      );
+        
+      currentX = margin;  
+      values.forEach((value, index) => {
+        drawTableCell(currentX, y, columnWidths[index], rowHeight, value, page);
+        currentX += columnWidths[index];
+      });
+      y -= rowHeight;
+  
+      if (y < 100) {
+        y = 800;
+        page = pdfDoc.addPage([595.28, 841.89]);
+        drawWatermark(page, logoImage);
+      }
+    }
+  
+    // Draw totals row
+    currentX = margin;
+    const totalRow = ["TOTAL", "", "", totalQuantity.toString(), totalWeight.toFixed(2), ""];
+      
+    totalRow.forEach((value, index) => {
+      drawTableCell(currentX, y, columnWidths[index], lineHeight, value, page, false, true);
+      currentX += columnWidths[index]; 
+    });
+  
+    // Generate PDF bytes
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: "application/pdf" });
+  }
+  /* ---------------------- RENDER ---------------------- */
+  return (
+    <div className="container">
+      <h1 className="page-title">Create Order</h1>
+      
+      {/* Both forms wrapped in a single container */}
+      <div className="forms-container">
+        {/* First Form */}
+        <div className="form-card">
+          <h2>Order Information</h2>
+          <div className="two-column-form">
+            {/* Party Ledger */}
+            <div className="field-group">
+              <Label htmlFor="partyLedger">Party Ledger</Label>
+              <select
+                id="partyLedger"
+                className="select"
+                value={formData.partyLedger}
+                onChange={(e) =>
+                  handleInputChange("partyLedger", e.target.value)
+                }
+              >
+                <option value="">Select Ledger</option>
+                {partyLedgers.map((ledger) => (
+                  <option key={ledger} value={ledger}>
+                    {ledger}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Subname */}
+            <div className="field-group">
+              <Label htmlFor="subname">Party Sub Name</Label>
+              <Input
+                id="subname"
+                value={formData.subname}
+                onChange={(e) => handleInputChange("subname", e.target.value)}
+                placeholder="e.g., Surname or short name"
+              />
+            </div>
+
+            {/* Product */}
+            <div className="field-group">
+              <Label htmlFor="product">Product Name</Label>
+              <Input
+                id="product"
+                value={formData.product}
+                onChange={(e) => handleInputChange("product", e.target.value)}
+                placeholder="e.g., Necklace"
+              />
+            </div>
+
+            {/* Purity */}
+                <div className="field-group">
+    <Label htmlFor="purity">Purity</Label>
+    <select
+        id="purity"
+        value={formData.purity}
+        onChange={(value) => handleInputChange("purity", value.target.value)}
+    >
+        <option value= "">Select Purity</option>
+        <option value= "24K">24K</option>
+        <option value= "22K">22K</option>
+        <option value= "18K">18K</option>
+        <option value= "14K">14K</option>
+    </select>
+    </div>
+
+            {/* Advance Metal */}
+            <div className="field-group">
+              <Label htmlFor="advanceMetal">Advance Metal</Label>
+              <Input
+                id="advanceMetal"
+                value={formData.advanceMetal}
+                onChange={(e) => handleInputChange("advanceMetal", e.target.value)}
+                placeholder="e.g., Gold"
+              />
+            </div>
+
+            {/* Advance Metal Purity */}
+            <div className="field-group">
+              <Label htmlFor="advanceMetalPurity">Advance Metal Purity</Label>
+              <Input
+                id="advanceMetalPurity"
+                value={formData.advanceMetalPurity}
+                onChange={(e) =>
+                  handleInputChange("advanceMetalPurity", e.target.value)
+                }
+                placeholder="e.g., 18K"
+              />
+            </div>
+
+            {/* Priority */}
+            <div className="field-group">
+              <Label htmlFor="priority">Priority</Label>
+              <Input
+                id="priority"
+                value={formData.priority}
+                onChange={(e) => handleInputChange("priority", e.target.value)}
+                placeholder="e.g., High"
+              />
+            </div>
+
+            {/* Delivery Date */}
+            <div className="field-group">
+              <Label htmlFor="deliveryDate">Delivery Date</Label>
+              <Input
+                id="deliveryDate"
+                type="date"
+                value={formData.deliveryDate}
+                onChange={(e) =>
+                  handleInputChange("deliveryDate", e.target.value)
+                }
+              />
+            </div>
+
+            {/* Remark */}
+            <div className="field-group">
+              <Label htmlFor="remark">Remark</Label>
+              <textarea
+                id="remark"
+                rows={2}
+                onChange={(e) => handleInputChange("remark", e.target.value)}
+                value={formData.remark}
+                placeholder="Additional remarks"
+              />
+            </div>
+
+            {/* Created By */}
+            <div className="field-group">
+              <Label htmlFor="createdBy">Created By</Label>
+              <Input
+                id="createdBy"
+                value={formData.createdBy}
+                onChange={(e) => handleInputChange("createdBy", e.target.value)}
+                placeholder="Your Name"
+              />
+            </div>
+          </div>
+          <button className="save-button" onClick={handleSaveOrder}>Save Order</button>
+        </div>
+
+        {/* Second Form */}
+        <div className="form-card">
+          <h2>Add Item</h2>
+          <div className="one-column-form">
+            <div className="field-group">
+              <Label htmlFor="category">Category</Label>
+              <Input
+                id="category"
+                value={formData.category}
+                onChange={(e) =>
+                  handleInputChange("category", e.target.value)
+                }
+                placeholder="e.g., Pendant"
+                disabled={!isOrderSaved}
+              />
+            </div>
+
+            <div className="field-group">
+              <Label htmlFor="wtRange">Weight Range</Label>
+              <Input
+                id="wtRange"
+                value={formData.wtRange}
+                onChange={(e) => handleInputChange("wtRange", e.target.value)}
+                placeholder="e.g., 10-15g"
+                disabled={!isOrderSaved}
+              />
+            </div>
+
+            <div className="field-group">
+              <Label htmlFor="size">Size</Label>
+              <Input
+                id="size"
+                value={formData.size}
+                onChange={(e) => handleInputChange("size", e.target.value)}
+                placeholder="Size"
+                disabled={!isOrderSaved}
+              />
+            </div>
+
+            <div className="field-group">
+              <Label htmlFor="quantity">Quantity</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="1"
+                value={formData.quantity}
+                onChange={(e) => handleInputChange("quantity", e.target.value)}
+                placeholder="Quantity"
+                disabled={!isOrderSaved}
+              />
+            </div>
+
+            <div className="field-group">
+              <Label htmlFor="itemRemark">Item Remark</Label>
+              <Input
+                id="itemRemark"
+                value={formData.itemRemark}
+                onChange={(e) =>
+                  handleInputChange("itemRemark", e.target.value)
+                }
+                placeholder="Any special instructions"
+                disabled={!isOrderSaved}
+              />
+            </div>
+          </div>
+          <button className="add-item-button" onClick={handleAddItem}>Add Item</button>
+        </div>
+      </div>
+
+      {/* Tables Container */}
+      <div className="table-container">
+        {/* Order Info Table */}
+        {orderInfo && (
+          <Card className="card">
+            <CardHeader>
+              <CardTitle>Order Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <table>
+                <thead>
+                  <tr>
+                    <th rowSpan={2}>Party Code</th>
+                    <th rowSpan={2}>Party Name</th>
+                    <th rowSpan={2}>Order No</th>
+                    <th rowSpan={2}>Order Date</th>
+                    <th rowSpan={2}>Product</th>
+                    <th rowSpan={2}>Purity</th>
+                    <th colSpan={2}>Advance Metal Details</th>
+                    <th colSpan={3}>Order Details</th>
+                  </tr>
+                  <tr>
+                    <th>Metal</th>
+                    <th>Metal Purity</th>
+                    <th>Priority</th>
+                    <th>Delivery Date</th>
+                    <th>Created By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{orderInfo.partyCode}</td>
+                    <td>{orderInfo.partyName}</td>
+                    <td>{orderInfo.orderNo}</td>
+                    <td>{orderInfo.orderDate}</td>
+                    <td>{orderInfo.category}</td>
+                    <td>{orderInfo.purity}</td>
+                    <td>{orderInfo.advanceMetal}</td>
+                    <td>{orderInfo.advanceMetalPurity}</td>
+                    <td>{orderInfo.priority}</td>
+                    <td>{orderInfo.deliveryDate}</td>
+                    <td>{orderInfo.createdBy}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Order Items Table */}
+        {orderItems.length > 0 && (
+          <Card className="card">
+            <CardHeader>
+              <CardTitle>Order Items</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Weight Range</th>
+                    <th>Size</th>
+                    <th>Quantity</th>
+                    <th>Remarks</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orderItems.map((item, index) => (
+                    <tr key={index}>
+                      <td>{item.category}</td>
+                      <td>{item.weightRange}</td>
+                      <td>{item.size}</td>
+                      <td>{item.quantity}</td>
+                      <td>{item.remark}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="remove-item-button"
+                          onClick={() => handleRemoveItem(index)}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td
+                      colSpan={3}
+                      style={{ fontWeight: "bold", textAlign: "right" }}
+                    >
+                      Total:
+                    </td>
+                    <td style={{ fontWeight: "bold" }}>
+                      {orderItems.reduce(
+                        (sum, item) => sum + parseInt(item.quantity || "0", 10),
+                        0
+                      )}
+                    </td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Buttons */}
+      <div className="button-group">
+        <button
+          type="button"
+          onClick={handleSubmitOrder}
+          disabled={!isOrderSaved || orderItems.length === 0}
+        >
+          Submit Order
+        </button>
+        <button
+          type="button"
+          onClick={generatePDF}
+          disabled={!isOrderSaved || orderItems.length === 0}
+        >
+          Generate PDF
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default OrderFormModal;

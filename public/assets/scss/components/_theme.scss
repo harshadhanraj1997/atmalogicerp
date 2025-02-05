@@ -1,0 +1,153 @@
+
+	:root {
+	  --primary: #7A4EBD;
+	  --secondary: #1C66DD;
+	  --success: #28C76F;
+	  --info: #00CFE8;
+	  --warning: #FF9F43;
+	  --danger: #EA5455;
+	  --light: #F6F6F6;
+	  --dark: #4B4B4B;
+	}
+	
+	html {
+	  @apply antialiased;
+	}
+  
+  
+
+	body {
+	  @apply text-sm leading-normal font-normal text-gray-700 dark:text-gray-300;
+	  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+	}
+  
+	h1, .h1 {
+	  @apply text-2xl font-semibold text-gray-900 dark:text-white mb-2;
+	}
+  
+	h2, .h2 {
+	  @apply text-xl font-semibold text-gray-900 dark:text-white mb-2;
+	}
+  
+	h3, .h3 {
+	  @apply text-lg font-semibold text-gray-900 dark:text-white mb-2;
+	}
+  
+	h4, .h4 {
+	  @apply text-base font-semibold text-gray-900 dark:text-white mb-2;
+	}
+  
+	h5, .h5 {
+	  @apply text-sm font-semibold text-gray-900 dark:text-white mb-1;
+	}
+  
+	h6, .h6 {
+	  @apply text-xs font-semibold text-gray-900 dark:text-white mb-1;
+	}
+  
+	p {
+	  @apply mb-4 text-gray-600 dark:text-gray-400;
+	}
+  
+	a {
+	  @apply text-primary hover:text-primary-dark transition-colors duration-200;
+	}
+  
+	// Layout containers
+	.container-fluid {
+	  @apply w-full px-4;
+	}
+  
+	.main-container {
+	  @apply min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200;
+	}
+  
+	// Card styles
+	.card {
+	  @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm;
+	}
+  
+	.card-header {
+	  @apply px-6 py-4 border-b border-gray-200 dark:border-gray-700;
+	}
+  
+	.card-body {
+	  @apply p-6;
+	}
+  
+	.card-footer {
+	  @apply px-6 py-4 border-t border-gray-200 dark:border-gray-700;
+	}
+  
+	// Form elements
+	.form-control {
+	  @apply block w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md;
+	  @apply focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none;
+	  @apply dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300;
+	}
+  
+	.form-label {
+	  @apply block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300;
+	}
+  
+	// Button styles
+	.btn {
+	  @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md;
+	  @apply transition-colors duration-200;
+	  @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+	}
+  
+	.btn-primary {
+	  @apply bg-primary text-white hover:bg-primary/90 focus:ring-primary/50;
+	}
+  
+	.btn-secondary {
+	  @apply bg-secondary text-white hover:bg-secondary/90 focus:ring-secondary/50;
+	}
+  
+	.btn-success {
+	  @apply bg-success text-white hover:bg-success/90 focus:ring-success/50;
+	}
+  
+	.btn-danger {
+	  @apply bg-danger text-white hover:bg-danger/90 focus:ring-danger/50;
+	}
+  
+	.btn-warning {
+	  @apply bg-warning text-white hover:bg-warning/90 focus:ring-warning/50;
+	}
+  
+	.btn-info {
+	  @apply bg-info text-white hover:bg-info/90 focus:ring-info/50;
+	}
+  
+	// Table styles
+	.table {
+	  @apply min-w-full divide-y divide-gray-200 dark:divide-gray-700;
+	}
+  
+	.table th {
+	  @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+	  @apply dark:text-gray-400;
+	}
+  
+	.table td {
+	  @apply px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400;
+	}
+  
+	// Utility classes
+	.scrollbar-hide {
+	  -ms-overflow-style: none;
+	  scrollbar-width: none;
+	  &::-webkit-scrollbar {
+		display: none;
+	  }
+	}
+  
+  
+  // Dark mode overrides can be added here if needed
+
+	.dark {
+	  color-scheme: dark;
+	}
+  
