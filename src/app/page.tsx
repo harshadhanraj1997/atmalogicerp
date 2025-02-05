@@ -9,9 +9,8 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-
   // API base URL (Uses `.env.local` for flexibility)
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/['"]+/g, "") || "http://localhost:5000";
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
