@@ -27,6 +27,23 @@ import TableControls from "@/components/elements/SharedInputs/TableControls";
 import DeleteModal from "@/components/common/DeleteModal";
 import { PDFDocument } from 'pdf-lib';
 
+const downloadAndPrint = async (pdfUrl: string) => {
+  try {
+    const response = await fetch(pdfUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    
+    // Open in a new tab for preview
+    window.open(url, "_blank");
+  } catch (error) {
+    console.error("Error downloading or previewing file:", error);
+    alert("Failed to open PDF.");
+  }
+};
+
 const DealsTable = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
@@ -205,26 +222,7 @@ console.log("Deals State:", deals);
                                       borderRadius: '4px',
                                       padding: '5px',
                                     }}
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      try {
-                                        const response = await fetch(deal.clientSheetPdf || '');
-                                        const arrayBuffer = await response.arrayBuffer();
-                                        console.log("PDF Data:", arrayBuffer); // Log to check data
-
-                                        const pdfDoc = await PDFDocument.load(arrayBuffer);
-                                        
-                                        // You can manipulate the PDF here if needed
-
-                                        const pdfBytes = await pdfDoc.save();
-                                        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                                        const url = URL.createObjectURL(blob);
-                                        window.open(url, "_blank");
-                                      } catch (error) {
-                                        console.error("Error processing PDF:", error);
-                                        alert("Failed to open PDF.");
-                                      }
-                                    }}
+                                    onClick={() => downloadAndPrint(deal.clientSheetPdf)}
                                   >
                                     <i className="fa-solid fa-print"></i>
                                   </button>

@@ -5,36 +5,42 @@ export const fetchDealData = async (): Promise<IDeal[]> => {
   console.log('fetchDealData: Starting API call...'); // Debug log 1
   
   try {
-    console.log('Attempting to fetch from:', 'https://needha-erp-server.onrender.com/api/orders'); // Debug log 2
+    console.log('Attempting to fetch from:', '/api/orders'); // Debug log 2
     
     const response = await fetch('https://needha-erp-server.onrender.com/api/orders');
-    console.log('API Response status:', response.status); // Debug log 3
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    const result = await response.json();
+    console.log('API Response:', result.data); // Debug log 3
+
+    if (response.ok && result.success) {
+      if (Array.isArray(result.data)) {
+        console.log('Raw API response data:', result.data); // Debug log 4
+        
+        // Transform the API response to match IDeal interface
+        console.log('Starting data transformation...'); // Debug log 5
+        const transformedData: IDeal[] = result.data.map((order: any) => {
+          const transformed = {
+            id: order.id,
+            dealName: order.partyName,
+            AdvanceMetal: order.advanceMetal || 0,
+            tags: "Order",
+            expectedEndDate: order.deliveryDate,
+            status: order.status || 'Open',
+            clientSheetPdf: order.pdfUrl || null,
+          };
+          console.log('Transformed order:', transformed); // Debug log 6
+          return transformed;
+        });
+
+        console.log('Final transformed data:', transformedData); // Debug log 7
+        return transformedData;
+      } else {
+        console.error("Data is not an array:", result.data);
+        return [];
+      }
+    } else {
+      console.error("Failed to fetch orders:", result.error);
+      return [];
     }
-
-    const data = await response.json();
-    console.log('Raw API response data:', data); // Debug log 4
-    
-    // Transform the API response to match IDeal interface
-    console.log('Starting data transformation...'); // Debug log 5
-    const transformedData: IDeal[] = data.map((order: any) => {
-      const transformed = {
-        id: order.id,
-        dealName: order.partyName,
-        AdvanceMetal: order.advanceMetal || 0,
-        tags: "Order",
-        expectedEndDate: order.deliveryDate,
-        status: order.status || 'Open',
-        clientSheetPdf: order.clientSheetPdf || null,
-      };
-      console.log('Transformed order:', transformed); // Debug log 6
-      return transformed;
-    });
-
-    console.log('Final transformed data:', transformedData); // Debug log 7
-    return transformedData;
     
   } catch (error) {
     console.error('Error in fetchDealData:', error); // Debug log 8
