@@ -10,6 +10,8 @@ const config = {
   eslint: {
     ignoreDuringBuilds: true, // ✅ Skip ESLint during build
   },
+
+  missingSuspenseWithCSRBailout: false,
 };
 
 export default config;
