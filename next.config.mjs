@@ -11,7 +11,9 @@ const config = {
     ignoreDuringBuilds: true, // ✅ Skip ESLint during build
   },
 
-  missingSuspenseWithCSRBailout: false,
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
+  },
 };
 
 export default config;
