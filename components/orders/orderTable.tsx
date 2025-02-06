@@ -15,6 +15,8 @@ import { visuallyHidden } from "@mui/utils";
 import useMaterialTableHook from "@/hooks/useMaterialTableHook";
 import { IDeal } from "@/interface/table.interface";
 import { dealHeadCells } from "@/data/table-head-cell/table-head";
+import * as pdfjs from "pdfjs-dist";
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 import {
   useTablePhaseHook,
   useTableStatusHook,
@@ -26,21 +28,59 @@ import { fetchDealData } from "@/data/crm/deal-data";
 import TableControls from "@/components/elements/SharedInputs/TableControls";
 import DeleteModal from "@/components/common/DeleteModal";
 import { PDFDocument } from 'pdf-lib';
+import Link from 'next/link';
 
-const downloadAndPrint = async (pdfUrl: string) => {
+const downloadPDF = async (pdfUrl: string) => {
   try {
-    const response = await fetch(pdfUrl);
+    const response = await fetch(pdfUrl, {
+      headers: {
+        "Authorization": `Bearer ${process.env.SALESFORCE_ACCESS_TOKEN}`, // Ensure you have a valid token if needed
+      },
+    });
+
     if (!response.ok) {
       throw new Error(`Failed to fetch PDF: ${response.statusText}`);
     }
+
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
-    
-    // Open in a new tab for preview
+
+    // Create a link element
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'downloaded-file.pdf'; // You can set a default file name here
+    document.body.appendChild(link);
+    link.click();
+
+    // Clean up
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Error downloading file:", error);
+    alert("Failed to download PDF.");
+  }
+};
+
+const previewPDF = async (pdfUrl: string) => {
+  try {
+    const response = await fetch(pdfUrl, {
+      headers: {
+        "Authorization": `Bearer ${process.env.SALESFORCE_ACCESS_TOKEN}`, // Ensure you have a valid token if needed
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+
+    // Open the PDF in a new tab for preview
     window.open(url, "_blank");
   } catch (error) {
-    console.error("Error downloading or previewing file:", error);
-    alert("Failed to open PDF.");
+    console.error("Error previewing file:", error);
+    alert("Failed to preview PDF.");
   }
 };
 
@@ -99,6 +139,34 @@ console.log("Deals State:", deals);
       alert("No PDF available to print.");
     }
   };
+  const handlePdfClick = (pdfUrl: string) => {
+    if (!pdfUrl) {
+      alert("No PDF available to print.");
+      return;
+    }
+
+    // Create an HTML page with an embedded PDF
+    const html = `
+      <html>
+        <head>
+          <title>PDF Preview</title>
+        </head>
+        <body style="margin:0">
+          <iframe src="${pdfUrl}" style="border:none; width:100%; height:100vh;"></iframe>
+        </body>
+      </html>
+    `;
+
+    // Open the HTML page in a new tab
+    const newWindow = window.open();
+    if (newWindow) {
+      newWindow.document.write(html);
+      newWindow.document.close();
+    }
+  };
+
+  
+  
 
   const startIndex = page * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
@@ -194,6 +262,12 @@ console.log("Deals State:", deals);
                                   <button
                                     type="button"
                                     className="table__icon download"
+                                    style={{
+                                      backgroundColor: 'green',
+                                      color: 'white',
+                                      borderRadius: '4px',
+                                      padding: '5px',
+                                    }}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setEditData(deal);
@@ -202,17 +276,40 @@ console.log("Deals State:", deals);
                                   >
                                     <i className="fa-regular fa-eye"></i>
                                   </button>
-                                  <button
-                                    type="button"
-                                    className="table__icon edit"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditData(deal);
-                                      setModalOpen(true);
+                                  <Link href={`/Orders/add-models?orderId=${deal.id}`} passHref>
+                                    <button
+                                      type="button"
+                                      className="table__icon edit"
+                                      style={{
+                                        display: 'inline-block',
+                                        backgroundColor: 'green',
+                                        color: 'white',
+                                        borderRadius: '4px',
+                                        padding: '5px',
+                                        textDecoration: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <i className="fa-sharp fa-light fa-pen"></i>
+                                    </button>
+                                  </Link>
+                                  <a
+                                    href={deal.clientSheetPdf}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="table__icon link"
+                                    style={{
+                                      backgroundColor: 'green',
+                                      color: 'white',
+                                      borderRadius: '4px',
+                                      padding: '5px',
+                                      textDecoration: 'none',
                                     }}
                                   >
-                                    <i className="fa-sharp fa-light fa-pen"></i>
-                                  </button>
+                                    <i className="fa-solid fa-file-pdf"></i>
+                                  </a>
                                   <button
                                     type="button"
                                     className="table__icon print"
@@ -222,7 +319,10 @@ console.log("Deals State:", deals);
                                       borderRadius: '4px',
                                       padding: '5px',
                                     }}
-                                    onClick={() => downloadAndPrint(deal.clientSheetPdf)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handlePdfClick(deal.clientSheetPdf);
+                                    }}
                                   >
                                     <i className="fa-solid fa-print"></i>
                                   </button>
@@ -298,6 +398,6 @@ console.log("Deals State:", deals);
       )}
     </>
   );
-};
+}
 
-export default DealsTable;
+export default DealsTable
