@@ -172,17 +172,24 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
 
   const handleSaveOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('=== Save Order Started ===');
+    console.log('Form Data:', formData);
+    
     try {
       if (!formData.partyLedger) {
+        console.log('Error: Missing Party Ledger');
         throw new Error("Please select a valid Party Ledger");
       }
 
+      console.log('Getting next order number for:', formData.partyLedger);
       const orderNo = await getNextOrderNumber(formData.partyLedger);
+      console.log('Generated Order Number:', orderNo);
+
       const newOrderInfo: OrderInfo = {
         partyCode: formData.partyLedger,
         partyName: formData.subname,
         orderNo,
-        orderDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+        orderDate: new Date().toISOString().split('T')[0],
         category: formData.product,
         purity: formData.purity,
         advanceMetal: formData.advanceMetal,
@@ -194,23 +201,50 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
         status: "Pending"
       };
 
+      console.log('New Order Info:', newOrderInfo);
+      console.log('Validating Order Info...');
+      
       if (!validateOrderInfo(newOrderInfo)) {
+        console.log('Validation Failed. Required fields:', {
+          partyCode: newOrderInfo.partyCode,
+          partyName: newOrderInfo.partyName,
+          advanceMetal: newOrderInfo.advanceMetal,
+          advanceMetalPurity: newOrderInfo.advanceMetalPurity,
+          priority: newOrderInfo.priority,
+          deliveryDate: newOrderInfo.deliveryDate,
+          createdBy: newOrderInfo.createdBy,
+        });
         throw new Error("Please fill in all required fields!");
       }
 
+      console.log('Validation Passed');
       setOrderInfo(newOrderInfo);
       setIsOrderSaved(true);
+      console.log('=== Save Order Completed Successfully ===');
     } catch (error: any) {
+      console.error('Save Order Error:', {
+        message: error.message,
+        stack: error.stack
+      });
       alert(error.message);
-      console.error("Error saving order:", error);
     }
   };
 
   const handleAddItem = () => {
+    console.log('Adding new item:', {
+      category: formData.category,
+      weightRange: formData.wtRange,
+      size: formData.size,
+      quantity: formData.quantity,
+      remark: formData.itemRemark
+    });
+    
     if (!orderInfo) {
+      console.log('Error: No order info saved yet');
       alert("Please save the order information first.");
       return;
     }
+
     const newItem: OrderItem = {
       category: formData.category || "",
       weightRange: formData.wtRange || "",
@@ -219,13 +253,19 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
       remark: formData.itemRemark || "",
     };
 
+    console.log('Validating new item...');
     if (!validateItem(newItem)) {
+      console.log('Item validation failed:', newItem);
       alert("Please fill out all item fields (Category, Weight, Size, Quantity).");
       return;
     }
 
+    console.log('Adding item to order items list');
     setOrderItems([...orderItems, newItem]);
+    console.log('Current items count:', orderItems.length + 1);
+
     // clear item fields
+    console.log('Clearing item form fields');
     setFormData((prev) => ({
       ...prev,
       category: "",
@@ -243,45 +283,63 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
   };
 
   const handleSubmitOrder = async () => {
+    console.log('=== Submit Order Started ===');
     try {
       if (!orderInfo || orderItems.length === 0) {
+        console.log('Validation Failed:', {
+          hasOrderInfo: !!orderInfo,
+          itemsCount: orderItems.length
+        });
         alert("Please complete the order info and items before submitting.");
         return;
       }
 
-      // Create form data to send both JSON and PDF
+      console.log('Preparing form data with:', {
+        orderInfo,
+        itemsCount: orderItems.length
+      });
+
       const formData = new FormData();
-      
-      // Add order data
-      formData.append('orderData', JSON.stringify({
+      const orderData = {
         orderInfo,
         items: orderItems
-      }));
+      };
+      
+      console.log('Order Data being sent:', orderData);
+      formData.append('orderData', JSON.stringify(orderData));
 
-      // Add PDF if it exists
       if (orderInfo.pdfBlob) {
+        console.log('Adding PDF to form data');
         formData.append('pdfFile', orderInfo.pdfBlob, `Order_${orderInfo.orderNo}.pdf`);
       }
 
+      console.log('Making API call to:', `${apiBaseUrl}/api/orders`);
       const response = await fetch(`${apiBaseUrl}/api/orders`, {
         method: "POST",
-        body: formData, // Send as FormData instead of JSON
+        body: formData,
       });
 
+      console.log('Raw response:', response);
       if (!response.ok) {
         throw new Error("Failed to submit order to server.");
       }
 
       const data = await response.json();
+      console.log('Parsed response:', data);
+
       if (!data.success) {
         throw new Error(data.error || "Order submission failed.");
       }
 
-      // success
+      console.log('=== Submit Order Completed Successfully ===');
       alert("Order submitted successfully!");
-      setOpen(false); // Close modal if using one
+      setOpen(false);
     } catch (error: any) {
-      console.error("Error submitting order:", error.message);
+      console.error('Submit Order Error:', {
+        message: error.message,
+        stack: error.stack,
+        type: error.type
+      });
       alert(error.message);
     }
   };
