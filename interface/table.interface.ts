@@ -144,8 +144,12 @@ export interface IDeal {
   expectedEndDate: string;
   status: string | null;
   clientSheetPdf?: string | null; // Optional, as it can be null
+  orderId?: string | null; // Optional, as it can be null
+  open?: boolean;
+  setOpen?: (open: boolean) => void;
 }
 // Define an interface for the deal statistic
+
 export interface IDealStatistic {
   id: number;
   salesRep: string;

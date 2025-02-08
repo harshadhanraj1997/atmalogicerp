@@ -9,6 +9,8 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { useSearchParams } from 'next/navigation';
 import "../add-order/add-order.css";
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+
 
 const AddModel = () => {
  const apiBaseUrl = "https://needha-erp-server.onrender.com";
@@ -28,8 +30,6 @@ const AddModel = () => {
    stoneWeight: '',
    netWeight: '',
    remarks: '',
-   batchNo: '',
-   treeNo: '',
    createdDate: new Date().toISOString().split('T')[0]
  });
 
@@ -38,6 +38,8 @@ const AddModel = () => {
  const [modelImage, setModelImage] = useState(null);
  const [models, setModels] = useState([]);
  const [orderDetails, setOrderDetails] = useState(null);
+ const [isLoading, setIsLoading] = useState(false);
+ const [modelStatus, setModelStatus] = useState('First');
 
  useEffect(() => {
    fetchCategories();
@@ -209,8 +211,6 @@ const handleAdd = () => {
     stoneWeight: '',
     netWeight: '',
     remarks: '',
-    batchNo: '',
-    treeNo: ''
   }));
   setModelImage(null);
 };
@@ -218,21 +218,110 @@ const handleAdd = () => {
  const handleFinalSubmit = async (e) => {
    e.preventDefault();
    try {
-     const response = await fetch(`${apiBaseUrl}/api/update-model`, {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({
-         orderId: orderId,
-         models: models
-       })
-     });
-
-     if (response.ok) {
-       alert('Models saved successfully');
-       setModels([]);
+     if (!orderId || models.length === 0) {
+       alert('Please add at least one model');
+       return;
      }
+
+     // Generate PDFs with proper instances
+     const detailedPdfDoc = await PDFDocument.create();
+     const imagesPdfDoc = await PDFDocument.create();
+
+     await generatePDF(detailedPdfDoc);
+     await generateImagesOnlyPDF(imagesPdfDoc);
+
+     // Convert PDFs to base64
+     const detailedPdfBytes = await detailedPdfDoc.save();
+     const imagesPdfBytes = await imagesPdfDoc.save();
+
+     // Convert to base64 without data URL prefix
+     const detailedPdf = Buffer.from(detailedPdfBytes).toString('base64');
+     const imagesPdf = Buffer.from(imagesPdfBytes).toString('base64');
+
+     // Format models data according to Salesforce fields
+     const formattedModels = models.map(model => ({
+       category: model.category,
+       item: model.item,
+       purity: model.purity,
+       size: model.size,
+       color: model.color,
+       quantity: model.quantity,
+       grossWeight: model.grossWeight,
+       stoneWeight: model.stoneWeight,
+       netWeight: model.netWeight,
+       remarks: model.remarks,
+       modelImage: model.modelImage,
+       modelStatus: modelStatus
+     }));
+
+     // Prepare data for API
+     const orderData = {
+       orderId: orderId,
+       models: formattedModels,
+       detailedPdf: detailedPdf,
+       imagesPdf: imagesPdf
+     };
+
+     // Show loading state
+     setIsLoading(true);
+
+     try {
+       // Log the form data before sending
+       console.log('Sending to server:', {
+         orderData,
+         modelStatus,
+         // Log other relevant data you're sending
+       });
+
+       // Make API call
+       const response = await fetch(`${apiBaseUrl}/api/update-model`, {
+         method: 'POST',
+         headers: { 
+           'Content-Type': 'application/json'
+         },
+         body: JSON.stringify(orderData)
+       });
+
+       const result = await response.json();
+
+       if (result.success) {
+         // Show success message
+         toast({
+           title: "Success",
+           description: "Models and PDFs saved successfully",
+           status: "success"
+         });
+
+         // Preview PDFs
+         const detailedPdfBlob = new Blob([detailedPdfBytes], { type: 'application/pdf' });
+         const imagesPdfBlob = new Blob([imagesPdfBytes], { type: 'application/pdf' });
+         window.open(URL.createObjectURL(detailedPdfBlob), '_blank');
+         window.open(URL.createObjectURL(imagesPdfBlob), '_blank');
+
+         // Clear form and redirect
+         setModels([]);
+         router.push('/Orders');
+       } else {
+         throw new Error(result.message || 'Failed to save models and PDFs');
+       }
+     } catch (error) {
+       console.error("API Error:", error);
+       toast({
+         title: "Error",
+         description: error.message || "Failed to save models and PDFs",
+         status: "error"
+       });
+     }
+
    } catch (error) {
-     console.error("Error saving models:", error);
+     console.error("Error in form submission:", error);
+     toast({
+       title: "Error",
+       description: "Error preparing data for submission",
+       status: "error"
+     });
+   } finally {
+     setIsLoading(false);
    }
  };
 
@@ -270,9 +359,7 @@ const columnWidths = {
   quantity: 0.05,    
   grossWeight: 0.07, 
   stoneWeight: 0.07, 
-  netWeight: 0.07,   
-  batchNo: 0.06,     
-  treeNo: 0.06,      
+  netWeight: 0.07,         
   remarks: 0.08,     
   image: 0.20        // Reduced to match example
 };
@@ -281,14 +368,13 @@ const columnWidths = {
 const rowHeight = 120;
 
 // Update the generatePDF function to include order details
-const generatePDF = async () => {
+const generatePDF = async (pdfDoc) => {
   try {
     if (!orderDetails) {
       console.log("No order details available");
-      return;
+      return pdfDoc;
     }
 
-    const pdfDoc = await PDFDocument.create();
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
@@ -397,9 +483,6 @@ const generatePDF = async () => {
       { display: 'Gross Weight', key: 'grossWeight', width: 0.07 },
       { display: 'Stone Weight', key: 'stoneWeight', width: 0.07 },
       { display: 'Net Weight', key: 'netWeight', width: 0.07 },
-      { display: 'Batch No', key: 'batchNo', width: 0.07 },
-      { display: 'Tree No', key: 'treeNo', width: 0.07 },
-      { display: 'Remarks', key: 'remarks', width: 0.08 },
       { display: 'Image', key: 'image', width: 0.20 }
     ];
 
@@ -453,8 +536,6 @@ const generatePDF = async () => {
         model.grossWeight || '',
         model.stoneWeight || '',
         model.netWeight || '',
-        model.batchNo || '',
-        model.treeNo || '',
         model.remarks || ''
       ];
 
@@ -598,24 +679,20 @@ const generatePDF = async () => {
       });
     }
 
-    const pdfBytes = await pdfDoc.save();
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+    return pdfDoc;
   } catch (error) {
     console.error('Error generating PDF:', error);
-    alert('Error generating PDF');
+    return PDFDocument;
   }
 };
 
-const generateImagesOnlyPDF = async () => {
+const generateImagesOnlyPDF = async (pdfDoc) => {
   try {
     if (models.length === 0) {
       alert('No models available');
-      return;
+      return pdfDoc;
     }
 
-    const pdfDoc = await PDFDocument.create();
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
@@ -717,15 +794,18 @@ const generateImagesOnlyPDF = async () => {
       });
     }
 
-    const pdfBytes = await pdfDoc.save();
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+    return pdfDoc;
   } catch (error) {
     console.error('Error generating images PDF:', error);
-    alert('Error generating images PDF');
+    return pdfDoc;
   }
 };
+
+// Add a function to handle row removal
+const handleRemoveRow = (index: number) => {
+  setModels(prevModels => prevModels.filter((_, i) => i !== index));
+};
+
  return (
    <div className="container mx-auto p-4">
      <Card className="mb-8">
@@ -848,27 +928,11 @@ const generateImagesOnlyPDF = async () => {
              />
            </div>
 
-           <div>
-             <Label htmlFor="batchNo">Batch No</Label>
-             <Input
-               id="batchNo"
-               value={formData.batchNo}
-               onChange={(e) => handleInputChange('batchNo', e.target.value)}
-               placeholder="Batch No"
-             />
-           </div>
+           
 
-           <div>
-             <Label htmlFor="treeNo">Tree No</Label>
-             <Input
-               id="treeNo"
-               value={formData.treeNo}
-               onChange={(e) => handleInputChange('treeNo', e.target.value)}
-               placeholder="Tree No"
-             />
-           </div>
+           
 
-           <div>
+            <div>
              <Label htmlFor="remarks">Remarks</Label>
              <Input
                id="remarks"
@@ -898,20 +962,90 @@ const generateImagesOnlyPDF = async () => {
              )}
            </div>
 
+           <div className="form-group" style={{ marginBottom: '20px' }}>
+             <label 
+               htmlFor="modelStatus" 
+               style={{ 
+                 display: 'block', 
+                 marginBottom: '8px',
+                 fontWeight: '500'
+               }}
+             >
+               Model Status:
+             </label>
+             <select
+               id="modelStatus"
+               value={modelStatus}
+               onChange={(e) => setModelStatus(e.target.value)}
+               style={{
+                 width: '100%',
+                 padding: '8px',
+                 borderRadius: '4px',
+                 border: '1px solid #ddd',
+                 fontSize: '14px'
+               }}
+               className="form-control"
+             >
+               <option value="First">First</option>
+               <option value="Canceled">Canceled</option>
+             </select>
+           </div>
+
            <div className="col-span-2 flex gap-4">
-             <Button type="button" onClick={handleAdd} className="flex-1">
+             <Button 
+               type="button"
+               onClick={handleAdd}
+               className="bg-blue-500 hover:bg-blue-600"
+             >
                Add Model
              </Button>
-             <Button type="submit" onClick={handleFinalSubmit} className="flex-1" disabled={models.length === 0}>
-               Submit All Models
+             
+             <Button 
+               type="button"
+               onClick={async () => {
+                 try {
+                   const doc = await PDFDocument.create();
+                   await generatePDF(doc);
+                   const pdfBytes = await doc.save();
+                   const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                   window.open(URL.createObjectURL(blob), '_blank');
+                 } catch (error) {
+                   console.error('Error generating PDF:', error);
+                   alert('Error generating PDF');
+                 }
+               }}
+               className="bg-blue-500 hover:bg-blue-600"
+             >
+               Preview Detailed PDF
              </Button>
-             <Button type="button" onClick={generatePDF} className="flex-1">
-               Generate PDF
-             </Button>
-             <Button type="button" onClick={generateImagesOnlyPDF} className="flex-1">
-    Generate Images PDF
-  </Button>
 
+             <Button 
+               type="button"
+               onClick={async () => {
+                 try {
+                   const doc = await PDFDocument.create();
+                   await generateImagesOnlyPDF(doc);
+                   const pdfBytes = await doc.save();
+                   const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                   window.open(URL.createObjectURL(blob), '_blank');
+                 } catch (error) {
+                   console.error('Error generating images PDF:', error);
+                   alert('Error generating images PDF');
+                 }
+               }}
+               className="bg-blue-500 hover:bg-blue-600"
+             >
+               Preview Images PDF
+             </Button>
+
+             <Button 
+               type="button"
+               onClick={handleFinalSubmit}
+               className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+               disabled={isLoading}
+             >
+               {isLoading ? "Saving..." : "Save Order"}
+             </Button>
            </div>
          </form>
        </CardContent>
@@ -935,10 +1069,9 @@ const generateImagesOnlyPDF = async () => {
                  <th className="p-2 border">Gross Weight</th>
                  <th className="p-2 border">Stone Weight</th>
                  <th className="p-2 border">Net Weight</th>
-                 <th className="p-2 border">Batch No</th>
-                 <th className="p-2 border">Tree No</th>
                  <th className="p-2 border">Remarks</th>
                  <th className="p-2 border">Image</th>
+                 <th className="p-2 border">Action</th>
                </tr>
              </thead>
              <tbody>
@@ -953,8 +1086,6 @@ const generateImagesOnlyPDF = async () => {
                    <td className="p-2 border">{model.grossWeight}</td>
                    <td className="p-2 border">{model.stoneWeight}</td>
                    <td className="p-2 border">{model.netWeight}</td>
-                   <td className="p-2 border">{model.batchNo}</td>
-                   <td className="p-2 border">{model.treeNo}</td>
                    <td className="p-2 border">{model.remarks}</td>
                    <td className="p-2 border">
                      {model.modelImage && (
@@ -964,6 +1095,16 @@ const generateImagesOnlyPDF = async () => {
                          className="w-64 h-64 object-contain hover:w-64 hover:h-64 transition-all duration-300"
                        />
                      )}
+                   </td>
+                   <td className="p-2 border">
+                     <Button
+                       onClick={() => handleRemoveRow(index)}
+                       className="bg-red-500 hover:bg-red-600 p-1 text-sm"
+                       variant="destructive"
+                       size="sm"
+                     >
+                       Remove
+                     </Button>
                    </td>
                  </tr>
                ))}

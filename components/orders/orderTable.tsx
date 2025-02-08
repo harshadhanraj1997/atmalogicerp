@@ -29,7 +29,9 @@ import TableControls from "@/components/elements/SharedInputs/TableControls";
 import DeleteModal from "@/components/common/DeleteModal";
 import { PDFDocument } from 'pdf-lib';
 import Link from 'next/link';
+import { toast } from 'react-hot-toast';
 
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 const downloadPDF = async (pdfUrl: string) => {
   try {
     const response = await fetch(pdfUrl, {
@@ -84,6 +86,17 @@ const previewPDF = async (pdfUrl: string) => {
   }
 };
 
+const getStatusClass = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case 'pending':
+      return 'bg-warning'; // yellow background
+    case 'finished':
+      return 'bg-success'; // green background
+    default:
+      return 'bg-secondary'; // default gray background
+  }
+};
+
 const DealsTable = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
@@ -95,6 +108,9 @@ const DealsTable = () => {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [showConfirmation, setShowConfirmation] = useState<number | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     const loadDeals = async () => {
@@ -165,8 +181,35 @@ console.log("Deals State:", deals);
     }
   };
 
-  
-  
+  const handleApproveOrder = async (orderId: string) => {
+    try {
+      setIsUpdating(true);
+      const response = await fetch(`${apiBaseUrl}/api/update-order-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orderId }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success('Order approved successfully');
+        if (onUpdate) {
+          onUpdate();
+        }
+      } else {
+        toast.error(result.message || 'Failed to approve order');
+      }
+    } catch (error) {
+      console.error('Error approving order:', error);
+      toast.error('Failed to approve order');
+    } finally {
+      setIsUpdating(false);
+      setShowConfirmation(null);
+    }
+  };
 
   const startIndex = page * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
@@ -248,8 +291,16 @@ console.log("Deals State:", deals);
                               <TableCell>{deal.dealName}</TableCell>
                               <TableCell>{deal.expectedEndDate}</TableCell>
                               <TableCell>
-                                <span className={`bd-badge ${stausClass}`}>
-                                  {" "}
+                                <span 
+                                  className={`bd-badge ${getStatusClass(deal.status)}`}
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    fontSize: '12px',
+                                    fontWeight: '500'
+                                  }}
+                                >
                                   {deal.status}
                                 </span>
                               </TableCell>
@@ -259,23 +310,26 @@ console.log("Deals State:", deals);
                               </TableCell>
                               <TableCell className="table__icon-box">
                                 <div className="flex items-center justify-start gap-[10px]">
-                                  <button
-                                    type="button"
-                                    className="table__icon download"
-                                    style={{
-                                      backgroundColor: 'green',
-                                      color: 'white',
-                                      borderRadius: '4px',
-                                      padding: '5px',
-                                    }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditData(deal);
-                                      setDetailsModalOpen(true);
-                                    }}
-                                  >
-                                    <i className="fa-regular fa-eye"></i>
-                                  </button>
+                                  <Link href={`/Orders/show-models?orderId=${deal.id}`} passHref>
+                                    <button
+                                      type="button"
+                                      className="table__icon edit"
+                                      style={{
+                                        display: 'inline-block',
+                                        backgroundColor: 'green',
+                                        color: 'white',
+                                        borderRadius: '4px',
+                                        padding: '5px',
+                                        textDecoration: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <i className="fa-regular fa-eye"></i>
+                                    </button>
+                                  </Link>
+
                                   <Link href={`/Orders/add-models?orderId=${deal.id}`} passHref>
                                     <button
                                       type="button"
@@ -295,46 +349,35 @@ console.log("Deals State:", deals);
                                       <i className="fa-sharp fa-light fa-pen"></i>
                                     </button>
                                   </Link>
-                                  <a
-                                    href={deal.clientSheetPdf}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="table__icon link"
-                                    style={{
-                                      backgroundColor: 'green',
-                                      color: 'white',
-                                      borderRadius: '4px',
-                                      padding: '5px',
-                                      textDecoration: 'none',
-                                    }}
-                                  >
-                                    <i className="fa-solid fa-file-pdf"></i>
-                                  </a>
+
                                   <button
                                     type="button"
-                                    className="table__icon print"
+                                    className="table__icon delete"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDelete(deal.id);
+                                    }}
+                                  >
+                                    <i className="fa-solid fa-trash"></i>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="table__icon approve"
                                     style={{
-                                      backgroundColor: 'green',
+                                      backgroundColor: '#4CAF50',
                                       color: 'white',
                                       borderRadius: '4px',
                                       padding: '5px',
+                                      border: 'none',
+                                      cursor: 'pointer',
                                     }}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handlePdfClick(deal.clientSheetPdf);
+                                      setShowConfirmation(deal.id);
                                     }}
                                   >
-                                    <i className="fa-solid fa-print"></i>
-                                  </button>
-                                  <button
-                                    className="removeBtn table__icon delete"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeleteId(index);
-                                      setModalDeleteOpen(true);
-                                    }}
-                                  >
-                                    <i className="fa-regular fa-trash"></i>
+                                    <i className="fa-solid fa-check"></i>
                                   </button>
                                 </div>
                               </TableCell>
@@ -396,8 +439,117 @@ console.log("Deals State:", deals);
           deleteId={deleteId}
         />
       )}
+
+      {showConfirmation && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              padding: '24px',
+              borderRadius: '8px',
+              maxWidth: '400px',
+              width: '90%',
+            }}
+          >
+            {!isApproved ? (
+              <>
+                <h3 style={{ marginTop: 0, marginBottom: '16px' }}>Confirm Approval</h3>
+                <p style={{ marginBottom: '24px' }}>
+                  Are you sure you want to approve this order? This action cannot be undone.
+                </p>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => {
+                      setShowConfirmation(null);
+                      setIsApproved(false);
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      backgroundColor: 'white',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        console.log('Making API call with orderId:', showConfirmation);
+                        const response = await fetch(`${apiBaseUrl}/api/update-order-status`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({ orderId: showConfirmation }),
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                          setIsApproved(true);
+                          setTimeout(() => {
+                            setShowConfirmation(null);
+                            setIsApproved(false);
+                            window.location.reload();
+                          }, 1500); // Show success message for 1.5 seconds
+                        } else {
+                          toast.error(result.message || 'Failed to approve order');
+                          setShowConfirmation(null);
+                        }
+                      } catch (error) {
+                        console.error('Error approving order:', error);
+                        toast.error('Failed to approve order');
+                        setShowConfirmation(null);
+                      }
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      border: 'none',
+                      borderRadius: '4px',
+                      backgroundColor: '#4CAF50',
+                      color: 'white',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Approve
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ 
+                  color: '#4CAF50', 
+                  fontSize: '48px', 
+                  marginBottom: '16px' 
+                }}>
+                  <i className="fa-solid fa-check-circle"></i>
+                </div>
+                <h3 style={{ 
+                  color: '#4CAF50', 
+                  marginTop: 0, 
+                  marginBottom: '16px' 
+                }}>
+                  Approved Successfully!
+                </h3>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
-
 export default DealsTable
