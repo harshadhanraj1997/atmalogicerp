@@ -46,7 +46,7 @@ const sidebarData: SidebarCategory[] = [
         icon: "icon-crm",
         subItems: [
           { label: "Add Models", link: "Models/add-models" },
-          { label: "Orders", link: "/add-order" },
+          { label: "Orders", link: "/Orders" },
           { label: "CRM Setup", link: "/crm/crm-setup" },
 
         ],
