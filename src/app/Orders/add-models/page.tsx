@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 
 
 const AddModel = () => {
- const apiBaseUrl = "https://needha-erp-server.onrender.com";
+ const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
  const router = useRouter();
  const searchParams = useSearchParams();
  const orderId = searchParams.get('orderId');

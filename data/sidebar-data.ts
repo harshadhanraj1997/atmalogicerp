@@ -42,12 +42,13 @@ const sidebarData: SidebarCategory[] = [
       },
       {
         id: 3,
-        label: "CRM",
+        label: "Orders",
         icon: "icon-crm",
         subItems: [
-          { label: "Leads", link: "/crm/leads" },
-          { label: "Deals", link: "/crm/deals" },
+          { label: "Add Models", link: "Models/add-models" },
+          { label: "Orders", link: "/add-order" },
           { label: "CRM Setup", link: "/crm/crm-setup" },
+
         ],
       },
       {
