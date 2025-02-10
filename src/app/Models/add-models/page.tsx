@@ -402,7 +402,7 @@ const AddJewelryModel = () => {
 
             {/* Gross Weight */}
             <div>
-              <Label htmlFor="grossWeight">Gross Weight</Label>
+              <Label htmlFor="grossWeight">Net Weight</Label>
               <Input
                 id="grossWeight"
                 type="number"

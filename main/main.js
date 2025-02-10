@@ -1,18 +1,22 @@
 import { app, BrowserWindow, ipcMain, protocol } from 'electron';
+import serve from 'electron-serve';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fetch from 'node-fetch';  // Add this if you need fetch in Node.js environment
 
 // Define __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let mainWindow;
+// Initialize electron serve for production
+const loadURL = serve({ directory: 'out' });
 
 // Backend API URL
 const BACKEND_URL = 'https://needha-erp-server.onrender.com';
 
-// Function to create the main application window
-function createMainWindow() {
+let mainWindow;
+
+async function createMainWindow() {
   try {
     console.log('[DEBUG] Creating main window...');
 
@@ -20,84 +24,82 @@ function createMainWindow() {
       width: 1200,
       height: 800,
       webPreferences: {
-        preload: path.join(__dirname, 'preload.cjs'), // Ensure this file exists
-        nodeIntegration: false, // Enforce security best practices
-        contextIsolation: true, // Enforce security
-        enableRemoteModule: false, // Disable remote module for security
+        preload: path.join(__dirname, 'preload.cjs'),  // Changed to .js extension
+        nodeIntegration: false,
+        contextIsolation: true,
+        enableRemoteModule: false,
+        webSecurity: true
       },
     });
 
-    // Set default zoom level
-    mainWindow.webContents.setZoomFactor(0.7);
-
     if (app.isPackaged) {
       console.log('[DEBUG] Loading packaged Next.js app...');
-      mainWindow.loadURL(`file://${path.join(__dirname, '../out/index.html')}`);
+      await loadURL(mainWindow);
     } else {
       console.log('[DEBUG] Loading Next.js from localhost:3000...');
-      mainWindow.loadURL('http://localhost:3000');
-      mainWindow.webContents.openDevTools(); // Keep DevTools open in dev mode
+      await mainWindow.loadURL('http://localhost:3000');
+      mainWindow.webContents.openDevTools();
     }
 
-    // Handle the window close event
     mainWindow.on('closed', () => {
       console.log('[DEBUG] Main window closed.');
       mainWindow = null;
     });
+
   } catch (error) {
     console.error('[ERROR] Failed to create main window:', error);
   }
 }
 
-// Handle application lifecycle events
-app.whenReady().then(() => {
-  console.log('[DEBUG] App is ready.');
-  createMainWindow();
+// Initialize app
+app.whenReady().then(async () => {
+  try {
+    console.log('[DEBUG] App is ready.');
 
-  // macOS-specific behavior: recreate window if no other windows are open
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      console.log('[DEBUG] Recreating main window...');
-      createMainWindow();
+    if (app.isPackaged) {
+      protocol.registerFileProtocol('app', (request, callback) => {
+        const url = request.url.substring(6);
+        callback({ path: path.normalize(`${__dirname}/${url}`) });
+      });
     }
-  });
+
+    await createMainWindow();
+  } catch (error) {
+    console.error('[ERROR] Failed during app initialization:', error);
+  }
 });
 
-// Quit the app when all windows are closed (except on macOS)
+app.on('activate', async () => {
+  if (!mainWindow) {
+    await createMainWindow();
+  }
+});
+
 app.on('window-all-closed', () => {
-  console.log('[DEBUG] All windows closed.');
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-app.disableHardwareAcceleration();
-
-// Backend communication: Handle login requests from renderer process
+// IPC Handlers
 ipcMain.handle('login', async (event, credentials) => {
   try {
-    console.log('[DEBUG] Handling login request from renderer:', credentials);
+    console.log('[DEBUG] Handling login request from renderer');
 
-    // Send login request to backend
     const response = await fetch(`${BACKEND_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials),
     });
 
-    const result = await response.json(); // Parse the backend response
-    console.log('[DEBUG] Backend response:', result);
-
-    if (result.success) {
-      console.log('[DEBUG] Login successful:', result.message);
-      // Load dashboard page correctly
+    const result = await response.json();
+    
+    if (result.success && mainWindow) {
       if (app.isPackaged) {
-        mainWindow.loadURL(`file://${path.join(__dirname, '../out/orders.html')}`);
+        await loadURL(mainWindow, '/orders');
       } else {
-        mainWindow.loadURL('http://localhost:3000/orders');
+        await mainWindow.loadURL('http://localhost:3000/orders');
       }
-    } else {
-      console.error('[DEBUG] Login failed:', result.error);
     }
 
     return result;
@@ -105,14 +107,4 @@ ipcMain.handle('login', async (event, credentials) => {
     console.error('[ERROR] Error during backend communication:', error);
     return { success: false, error: 'Failed to connect to the server' };
   }
-});
-
-// Error handling for uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('[ERROR] Uncaught exception:', error);
-});
-
-// Error handling for unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('[ERROR] Unhandled promise rejection:', reason, promise);
 });

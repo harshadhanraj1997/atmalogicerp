@@ -24,7 +24,7 @@ const AddModel = () => {
    item: '',
    purity: '',
    size: '',
-   color: '',
+   color: 'Yellow',
    quantity: '',
    grossWeight: '',
    stoneWeight: '',
@@ -97,8 +97,8 @@ const AddModel = () => {
        [field]: value
      };
 
-     // Calculate net weight when gross weight or stone weight changes
-     if (field === 'grossWeight' || field === 'stoneWeight') {
+     // Only calculate net weight when stone weight changes
+     if (field === 'stoneWeight') {
        const grossWeight = parseFloat(updatedData.grossWeight) || 0;
        const stoneWeight = parseFloat(updatedData.stoneWeight) || 0;
        updatedData.netWeight = Math.max(0, grossWeight - stoneWeight).toFixed(3);
@@ -151,12 +151,11 @@ const handleItemSelect = async (itemName) => {
     console.log("Selected item data:", selectedItem);
 
     if (selectedItem) {
-      // Get the values using exact field names from API
-      const grossWeight = selectedItem.GrossWeight || 0;
+      const netWeight = selectedItem.GrossWeight || 0;
       const size = selectedItem.Size || '';
       let imageUrl = selectedItem.ImageURL || '';
 
-      console.log("Found gross weight:", grossWeight);
+      console.log("Found net weight:", netWeight);
       console.log("Found size:", size);
       console.log("Original image URL:", imageUrl);
 
@@ -164,8 +163,11 @@ const handleItemSelect = async (itemName) => {
       setFormData(prev => ({
         ...prev,
         item: selectedItem.Name,
-        grossWeight: grossWeight,
-        size: size
+        netWeight: netWeight,
+        size: size,
+        stoneWeight: '',
+        grossWeight: '',
+        color: 'Yellow'
       }));
 
       // Handle image URL
@@ -207,9 +209,10 @@ const handleAdd = () => {
     size: '',
     color: '',
     quantity: '',
-    grossWeight: '',
+    wtWeight: '',
     stoneWeight: '',
     netWeight: '',
+    grossWeight: '',
     remarks: '',
   }));
   setModelImage(null);
@@ -246,9 +249,10 @@ const handleAdd = () => {
        size: model.size,
        color: model.color,
        quantity: model.quantity,
-       grossWeight: model.grossWeight,
+       wtWeight: model.wtWeight,
        stoneWeight: model.stoneWeight,
        netWeight: model.netWeight,
+       grossWeight: model.grossWeight,
        remarks: model.remarks,
        modelImage: model.modelImage,
        modelStatus: modelStatus
@@ -360,7 +364,7 @@ const columnWidths = {
   size: 0.06,           // 3.5mm
   color: 0.06,          // yellow
   quantity: 0.05,       // 3
-  grossWeight: 0.07,    // 6.35
+  wtWeight: 0.07,    // 6.35
   stoneWeight: 0.07,    // 0
   netWeight: 0.07,      // 6.350
   remarks: 0.13,        // No remarks
@@ -478,9 +482,10 @@ const generatePDF = async (pdfDoc) => {
       { display: 'Size', key: 'size', width: 0.06 },
       { display: 'Color', key: 'color', width: 0.06 },
       { display: 'Quantity', key: 'quantity', width: 0.05 },
-      { display: 'Gross Wt', key: 'grossWeight', width: 0.07 },
-      { display: 'Stone Wt', key: 'stoneWeight', width: 0.07 },
-      { display: 'Net Wt', key: 'netWeight', width: 0.07 },
+      { display: 'WT Weight', key: 'wtWeight', width: 0.07 },
+      { display: 'Stone Weight', key: 'stoneWeight', width: 0.07 },
+      { display: 'Net Weight', key: 'netWeight', width: 0.07 },
+      { display: 'Gross Weight', key: 'grossWeight', width: 0.07 },
       { display: 'Remarks', key: 'remarks', width: 0.13 },
       { display: 'Image', key: 'image', width: 0.20 }
     ];
@@ -495,7 +500,7 @@ const generatePDF = async (pdfDoc) => {
     y -= 30;
 
     // Draw table headers with proper spacing
-    const headers = ['Category', 'Item', 'Purity', 'Size', 'Color', 'Quantity', 'Gross Wt', 'Stone Wt', 'Net Wt', 'Remarks', 'Image'];
+    const headers = ['Category', 'Item', 'Purity', 'Size', 'Color', 'Quantity', 'WT Weight', 'Stone Weight', 'Net Weight', 'Gross Weight', 'Remarks', 'Image'];
     let xPos = margin;
     
     headers.forEach((header, index) => {
@@ -526,9 +531,10 @@ const generatePDF = async (pdfDoc) => {
         model.size || '',
         model.color || '',
         model.quantity?.toString() || '',
-        model.grossWeight?.toString() || '',
+        model.wtWeight?.toString() || '',
         model.stoneWeight?.toString() || '',
         model.netWeight?.toString() || '',
+        model.grossWeight?.toString() || '',
         model.remarks || ''
       ];
 
@@ -744,7 +750,7 @@ const generateImagesOnlyPDF = async (pdfDoc) => {
             const details = [
               `Size: ${model.size || '-'}`,
               `Purity: ${model.purity || '-'}`,
-              `Gross Weight: ${model.grossWeight || '-'}`,
+              `WT Weight: ${model.wtWeight || '-'}`,
               `Stone Weight: ${model.stoneWeight || '-'}`
             ];
 
@@ -860,8 +866,9 @@ const handleRemoveRow = (index: number) => {
              <Label htmlFor="color">Color</Label>
              <Input
                id="color"
-               value={formData.color}
-               onChange={(e) => handleInputChange('color', e.target.value)}
+               value="Yellow"
+               readOnly
+               className="bg-gray-100"
                placeholder="Color"
              />
            </div>
@@ -913,11 +920,7 @@ const handleRemoveRow = (index: number) => {
              />
            </div>
 
-           
-
-           
-
-            <div>
+           <div>
              <Label htmlFor="remarks">Remarks</Label>
              <Input
                id="remarks"
@@ -1051,9 +1054,9 @@ const handleRemoveRow = (index: number) => {
                  <th className="p-2 border">Size</th>
                  <th className="p-2 border">Color</th>
                  <th className="p-2 border">Quantity</th>
-                 <th className="p-2 border">Gross Weight</th>
-                 <th className="p-2 border">Stone Weight</th>
                  <th className="p-2 border">Net Weight</th>
+                 <th className="p-2 border">Stone Weight</th>
+                 <th className="p-2 border">Gross Weight</th>
                  <th className="p-2 border">Remarks</th>
                  <th className="p-2 border">Image</th>
                  <th className="p-2 border">Action</th>
@@ -1068,9 +1071,9 @@ const handleRemoveRow = (index: number) => {
                    <td className="p-2 border">{model.size}</td>
                    <td className="p-2 border">{model.color}</td>
                    <td className="p-2 border">{model.quantity}</td>
-                   <td className="p-2 border">{model.grossWeight}</td>
-                   <td className="p-2 border">{model.stoneWeight}</td>
                    <td className="p-2 border">{model.netWeight}</td>
+                   <td className="p-2 border">{model.stoneWeight}</td>
+                   <td className="p-2 border">{model.grossWeight}</td>
                    <td className="p-2 border">{model.remarks}</td>
                    <td className="p-2 border">
                      {model.modelImage && (
