@@ -279,7 +279,10 @@ const handleAdd = () => {
          headers: { 
            'Content-Type': 'application/json'
          },
-         body: JSON.stringify(orderData)
+         body: JSON.stringify({
+           ...orderData,
+           modelStatus
+         })
        });
 
        const result = await response.json();
@@ -349,23 +352,43 @@ const embedBase64Image = async (base64Data, pdfDoc) => {
   }
 };
 
-// Update the columnWidths to match the example more precisely
+// Adjusted column widths to match the example layout
 const columnWidths = {
-  category: 0.09,    
-  item: 0.09,        
-  purity: 0.05,      
-  size: 0.05,        
-  color: 0.06,       
-  quantity: 0.05,    
-  grossWeight: 0.07, 
-  stoneWeight: 0.07, 
-  netWeight: 0.07,         
-  remarks: 0.08,     
-  image: 0.20        // Reduced to match example
+  category: 0.15,        // Mogapu Plain(MUPL)
+  item: 0.08,           // 1011
+  purity: 0.06,         // 24K
+  size: 0.06,           // 3.5mm
+  color: 0.06,          // yellow
+  quantity: 0.05,       // 3
+  grossWeight: 0.07,    // 6.35
+  stoneWeight: 0.07,    // 0
+  netWeight: 0.07,      // 6.350
+  remarks: 0.13,        // No remarks
+  image: 0.20          // Image with more space
 };
 
 // Keep the row height
 const rowHeight = 120;
+
+// Add this helper function for text wrapping
+const wrapText = (text: string, width: number, font: PDFFont, fontSize: number) => {
+  const words = text.split(' ');
+  const lines = [];
+  let currentLine = words[0];
+
+  for (let i = 1; i < words.length; i++) {
+    const word = words[i];
+    const width = font.widthOfTextAtSize(`${currentLine} ${word}`, fontSize);
+    if (width < width) {
+      currentLine += ` ${word}`;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  lines.push(currentLine);
+  return lines;
+};
 
 // Update the generatePDF function to include order details
 const generatePDF = async (pdfDoc) => {
@@ -386,36 +409,25 @@ const generatePDF = async (pdfDoc) => {
 
     // Draw company header
     page.drawText('NEEDHA Gold PRIVATE LIMITED', {
-      x: (page.getWidth() - boldFont.widthOfTextAtSize('NEEDHA Gold PRIVATE LIMITED ORDER Sheet', 16)) / 2,
+      x: (page.getWidth() - boldFont.widthOfTextAtSize('NEEDHA Gold PRIVATE LIMITED', 16)) / 2,
       y: y + 20,
       size: 16,
       font: boldFont
     });
     y -= lineHeight * 2;
 
-    // Helper function to format date
-    const formatDate = (dateString) => {
-      if (!dateString) return '-';
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    };
-
     // Draw order details
-    console.log("Drawing order details:", orderDetails);
-    
+    console.log("Order Status:", modelStatus);
     const orderInfoLines = [
       ['Order ID:', orderDetails.id || '-'],
       ['Customer Name:', orderDetails.partyName || '-'],
-      ['Created Date:', formatDate(orderDetails.created_date)],
-      ['Delivery Date:', formatDate(orderDetails.deliveryDate)],
+      ['Created Date:', new Date().toLocaleDateString()],
+      ['Delivery Date:', orderDetails.deliveryDate || '-'],
       ['Created By:', orderDetails.created_by || '-'],
       ['Advance Metal:', orderDetails.advanceMetal || '-'],
       ['Purity:', orderDetails.purity || '-'],
       ['Status:', orderDetails.status || '-'],
+      ['Model Status:', modelStatus || '-'],
       ['Remarks:', orderDetails.remarks || '-']
     ];
 
@@ -437,7 +449,6 @@ const generatePDF = async (pdfDoc) => {
       const [label, value] = detail;
       const x = index % 2 === 0 ? leftX : rightX;
 
-      // Draw label
       page.drawText(label, {
         x,
         y: currentY,
@@ -445,16 +456,13 @@ const generatePDF = async (pdfDoc) => {
         font: boldFont
       });
 
-      // Draw value
-      const valueStr = value?.toString() || '-';
-      page.drawText(valueStr, {
+      page.drawText(value?.toString() || '-', {
         x: x + 100,
         y: currentY,
         size: 10,
         font: font
       });
 
-      // Move to next row after every two items
       if (index % 2 === 1) {
         currentY -= lineHeight;
       }
@@ -462,65 +470,50 @@ const generatePDF = async (pdfDoc) => {
 
     y = currentY - lineHeight * 2;
 
-    // Draw models table title
-    page.drawText('Model Details', {
-      x: margin,
-      y,
-      size: 14,
-      font: boldFont
-    });
-    y -= lineHeight * 2;
-
     // Define table structure
-    const tableWidth = page.getWidth() - (2 * margin);
     const tableHeaderMapping = [
-      { display: 'Category', key: 'category', width: 0.11 },
-      { display: 'Item', key: 'item', width: 0.11 },
-      { display: 'Purity', key: 'purity', width: 0.05 },
-      { display: 'Size', key: 'size', width: 0.05 },
-      { display: 'Color', key: 'color', width: 0.07 },
+      { display: 'Category', key: 'category', width: 0.15 },
+      { display: 'Item', key: 'item', width: 0.08 },
+      { display: 'Purity', key: 'purity', width: 0.06 },
+      { display: 'Size', key: 'size', width: 0.06 },
+      { display: 'Color', key: 'color', width: 0.06 },
       { display: 'Quantity', key: 'quantity', width: 0.05 },
-      { display: 'Gross Weight', key: 'grossWeight', width: 0.07 },
-      { display: 'Stone Weight', key: 'stoneWeight', width: 0.07 },
-      { display: 'Net Weight', key: 'netWeight', width: 0.07 },
+      { display: 'Gross Wt', key: 'grossWeight', width: 0.07 },
+      { display: 'Stone Wt', key: 'stoneWeight', width: 0.07 },
+      { display: 'Net Wt', key: 'netWeight', width: 0.07 },
+      { display: 'Remarks', key: 'remarks', width: 0.13 },
       { display: 'Image', key: 'image', width: 0.20 }
     ];
 
-    // Draw table headers
+    // Draw "Model Details" heading
+    page.drawText("Model Details", {
+      x: margin,
+      y: y,
+      size: 14,
+      font: boldFont
+    });
+    y -= 30;
+
+    // Draw table headers with proper spacing
+    const headers = ['Category', 'Item', 'Purity', 'Size', 'Color', 'Quantity', 'Gross Wt', 'Stone Wt', 'Net Wt', 'Remarks', 'Image'];
     let xPos = margin;
-    tableHeaderMapping.forEach(({ display, width }) => {
-      const cellWidth = width * tableWidth;
-      
-      page.drawRectangle({
+    
+    headers.forEach((header, index) => {
+      const columnWidth = columnWidths[Object.keys(columnWidths)[index]] * (page.getWidth() - 2 * margin);
+      page.drawText(header, {
         x: xPos,
-        y,
-        width: cellWidth,
-        height: 25,
-        borderColor: rgb(0, 0, 0),
-        borderWidth: 0.5
-      });
-
-      const headerWidth = boldFont.widthOfTextAtSize(display, 8);
-      const headerX = xPos + (cellWidth - headerWidth) / 2;
-
-      page.drawText(display, {
-        x: headerX,
-        y: y + 8,
-        size: 8,
+        y: y,
+        size: 9,  // Slightly smaller font size for headers
         font: boldFont
       });
-
-      xPos += cellWidth;
+      xPos += columnWidth;
     });
 
-    y -= 25;
+    y -= 20;
 
-    // Draw table rows
+    // Draw table rows with adjusted spacing
     for (const model of models) {
-      const rowHeight = 120; // Increased from 80 to 120
-
-      // Add new page if needed
-      if (y < margin + rowHeight) {
+      if (y < margin + 120) {
         page = pdfDoc.addPage([841.89, 595.28]);
         y = 550;
       }
@@ -532,16 +525,16 @@ const generatePDF = async (pdfDoc) => {
         model.purity || '',
         model.size || '',
         model.color || '',
-        model.quantity || '',
-        model.grossWeight || '',
-        model.stoneWeight || '',
-        model.netWeight || '',
+        model.quantity?.toString() || '',
+        model.grossWeight?.toString() || '',
+        model.stoneWeight?.toString() || '',
+        model.netWeight?.toString() || '',
         model.remarks || ''
       ];
 
-      // Draw data cells
+      // Draw row data with proper spacing
       rowData.forEach((data, index) => {
-        const cellWidth = tableHeaderMapping[index].width * tableWidth;
+        const cellWidth = columnWidths[Object.keys(columnWidths)[index]] * (page.getWidth() - 2 * margin);
         
         page.drawRectangle({
           x: xPos,
@@ -553,28 +546,40 @@ const generatePDF = async (pdfDoc) => {
         });
 
         const text = data?.toString() || '';
-        const textWidth = font.widthOfTextAtSize(text, 8);
-        const textX = xPos + (cellWidth - textWidth) / 2;
+        
+        // Special handling for remarks column
+        if (tableHeaderMapping[index].key === 'remarks') {
+          const maxWidth = cellWidth - 10; // Leave some padding
+          const lines = wrapText(text, maxWidth, font, 8);
+          
+          // Draw each line of the wrapped text
+          lines.forEach((line, lineIndex) => {
+            const textWidth = font.widthOfTextAtSize(line, 8);
+            const textX = xPos + 5; // Left align with padding
+            const lineHeight = 12; // Space between lines
+            const startY = y - (rowHeight/2) + (lines.length * lineHeight/2);
+            
+            page.drawText(line, {
+              x: textX,
+              y: startY - (lineIndex * lineHeight),
+              size: 8,
+              font: font
+            });
+          });
+        } else {
+          // Normal cell handling for other columns
+          const textWidth = font.widthOfTextAtSize(text, 8);
+          const textX = xPos + (cellWidth - textWidth) / 2;
 
-        page.drawText(text, {
-          x: textX,
-          y: y - rowHeight/2,
-          size: 8,
-          font: font
-        });
+          page.drawText(text, {
+            x: textX,
+            y: y - rowHeight/2,
+            size: 8,
+            font: font
+          });
+        }
 
         xPos += cellWidth;
-      });
-
-      // Draw image cell
-      const imageWidth = tableHeaderMapping[11].width * tableWidth;
-      page.drawRectangle({
-        x: xPos,
-        y: y - rowHeight,
-        width: imageWidth,
-        height: rowHeight,
-        borderColor: rgb(0, 0, 0),
-        borderWidth: 0.5
       });
 
       // Handle image
@@ -591,22 +596,21 @@ const generatePDF = async (pdfDoc) => {
 
           if (embeddedImage) {
             // Draw cell border first
-            const cellWidth = columnWidths.image * tableWidth;
-            const cellHeight = rowHeight;
+            const imageColumnWidth = tableHeaderMapping[10].width * (page.getWidth() - 2 * margin); // Use index 10 for image column
             
             page.drawRectangle({
               x: xPos,
               y: y - rowHeight,
-              width: cellWidth,
-              height: cellHeight,
+              width: imageColumnWidth,
+              height: rowHeight,
               borderColor: rgb(0, 0, 0),
               borderWidth: 0.5,
-              color: rgb(1, 1, 1, 0)
+              color: rgb(1, 1, 1, 0) // Transparent fill
             });
 
             // Calculate image dimensions
-            const maxWidth = cellWidth * 0.8;  // 80% of cell width
-            const maxHeight = cellHeight * 0.8; // 80% of cell height
+            const maxWidth = imageColumnWidth * 0.8;  // 80% of cell width
+            const maxHeight = rowHeight * 0.8; // 80% of cell height
             
             // Get original aspect ratio
             const aspectRatio = embeddedImage.width / embeddedImage.height;
@@ -614,75 +618,56 @@ const generatePDF = async (pdfDoc) => {
             // Calculate dimensions maintaining aspect ratio
             let finalWidth, finalHeight;
             if (aspectRatio > 1) {
-              // Landscape image
               finalWidth = maxWidth;
               finalHeight = maxWidth / aspectRatio;
             } else {
-              // Portrait image
               finalHeight = maxHeight;
               finalWidth = maxHeight * aspectRatio;
             }
             
-            // Ensure dimensions don't exceed maximums
-            if (finalWidth > maxWidth) {
-              finalWidth = maxWidth;
-              finalHeight = finalWidth / aspectRatio;
-            }
-            if (finalHeight > maxHeight) {
-              finalHeight = maxHeight;
-              finalWidth = finalHeight * aspectRatio;
-            }
-            
             // Center image in cell
-            const xOffset = xPos + (cellWidth - finalWidth) / 2;
-            const yOffset = y - rowHeight + (cellHeight - finalHeight) / 2;
+            const xOffset = xPos + (imageColumnWidth - finalWidth) / 2;
+            const yOffset = y - rowHeight + (rowHeight - finalHeight) / 2;
 
             // Draw image
-            const drawOptions = {
-              x: Number(xOffset),
-              y: Number(yOffset),
-              width: Number(finalWidth),
-              height: Number(finalHeight)
-            };
-
-            if (!Object.values(drawOptions).some(isNaN)) {
-              page.drawImage(embeddedImage, drawOptions);
-            }
+            page.drawImage(embeddedImage, {
+              x: xOffset,
+              y: yOffset,
+              width: finalWidth,
+              height: finalHeight
+            });
           }
         } catch (error) {
           console.error('Error embedding image:', error);
-          // Draw empty cell
+          // Draw empty cell with border if image fails
           page.drawRectangle({
             x: xPos,
             y: y - rowHeight,
-            width: columnWidths.image * tableWidth,
+            width: tableHeaderMapping[10].width * (page.getWidth() - 2 * margin),
             height: rowHeight,
             borderColor: rgb(0, 0, 0),
-            borderWidth: 0.5,
-            color: rgb(1, 1, 1, 0)
+            borderWidth: 0.5
           });
         }
+      } else {
+        // Draw empty cell with border if no image
+        page.drawRectangle({
+          x: xPos,
+          y: y - rowHeight,
+          width: tableHeaderMapping[10].width * (page.getWidth() - 2 * margin),
+          height: rowHeight,
+          borderColor: rgb(0, 0, 0),
+          borderWidth: 0.5
+        });
       }
 
-      y -= rowHeight;
-    }
-
-    // Add page numbers
-    const totalPages = pdfDoc.getPageCount();
-    for (let i = 0; i < totalPages; i++) {
-      const currentPage = pdfDoc.getPage(i);
-      currentPage.drawText(`Page ${i + 1} of ${totalPages}`, {
-        x: currentPage.getWidth() - margin - 60,
-        y: margin,
-        size: 8,
-        font: font
-      });
+      y -= 120; // Increased row height for better spacing
     }
 
     return pdfDoc;
   } catch (error) {
     console.error('Error generating PDF:', error);
-    return PDFDocument;
+    return pdfDoc;
   }
 };
 

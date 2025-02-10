@@ -80,7 +80,7 @@ const DashboardHeader = () => {
               </button>
             </div>
             <h2 className="header__title">
-              Hello Puneeth{" "}
+              Hello User{" "}
               <span>
                 <Image
                   className="inline-block"

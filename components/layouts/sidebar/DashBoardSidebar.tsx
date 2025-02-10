@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import sidebarMainLogo from "../../../public/assets/images/logo/logo.svg"
+import sidebarMainLogo from "../../../assets/needhgoldlogo.jpg";
 import sidebarDarkLogo from "../../../public/assets/images/logo/logo-white.svg";
 import useGlobalContext from "@/hooks/use-context";
 import sidebarImg from "../../../public/assets/images/bg/side-bar.png";

@@ -67,7 +67,23 @@
     "files": [
       "main/**/*",
       "out/**/*",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "svg/**/*",
+      "!**/*.ts",
+      "!**/*.map",
+      "assets/**/*",
+      "common/**/*",
+      "components/**/*",
+      "data/**/*",
+      "hooks/**/*",
+      "interface/**/*",
+      "lib/**/*",
+      "main/**/*",
+      "styles/**/*",
+      "src/**/*",
+      "public/**/*",
+      "!**/*.ts",
+      "!**/*.map"
     ],
     "extraResources": [
       {

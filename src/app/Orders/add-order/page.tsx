@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import COMPANY_LOGO from "@/assets/needhagoldlogo.png"
 import "./add-order.css"; // Ensure this import is present
+import router from "next/router";
 
 interface OrderFormModalProps {
   open: boolean;
@@ -333,7 +334,7 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
 
       console.log('=== Submit Order Completed Successfully ===');
       alert("Order submitted successfully!");
-      setOpen(false);
+      router.push('/Orders');
     } catch (error: any) {
       console.error('Submit Order Error:', {
         message: error.message,

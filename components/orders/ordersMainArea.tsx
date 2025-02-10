@@ -35,10 +35,11 @@ const DealsMainArea = () => {
           </div>
         </div>
         <div className="grid grid-cols-12 gap-x-6 maxXs:gap-x-0">
-          <DealsSummary />
+         {/* <DealsSummary /> */}
           <DealsTable />
         </div>
       </div>
+
       {/* -- App side area end -- */}
     </>
   );
