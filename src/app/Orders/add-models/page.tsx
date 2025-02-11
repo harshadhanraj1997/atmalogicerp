@@ -748,10 +748,12 @@ const generateImagesOnlyPDF = async (pdfDoc) => {
 
             // Draw additional details below the image
             const details = [
+              `Model: ${model.item || '-'}`,
               `Size: ${model.size || '-'}`,
               `Purity: ${model.purity || '-'}`,
-              `WT Weight: ${model.wtWeight || '-'}`,
-              `Stone Weight: ${model.stoneWeight || '-'}`
+              `Net Weight: ${model.netWeight || '-'}`,
+              `Stone Weight: ${model.stoneWeight || '-'}`,
+              `Gross Weight: ${model.grossWeight || '-'}`
             ];
 
             let detailY = yOffset - margin;

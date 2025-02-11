@@ -1,6 +1,6 @@
 {
   "type": "module",
-  "name": "atmalogicerp",
+  "name": "needhagold",
   "version": "0.1.0",
   "private": true,
   "main": "main/main.js",
@@ -8,11 +8,12 @@
   "description": "Electron + NextJS ERP",
   "scripts": {
     "dev": "concurrently -n \"NEXT,ELECTRON\" -c \"yellow,blue\" --kill-others \"next dev\" \"electron .\"",
-    "build": "next build && electron-builder",
+    "build": "npm run generate-icons && set NODE_OPTIONS=--max-old-space-size=8192 && next build && electron-builder",
     "start": "next start",
     "clean": "rm -rf .next out dist && npm cache clean --force",
     "rebuild": "npm run clean && npm install && npm run dev",
-    "lint": "next lint"
+    "lint": "next lint",
+    "generate-icons": "electron-icon-builder --input=./assets/needhagoldlogo.png --output=build --flatten"
   },
   "dependencies": {
     "@emotion/cache": "^11.11.0",
@@ -52,6 +53,7 @@
     "concurrently": "^8.2.2",
     "electron": "^28.1.1",
     "electron-builder": "^24.9.1",
+    "electron-icon-builder": "^2.0.1",
     "eslint": "^8.56.0",
     "eslint-config-next": "14.1.0",
     "postcss": "^8.4.33",
@@ -64,18 +66,37 @@
     "asar": true,
     "directories": {
       "output": "dist",
-      "buildResources": "resources"
+      "buildResources": "build"
     },
     "files": [
       "main/**/*",
       "out/**/*",
-      "package.json"
+      "package.json",
+      "build/**/*"
     ],
     "extraResources": [
       {
         "from": "out",
         "to": "app/out"
       }
-    ]
+    ],
+    "win": {
+      "icon": "build/icons/win/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Needha Gold"
+    }
   }
 }

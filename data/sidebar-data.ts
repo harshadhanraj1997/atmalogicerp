@@ -53,15 +53,17 @@ const sidebarData: SidebarCategory[] = [
       },
       {
         id: 4,
-        label: "Apps",
+        label: "Making Progress",
         icon: "fa-sharp fa-light fa-grid-2",
         subItems: [
-          { label: "Chat", link: "/apps/app-chat" },
-          { label: "Email Inbox", link: "/apps/email-inbox" },
-          { label: "Email Read", link: "/apps/email-read" },
-          { label: "Email Compose", link: "/apps/email-compose" },
-          { label: "Contacts", link: "/apps/contacts" },
-          { label: "Calendar", link: "/apps/calendar" },
+          { label: "Waxing", link: "/apps/calendar" },
+          { label: "Casting", link: "/apps/app-chat" },
+          { label: "Grinding", link: "/apps/email-inbox" },
+          { label: "Filing", link: "/apps/email-read" },
+          { label: "Setting", link: "/apps/email-compose" },
+
+          { label: "Rhodium", link: "/apps/contacts" },
+          
         ],
       },
       {
