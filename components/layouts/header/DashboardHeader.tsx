@@ -7,6 +7,7 @@ import useGlobalContext from "@/hooks/use-context";
 import sidebarData from "@/data/sidebar-data";
 import Link from "next/link";
 import { SidebarCategory } from "@/interface";
+import { useSession } from "@/src/contexts/SessionContext";
 
 const DashboardHeader = () => {
   const context = useGlobalContext();
@@ -16,6 +17,7 @@ const DashboardHeader = () => {
   const [searchResultData, setSearchResultData] = useState<
     SidebarCategory[] | null
   >([]);
+  const { user } = useSession();
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.toLowerCase();
@@ -80,7 +82,7 @@ const DashboardHeader = () => {
               </button>
             </div>
             <h2 className="header__title">
-              Hello User{" "}
+              Hello {user?.username || 'User'}{" "}
               <span>
                 <Image
                   className="inline-block"
