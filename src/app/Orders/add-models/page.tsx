@@ -750,6 +750,7 @@ const generateImagesOnlyPDF = async (pdfDoc) => {
             const details = [
               `Model: ${model.item || '-'}`,
               `Size: ${model.size || '-'}`,
+              `Quantity: ${model.quantity || '-'}`,
               `Purity: ${model.purity || '-'}`,
               `Net Weight: ${model.netWeight || '-'}`,
               `Stone Weight: ${model.stoneWeight || '-'}`,
