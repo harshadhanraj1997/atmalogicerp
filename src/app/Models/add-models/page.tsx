@@ -303,7 +303,7 @@ const AddJewelryModel = () => {
 
       if (result.success) {
         alert('Model added successfully!');
-        router.push('/jewelry-models');
+        router.push('/add-models');
       } else {
         throw new Error(result.message || 'Failed to add model');
       }

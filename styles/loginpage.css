@@ -31,6 +31,7 @@ body {
     align-items: center;
     justify-content: center;
     height: 100vh;
+    padding-left: 60px;
   }
   
   /* Form */

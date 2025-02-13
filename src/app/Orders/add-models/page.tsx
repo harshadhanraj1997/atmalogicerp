@@ -116,10 +116,22 @@ const AddModel = () => {
     console.log("Raw API Response:", data);
     
     if (data.success && data.data) {
-      // Since data.data might be an array, get the first item
-      const orderData = Array.isArray(data.data) ? data.data[0] : data.data;
-      setOrderDetails(orderData);
-      console.log("Stored order details:", orderData);
+      // Find the exact order that matches our orderId
+      const orderData = Array.isArray(data.data) 
+        ? data.data.find(order => order.id === orderId)
+        : data.data;
+
+      if (orderData) {
+        setOrderDetails(orderData);
+        console.log("Stored order details:", orderData);
+      } else {
+        console.error("Order not found for orderId:", orderId);
+        toast({
+          title: "Error",
+          description: "Order details not found",
+          status: "error"
+        });
+      }
     } else {
       console.error("API returned success: false");
     }
@@ -209,7 +221,6 @@ const handleAdd = () => {
     size: '',
     color: '',
     quantity: '',
-    wtWeight: '',
     stoneWeight: '',
     netWeight: '',
     grossWeight: '',
@@ -249,7 +260,6 @@ const handleAdd = () => {
        size: model.size,
        color: model.color,
        quantity: model.quantity,
-       wtWeight: model.wtWeight,
        stoneWeight: model.stoneWeight,
        netWeight: model.netWeight,
        grossWeight: model.grossWeight,
@@ -356,19 +366,19 @@ const embedBase64Image = async (base64Data, pdfDoc) => {
   }
 };
 
-// Adjusted column widths to match the example layout
+// Update column widths to ensure proper spacing
 const columnWidths = {
-  category: 0.15,        // Mogapu Plain(MUPL)
-  item: 0.08,           // 1011
-  purity: 0.06,         // 24K
-  size: 0.06,           // 3.5mm
-  color: 0.06,          // yellow
-  quantity: 0.05,       // 3
-  wtWeight: 0.07,    // 6.35
-  stoneWeight: 0.07,    // 0
-  netWeight: 0.07,      // 6.350
-  remarks: 0.13,        // No remarks
-  image: 0.20          // Image with more space
+  category: 0.15,
+  item: 0.08,
+  purity: 0.06,
+  size: 0.06,
+  color: 0.06,
+  quantity: 0.07,
+  stoneWeight: 0.07,
+  netWeight: 0.07,
+  grossWeight: 0.07,
+  remarks: 0.11,
+  image: 0.20
 };
 
 // Keep the row height
@@ -474,47 +484,70 @@ const generatePDF = async (pdfDoc) => {
 
     y = currentY - lineHeight * 2;
 
-    // Define table structure
-    const tableHeaderMapping = [
-      { display: 'Category', key: 'category', width: 0.15 },
-      { display: 'Item', key: 'item', width: 0.08 },
-      { display: 'Purity', key: 'purity', width: 0.06 },
-      { display: 'Size', key: 'size', width: 0.06 },
-      { display: 'Color', key: 'color', width: 0.06 },
-      { display: 'Quantity', key: 'quantity', width: 0.05 },
-      { display: 'WT Weight', key: 'wtWeight', width: 0.07 },
-      { display: 'Stone Weight', key: 'stoneWeight', width: 0.07 },
-      { display: 'Net Weight', key: 'netWeight', width: 0.07 },
-      { display: 'Gross Weight', key: 'grossWeight', width: 0.07 },
-      { display: 'Remarks', key: 'remarks', width: 0.13 },
-      { display: 'Image', key: 'image', width: 0.20 }
+    // Define headers with proper spacing
+    const tableHeaders = [
+      { text: 'Category', width: 0.15 },
+      { text: 'Item', width: 0.08 },
+      { text: 'Purity', width: 0.06 },
+      { text: 'Size', width: 0.06 },
+      { text: 'Color', width: 0.06 },
+      { text: 'Quantity', width: 0.07 },
+      { text: 'Stone Wt', width: 0.07 },
+      { text: 'Net Wt', width: 0.07 },
+      { text: 'Gross Wt', width: 0.07 },
+      { text: 'Remarks', width: 0.11 },
+      { text: 'Image', width: 0.20 }
     ];
 
-    // Draw "Model Details" heading
-    page.drawText("Model Details", {
-      x: margin,
-      y: y,
-      size: 14,
-      font: boldFont
-    });
-    y -= 30;
-
-    // Draw table headers with proper spacing
-    const headers = ['Category', 'Item', 'Purity', 'Size', 'Color', 'Quantity', 'WT Weight', 'Stone Weight', 'Net Weight', 'Gross Weight', 'Remarks', 'Image'];
+    // Draw table headers
     let xPos = margin;
+    const headerHeight = 40; // Increased height for better spacing
+    const fontSize = 9;
     
-    headers.forEach((header, index) => {
-      const columnWidth = columnWidths[Object.keys(columnWidths)[index]] * (page.getWidth() - 2 * margin);
-      page.drawText(header, {
+    // Draw header cells
+    tableHeaders.forEach((header) => {
+      const columnWidth = header.width * (page.getWidth() - 2 * margin);
+      
+      // Draw cell border
+      page.drawRectangle({
         x: xPos,
-        y: y,
-        size: 9,  // Slightly smaller font size for headers
-        font: boldFont
+        y: y - headerHeight,
+        width: columnWidth,
+        height: headerHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 0.5,
+        color: rgb(0.95, 0.95, 0.95)
       });
+
+      // Handle multi-line headers
+      const lines = header.text.split('\n');
+      const lineHeight = fontSize + 4; // Add some padding between lines
+      const totalTextHeight = lines.length * lineHeight;
+      
+      // Calculate starting Y position to center text vertically
+      let textY = y - (headerHeight - totalTextHeight) / 2;
+      
+      // Adjust starting Y position based on number of lines
+      if (lines.length > 1) {
+        textY += lineHeight / 2;
+      }
+
+      lines.forEach((line, index) => {
+        const textWidth = boldFont.widthOfTextAtSize(line.trim(), fontSize);
+        const textX = xPos + (columnWidth - textWidth) / 2;
+        
+        page.drawText(line.trim(), {
+          x: textX,
+          y: textY - (index * lineHeight),
+          size: fontSize,
+          font: boldFont
+        });
+      });
+
       xPos += columnWidth;
     });
 
-    y -= 20;
+    y -= headerHeight; // Move down after headers
 
     // Draw table rows with adjusted spacing
     for (const model of models) {
@@ -531,7 +564,6 @@ const generatePDF = async (pdfDoc) => {
         model.size || '',
         model.color || '',
         model.quantity?.toString() || '',
-        model.wtWeight?.toString() || '',
         model.stoneWeight?.toString() || '',
         model.netWeight?.toString() || '',
         model.grossWeight?.toString() || '',
@@ -554,7 +586,7 @@ const generatePDF = async (pdfDoc) => {
         const text = data?.toString() || '';
         
         // Special handling for remarks column
-        if (tableHeaderMapping[index].key === 'remarks') {
+        if (tableHeaders[index].text === 'Remarks') {
           const maxWidth = cellWidth - 10; // Leave some padding
           const lines = wrapText(text, maxWidth, font, 8);
           
@@ -602,7 +634,7 @@ const generatePDF = async (pdfDoc) => {
 
           if (embeddedImage) {
             // Draw cell border first
-            const imageColumnWidth = tableHeaderMapping[10].width * (page.getWidth() - 2 * margin); // Use index 10 for image column
+            const imageColumnWidth = columnWidths['image'] * (page.getWidth() - 2 * margin); // Use index 9 for image column
             
             page.drawRectangle({
               x: xPos,
@@ -649,7 +681,7 @@ const generatePDF = async (pdfDoc) => {
           page.drawRectangle({
             x: xPos,
             y: y - rowHeight,
-            width: tableHeaderMapping[10].width * (page.getWidth() - 2 * margin),
+            width: columnWidths['image'] * (page.getWidth() - 2 * margin),
             height: rowHeight,
             borderColor: rgb(0, 0, 0),
             borderWidth: 0.5
@@ -660,7 +692,7 @@ const generatePDF = async (pdfDoc) => {
         page.drawRectangle({
           x: xPos,
           y: y - rowHeight,
-          width: tableHeaderMapping[10].width * (page.getWidth() - 2 * margin),
+          width: columnWidths['image'] * (page.getWidth() - 2 * margin),
           height: rowHeight,
           borderColor: rgb(0, 0, 0),
           borderWidth: 0.5
@@ -800,12 +832,16 @@ const handleRemoveRow = (index: number) => {
 };
 
  return (
-   <div className="container mx-auto p-4">
-     <Card className="mb-8">
+   <div className="container mx-auto p-4" style={{ 
+     paddingLeft: '300px',  // Increased padding to account for sidebar width
+     paddingTop: '80px', 
+     paddingRight: '40px'
+   }}>
+     <Card className="mb-8" style={{ marginTop: '40px' }}>
        <CardHeader>
-         <CardTitle>Add Model</CardTitle>
+         <CardTitle>Update Inventory</CardTitle>
        </CardHeader>
-       <CardContent>
+       <CardContent style={{ paddingTop: '30px' }}>
          <form className="grid grid-cols-2 gap-4">
            {/* Form fields */}
            <div>
@@ -1045,9 +1081,9 @@ const handleRemoveRow = (index: number) => {
        <CardHeader>
          <CardTitle>Added Models</CardTitle>
        </CardHeader>
-       <CardContent>
+       <CardContent style={{ paddingLeft: '40px' }}>
          <div className="overflow-x-auto">
-           <table className="w-full">
+           <table className="w-full" style={{ paddingLeft: '40px' }}>
              <thead>
                <tr>
                  <th className="p-2 border">Category</th>
@@ -1056,8 +1092,8 @@ const handleRemoveRow = (index: number) => {
                  <th className="p-2 border">Size</th>
                  <th className="p-2 border">Color</th>
                  <th className="p-2 border">Quantity</th>
-                 <th className="p-2 border">Net Weight</th>
                  <th className="p-2 border">Stone Weight</th>
+                 <th className="p-2 border">Net Weight</th>
                  <th className="p-2 border">Gross Weight</th>
                  <th className="p-2 border">Remarks</th>
                  <th className="p-2 border">Image</th>
@@ -1073,8 +1109,8 @@ const handleRemoveRow = (index: number) => {
                    <td className="p-2 border">{model.size}</td>
                    <td className="p-2 border">{model.color}</td>
                    <td className="p-2 border">{model.quantity}</td>
-                   <td className="p-2 border">{model.netWeight}</td>
                    <td className="p-2 border">{model.stoneWeight}</td>
+                   <td className="p-2 border">{model.netWeight}</td>
                    <td className="p-2 border">{model.grossWeight}</td>
                    <td className="p-2 border">{model.remarks}</td>
                    <td className="p-2 border">
