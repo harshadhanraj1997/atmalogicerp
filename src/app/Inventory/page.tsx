@@ -176,3 +176,4 @@ const InventoryUpdateForm = () => {
 };
 
 export default InventoryUpdateForm;
+

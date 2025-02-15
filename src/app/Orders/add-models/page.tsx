@@ -11,6 +11,9 @@ import "../add-order/add-order.css";
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
+// Add this at the top of the file, with other component-level constants
+const margin = 30;
+const summaryHeaderWidth = 150; // Fixed width for summary table columns
 
 const AddModel = () => {
  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -155,7 +158,7 @@ const AddModel = () => {
   }
 };
 
-// First, update the handleItemSelect function to store the image URL
+// Update handleItemSelect function
 const handleItemSelect = async (itemName) => {
   try {
     console.log("Selected item name:", itemName);
@@ -167,28 +170,52 @@ const handleItemSelect = async (itemName) => {
       const size = selectedItem.Size || '';
       let imageUrl = selectedItem.ImageURL || '';
 
-      console.log("Found net weight:", netWeight);
-      console.log("Found size:", size);
-      console.log("Original image URL:", imageUrl);
+      // Check if category contains PLAIN or STONE
+      const categoryUpper = (formData.category || '').toUpperCase().trim();
+      console.log("Original Category:", formData.category);
+      console.log("Trimmed Uppercase Category:", categoryUpper);
+      console.log("Length of category:", categoryUpper.length);
+      console.log("Contains 'PLAIN':", categoryUpper.indexOf('PLAIN') !== -1);
+      console.log("Contains 'STONE':", categoryUpper.indexOf('STONE') !== -1);
+      
+      const isPlainCategory = categoryUpper.indexOf('PLAIN') !== -1;
+      const isStoneCategory = categoryUpper.indexOf('STONE') !== -1;
+      
+      console.log("Is Plain Category:", isPlainCategory);
+      console.log("Is Stone Category:", isStoneCategory);
+      console.log("------------------------");
+
+      // Handle plain and stone items differently
+      const formDataUpdate = {
+        item: selectedItem.Name,
+        netWeight: netWeight,
+        size: size,
+        color: 'Yellow'
+      };
+
+      if (isPlainCategory) {
+        console.log("Plain category detected");
+        formDataUpdate.stoneWeight = '0';
+        formDataUpdate.grossWeight = netWeight;
+      } else if (isStoneCategory) {
+        console.log("Stone category detected");
+        formDataUpdate.stoneWeight = '';
+        formDataUpdate.grossWeight = '';
+      } else {
+        formDataUpdate.stoneWeight = '';
+        formDataUpdate.grossWeight = '';
+      }
 
       // Update form data
       setFormData(prev => ({
         ...prev,
-        item: selectedItem.Name,
-        netWeight: netWeight,
-        size: size,
-        stoneWeight: '',
-        grossWeight: '',
-        color: 'Yellow'
+        ...formDataUpdate
       }));
 
       // Handle image URL
       if (imageUrl) {
-        // Construct the download URL using the existing endpoint
         const downloadUrl = `${apiBaseUrl}/api/download-file?url=${encodeURIComponent(imageUrl)}`;
         console.log("Download URL:", downloadUrl);
-        
-        // Set the image URL directly
         setModelImage(downloadUrl);
       } else {
         setModelImage(null);
@@ -366,23 +393,93 @@ const embedBase64Image = async (base64Data, pdfDoc) => {
   }
 };
 
-// Update column widths to ensure proper spacing
-const columnWidths = {
-  category: 0.15,
-  item: 0.08,
-  purity: 0.06,
-  size: 0.06,
-  color: 0.06,
-  quantity: 0.07,
-  stoneWeight: 0.07,
-  netWeight: 0.07,
-  grossWeight: 0.07,
-  remarks: 0.11,
-  image: 0.20
+// Update calculateCategorySummary function to handle stone items correctly
+const calculateCategorySummary = (models) => {
+  console.log("Starting category summary calculation");
+  const plainSummary = {};
+  const stoneSummary = {};
+  const regularSummary = {};
+
+  models.forEach(model => {
+    const category = model.category;
+    const categoryUpper = (category || '').toUpperCase().trim();
+    const isPlainCategory = categoryUpper.includes('PLAIN');
+    const isStoneCategory = categoryUpper.includes('STONE');
+    
+    console.log("Processing category:", category);
+    console.log("Is Plain:", isPlainCategory);
+    console.log("Is Stone:", isStoneCategory);
+
+    if (isPlainCategory) {
+      if (!plainSummary[category]) {
+        plainSummary[category] = {
+          quantity: 0,
+          netWeight: 0,
+          grossWeight: 0,
+          stoneWeight: 0
+        };
+      }
+      plainSummary[category].quantity += Number(model.quantity) || 0;
+      plainSummary[category].netWeight += Number(model.grossWeight) || 0;
+      plainSummary[category].grossWeight += Number(model.grossWeight) || 0;
+      plainSummary[category].stoneWeight = 0;
+    } 
+    else if (isStoneCategory) {
+      if (!stoneSummary[category]) {
+        stoneSummary[category] = {
+          quantity: 0,
+          netWeight: 0,
+          grossWeight: null,
+          stoneWeight: null  // Changed to null for stone items
+        };
+      }
+      stoneSummary[category].quantity += Number(model.quantity) || 0;
+      stoneSummary[category].netWeight += Number(model.netWeight) || 0;
+      // Both stone weight and gross weight remain null for stone items
+    }
+    else {
+      if (!regularSummary[category]) {
+        regularSummary[category] = {
+          quantity: 0,
+          netWeight: 0,
+          grossWeight: 0,
+          stoneWeight: 0
+        };
+      }
+      regularSummary[category].quantity += Number(model.quantity) || 0;
+      regularSummary[category].netWeight += Number(model.netWeight) || 0;
+      regularSummary[category].grossWeight += Number(model.grossWeight) || 0;
+      regularSummary[category].stoneWeight += Number(model.stoneWeight) || 0;
+    }
+  });
+
+  return {
+    plain: plainSummary,
+    stone: stoneSummary,
+    regular: regularSummary
+  };
 };
 
-// Keep the row height
-const rowHeight = 120;
+// Update column widths with larger category column
+const columnWidths = {
+  category: 0.15,    // Increased from 0.14 to 0.17
+  item: 0.10,
+  purity: 0.05,
+  size: 0.05,
+  color: 0.05,
+  quantity: 0.05,
+  stoneWeight: 0.06,
+  netWeight: 0.06,
+  grossWeight: 0.06,
+  remarks: 0.13,     // Decreased from 0.13 to 0.10 to compensate
+  image: 0.15
+};
+
+// Total = 1.0 (0.04 + 0.17 + 0.08 + 0.06 + 0.06 + 0.06 + 0.07 + 0.07 + 0.07 + 0.07 + 0.10 + 0.15)
+
+// Decrease row height
+const headerHeight = 30;
+const rowHeight = 100;  // Decreased from 120 to 100
 
 // Add this helper function for text wrapping
 const wrapText = (text: string, width: number, font: PDFFont, fontSize: number) => {
@@ -404,7 +501,7 @@ const wrapText = (text: string, width: number, font: PDFFont, fontSize: number) 
   return lines;
 };
 
-// Update the generatePDF function to include order details
+// Update the generatePDF function to include the category summary table
 const generatePDF = async (pdfDoc) => {
   try {
     if (!orderDetails) {
@@ -414,11 +511,13 @@ const generatePDF = async (pdfDoc) => {
 
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const fontSize = 9;
+    const headerFontSize = 9;
+    const textFontSize = 8;
 
     // Create first page
     let page = pdfDoc.addPage([841.89, 595.28]); // A4 Landscape
     let y = 550;
-    const margin = 30;
     const lineHeight = 20;
 
     // Draw company header
@@ -484,25 +583,277 @@ const generatePDF = async (pdfDoc) => {
 
     y = currentY - lineHeight * 2;
 
-    // Define headers with proper spacing
+    // Inside generatePDF function, after order details and before main table
+    console.log("Starting PDF generation");
+    const categorySummary = calculateCategorySummary(models);
+
+    // Add logging before summary tables
+    console.log("Category Summary Data:", categorySummary);
+    console.log("Plain items:", Object.keys(categorySummary.plain));
+    console.log("Stone items:", Object.keys(categorySummary.stone));
+    console.log("Regular items:", Object.keys(categorySummary.regular));
+
+    // Update plain items summary to match stone summary layout
+    if (Object.keys(categorySummary.plain).length > 0) {
+      // Add underline to the heading
+      page.drawText('Plain Items Summary', {
+        x: margin,
+        y: y + 40,
+        size: 12,
+        font: boldFont
+      });
+      
+      // Draw underline
+      page.drawLine({
+        start: { x: margin, y: y + 35 },
+        end: { x: margin + 150, y: y + 35 },
+        thickness: 1,
+        color: rgb(0, 0, 0),
+      });
+      
+      y -= 30;
+
+      // Keep headers aligned with data cells
+      const plainHeaders = ['Category', 'Quantity', 'Stone Weight', 'Net Weight', 'Gross Weight'];
+      let summaryXPos = margin + 100; // Increased indent to match stone summary
+      
+      plainHeaders.forEach(header => {
+        const width = summaryHeaderWidth * 0.8;
+        page.drawRectangle({
+          x: summaryXPos,
+          y: y,
+          width: width,
+          height: 25,
+          borderColor: rgb(0, 0, 0),
+          borderWidth: 0.5,
+          color: rgb(0.95, 0.95, 0.95)
+        });
+
+        const textWidth = boldFont.widthOfTextAtSize(header, 9);
+        page.drawText(header, {
+          x: summaryXPos + (width - textWidth) / 2,
+          y: y + 8,
+          size: 9,
+          font: boldFont
+        });
+
+        summaryXPos += width;
+      });
+      y -= 25;
+
+      // Draw plain items data with aligned columns
+      Object.entries(categorySummary.plain).forEach(([category, data]) => {
+        summaryXPos = margin + 100; // Match header indent
+        const rowData = [
+          category,
+          data.quantity.toString(),
+          '0.000',
+          data.netWeight.toFixed(3),
+          data.grossWeight.toFixed(3)
+        ];
+
+        rowData.forEach(text => {
+          const width = summaryHeaderWidth * 0.8;
+          page.drawRectangle({
+            x: summaryXPos,
+            y: y,
+            width: width,
+            height: 25,
+            borderColor: rgb(0, 0, 0),
+            borderWidth: 0.5
+          });
+
+          const textWidth = font.widthOfTextAtSize(text, 9);
+          page.drawText(text, {
+            x: summaryXPos + (width - textWidth) / 2,
+            y: y + 8,
+            size: 9,
+            font: font
+          });
+
+          summaryXPos += width;
+        });
+        y -= 25;
+      });
+
+      // Add total row with same alignment
+      summaryXPos = margin + 100; // Match header indent
+      const totalRow = [
+        'Total',
+        Object.values(categorySummary.plain).reduce((sum, data) => sum + data.quantity, 0).toString(),
+        '0.000',
+        Object.values(categorySummary.plain).reduce((sum, data) => sum + data.netWeight, 0).toFixed(3),
+        Object.values(categorySummary.plain).reduce((sum, data) => sum + data.grossWeight, 0).toFixed(3)
+      ];
+
+      totalRow.forEach((text, index) => {
+        const width = summaryHeaderWidth * 0.8;
+        page.drawRectangle({
+          x: summaryXPos,
+          y: y,
+          width: width,
+          height: 25,
+          borderColor: rgb(0, 0, 0),
+          borderWidth: 0.5,
+          color: index === 0 ? rgb(0.95, 0.95, 0.95) : rgb(1, 1, 1, 0)
+        });
+
+        const textWidth = boldFont.widthOfTextAtSize(text, 10);
+        page.drawText(text, {
+          x: summaryXPos + (width - textWidth) / 2,
+          y: y + 8,
+          size: 10,
+          font: boldFont
+        });
+
+        summaryXPos += width;
+      });
+      y -= 45; // Existing space after plain summary table
+      y -= 20; // Add extra gap before stone summary heading
+    }
+
+    // Update stone items summary to match plain items cell width
+    if (Object.keys(categorySummary.stone).length > 0) {
+      // Title and underline remain the same
+      page.drawText('Stone Items Summary', {
+        x: margin,
+        y: y + 40,
+        size: 12,
+        font: boldFont
+      });
+      
+      page.drawLine({
+        start: { x: margin, y: y + 35 },
+        end: { x: margin + 150, y: y + 35 },
+        thickness: 1,
+        color: rgb(0, 0, 0),
+      });
+      
+      y -= 30;
+
+      const stoneHeaders = ['Category', 'Quantity', 'Stone Weight', 'Net Weight', 'Gross Weight'];
+      let summaryXPos = margin + 100;
+      
+      stoneHeaders.forEach(header => {
+        const width = summaryHeaderWidth * 0.8; // Match plain items cell width
+        page.drawRectangle({
+          x: summaryXPos,
+          y: y,
+          width: width,
+          height: 25,
+          borderColor: rgb(0, 0, 0),
+          borderWidth: 0.5,
+          color: rgb(0.95, 0.95, 0.95)
+        });
+
+        const textWidth = boldFont.widthOfTextAtSize(header, 9);
+        page.drawText(header, {
+          x: summaryXPos + (width - textWidth) / 2,
+          y: y + 8,
+          size: 9,
+          font: boldFont
+        });
+
+        summaryXPos += width;
+      });
+      y -= 25;
+
+      // Draw stone items data with matching width
+      Object.entries(categorySummary.stone).forEach(([category, data]) => {
+        summaryXPos = margin + 100;
+        const rowData = [
+          category,
+          data.quantity.toString(),
+          '',  // Blank stone weight
+          data.netWeight.toFixed(3),
+          ''   // Blank gross weight
+        ];
+
+        rowData.forEach(text => {
+          const width = summaryHeaderWidth * 0.8; // Match plain items cell width
+          page.drawRectangle({
+            x: summaryXPos,
+            y: y,
+            width: width,
+            height: 25,
+            borderColor: rgb(0, 0, 0),
+            borderWidth: 0.5
+          });
+
+          const textWidth = font.widthOfTextAtSize(text, 9);
+          page.drawText(text, {
+            x: summaryXPos + (width - textWidth) / 2,
+            y: y + 8,
+            size: 9,
+            font: font
+          });
+
+          summaryXPos += width;
+        });
+        y -= 25;
+      });
+
+      // Add total row with matching width
+      summaryXPos = margin + 100;
+      const totalRow = [
+        'Total',
+        Object.values(categorySummary.stone).reduce((sum, data) => sum + data.quantity, 0).toString(),
+        '',  // Blank stone weight
+        Object.values(categorySummary.stone).reduce((sum, data) => sum + data.netWeight, 0).toFixed(3),
+        ''   // Blank gross weight
+      ];
+
+      totalRow.forEach((text, index) => {
+        const width = summaryHeaderWidth * 0.8; // Match plain items cell width
+        page.drawRectangle({
+          x: summaryXPos,
+          y: y,
+          width: width,
+          height: 25,
+          borderColor: rgb(0, 0, 0),
+          borderWidth: 0.5,
+          color: index === 0 ? rgb(0.95, 0.95, 0.95) : rgb(1, 1, 1, 0)
+        });
+
+        const textWidth = boldFont.widthOfTextAtSize(text, 10);
+        page.drawText(text, {
+          x: summaryXPos + (width - textWidth) / 2,
+          y: y + 8,
+          size: 10,
+          font: boldFont
+        });
+
+        summaryXPos += width;
+      });
+      y -= 45;
+    }
+
+    // After summary tables
+    console.log("Summary tables generated, starting main table...");
+    console.log("Current Y position:", y);
+
+    // Before main table headers
     const tableHeaders = [
+      { text: 'S.No', width: 0.04 },  // Add serial number column
       { text: 'Category', width: 0.15 },
-      { text: 'Item', width: 0.08 },
-      { text: 'Purity', width: 0.06 },
-      { text: 'Size', width: 0.06 },
-      { text: 'Color', width: 0.06 },
-      { text: 'Quantity', width: 0.07 },
-      { text: 'Stone Wt', width: 0.07 },
-      { text: 'Net Wt', width: 0.07 },
-      { text: 'Gross Wt', width: 0.07 },
-      { text: 'Remarks', width: 0.11 },
-      { text: 'Image', width: 0.20 }
+      { text: 'Item', width: 0.10 },
+      { text: 'Purity', width: 0.05 },
+      { text: 'Size', width: 0.05 },
+      { text: 'Color', width: 0.05 },
+      { text: 'Quantity', width: 0.05 },
+      { text: 'Stone Wt', width: 0.06 },
+      { text: 'Net Wt', width: 0.06 },
+      { text: 'Gross Wt', width: 0.06 },
+      { text: 'Remarks', width: 0.13 },
+      { text: 'Image', width: 0.15 }
     ];
+    console.log("Drawing main table headers...");
+
+    // After headers, before rows
+    console.log("Headers drawn, starting rows...");
 
     // Draw table headers
     let xPos = margin;
-    const headerHeight = 40; // Increased height for better spacing
-    const fontSize = 9;
     
     // Draw header cells
     tableHeaders.forEach((header) => {
@@ -550,6 +901,8 @@ const generatePDF = async (pdfDoc) => {
     y -= headerHeight; // Move down after headers
 
     // Draw table rows with adjusted spacing
+    console.log("Starting PDF generation");
+    let serialNo = 1;
     for (const model of models) {
       if (y < margin + 120) {
         page = pdfDoc.addPage([841.89, 595.28]);
@@ -557,6 +910,35 @@ const generatePDF = async (pdfDoc) => {
       }
 
       xPos = margin;
+      const rowHeight = 150;
+      const categoryUpper = (model.category || '').toUpperCase().trim();
+      const isPlainCategory = categoryUpper.includes('PLAIN');
+      const isStoneCategory = categoryUpper.includes('STONE');
+
+      // Draw serial number cell first
+      const serialWidth = (page.getWidth() - 2 * margin) * 0.04;
+      page.drawRectangle({
+        x: xPos,
+        y: y - rowHeight,
+        width: serialWidth,
+        height: rowHeight,
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 0.5
+      });
+
+      // Draw serial number text
+      const serialText = serialNo.toString();
+      const serialTextWidth = font.widthOfTextAtSize(serialText, 8);
+      page.drawText(serialText, {
+        x: xPos + (serialWidth - serialTextWidth) / 2,
+        y: y - rowHeight/2,
+        size: 8,
+        font: font
+      });
+
+      xPos += serialWidth;
+
+      // Rest of the row data
       const rowData = [
         model.category || '',
         model.item || '',
@@ -564,13 +946,13 @@ const generatePDF = async (pdfDoc) => {
         model.size || '',
         model.color || '',
         model.quantity?.toString() || '',
-        model.stoneWeight?.toString() || '',
-        model.netWeight?.toString() || '',
-        model.grossWeight?.toString() || '',
+        isPlainCategory ? '0' : (model.stoneWeight?.toString() || ''),
+        isPlainCategory ? model.grossWeight?.toString() : (model.netWeight?.toString() || ''),
+        isStoneCategory ? '' : (model.grossWeight?.toString() || ''),
         model.remarks || ''
       ];
 
-      // Draw row data with proper spacing
+      // Draw rest of the columns
       rowData.forEach((data, index) => {
         const cellWidth = columnWidths[Object.keys(columnWidths)[index]] * (page.getWidth() - 2 * margin);
         
@@ -634,7 +1016,7 @@ const generatePDF = async (pdfDoc) => {
 
           if (embeddedImage) {
             // Draw cell border first
-            const imageColumnWidth = columnWidths['image'] * (page.getWidth() - 2 * margin); // Use index 9 for image column
+            const imageColumnWidth = columnWidths['image'] * (page.getWidth() - 2 * margin);
             
             page.drawRectangle({
               x: xPos,
@@ -647,8 +1029,8 @@ const generatePDF = async (pdfDoc) => {
             });
 
             // Calculate image dimensions
-            const maxWidth = imageColumnWidth * 0.8;  // 80% of cell width
-            const maxHeight = rowHeight * 0.8; // 80% of cell height
+            const maxWidth = imageColumnWidth * 0.45;  // Reduced from 0.60 to 0.45
+            const maxHeight = rowHeight * 0.45;    // Reduced from 0.60 to 0.45
             
             // Get original aspect ratio
             const aspectRatio = embeddedImage.width / embeddedImage.height;
@@ -699,12 +1081,16 @@ const generatePDF = async (pdfDoc) => {
         });
       }
 
-      y -= 120; // Increased row height for better spacing
+      serialNo++;
+      y -= rowHeight;
     }
+
+    // After all rows
+    console.log("All rows drawn");
 
     return pdfDoc;
   } catch (error) {
-    console.error('Error generating PDF:', error);
+    console.error('Error in generatePDF:', error);
     return pdfDoc;
   }
 };
@@ -720,6 +1106,7 @@ const generateImagesOnlyPDF = async (pdfDoc) => {
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
     // Process each model
+    let serialNo = 1;
     for (const model of models) {
       if (model.modelImage) {
         try {
@@ -839,7 +1226,7 @@ const handleRemoveRow = (index: number) => {
    }}>
      <Card className="mb-8" style={{ marginTop: '40px' }}>
        <CardHeader>
-         <CardTitle>Update Inventory</CardTitle>
+         <CardTitle>Update Models</CardTitle>
        </CardHeader>
        <CardContent style={{ paddingTop: '30px' }}>
          <form className="grid grid-cols-2 gap-4">

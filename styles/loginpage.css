@@ -161,11 +161,14 @@ body {
   }
   
   /* Links */
-  .links a:nth-child(1) {
+  .links a:nth-child(1) { 
     float: left;
   }
   
   .links a:nth-child(2) {
     float: right;
   }
+  
+
+
   
