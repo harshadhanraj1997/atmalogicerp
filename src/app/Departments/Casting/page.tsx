@@ -10,7 +10,6 @@ import { AlertDescription } from "@/components/ui/alertdescription";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import "../../Orders/add-order/add-order.css";
 import CastingTable from "@/components/casting/castingtable";
-import { toast } from 'react-hot-toast';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 interface InventoryItem {
@@ -509,42 +508,6 @@ const CastingForm = () => {
     }
   };
 
-  // Add new state for transfer modal
-  const [showTransferModal, setShowTransferModal] = useState(false);
-  const [transferLoading, setTransferLoading] = useState(false);
-
-  // Add transfer function
-  const handleTransferToGrinding = async (castingId: string) => {
-    setTransferLoading(true);
-    try {
-      const response = await fetch(`${apiUrl}/api/transfer-to-grinding`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          castingId,
-          status: 'transferred',
-          department: 'grinding'
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to transfer to grinding');
-      }
-
-      toast.success('Successfully transferred to grinding department');
-      setShowTransferModal(false);
-      // Optionally refresh the data
-      fetchData();
-    } catch (error) {
-      console.error('Transfer error:', error);
-      toast.error('Failed to transfer to grinding');
-    } finally {
-      setTransferLoading(false);
-    }
-  };
-
   return (
     <div className="h-screen overflow-hidden">
       <div className="h-full overflow-y-auto p-4 pt-40 mt-[-30px] bg-gray-50">
@@ -782,26 +745,14 @@ const CastingForm = () => {
                             <td className="px-4 py-3 text-sm text-gray-900">{issuedGold.toFixed(4)}</td>
                             <td className="px-4 py-3 text-sm text-gray-900">{issuedAlloy.toFixed(4)}</td>
                             <td className="px-4 py-3 text-sm">
-                              <div className="flex items-center justify-start gap-[10px]">
-                                <Button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowTransferModal(true);
-                                  }}
-                                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1 rounded"
-                                >
-                                  <i className="fa-solid fa-share"></i>
-                                </Button>
-                                <Button
-                                  type="button"
-                                  onClick={() => handleRemoveInventoryItem(item.id)}
-                                  className="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded"
-                                  size="sm"
-                                >
-                                  Remove
-                                </Button>
-                              </div>
+                              <Button
+                                type="button"
+                                onClick={() => handleRemoveInventoryItem(item.id)}
+                                className="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded"
+                                size="sm"
+                              >
+                                Remove
+                              </Button>
                             </td>
                           </tr>
                         );
@@ -945,33 +896,6 @@ const CastingForm = () => {
         </div>
       </div>
   
-      {/* Add Transfer Modal */}
-      {showTransferModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Transfer to Grinding</h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to transfer this casting order to the grinding department?
-            </p>
-            <div className="flex justify-end gap-4">
-              <button
-                className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
-                onClick={() => setShowTransferModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                onClick={() => handleTransferToGrinding(castingNumber)}
-                disabled={transferLoading}
-              >
-                {transferLoading ? 'Transferring...' : 'Transfer'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
   );
 };
 
