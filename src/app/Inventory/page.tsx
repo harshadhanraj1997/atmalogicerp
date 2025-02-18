@@ -1,4 +1,3 @@
-
 "use client";
 import React, { useState } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
@@ -10,7 +9,7 @@ import { Alert } from "@/components/ui/alert";
 import { AlertDescription } from "@/components/ui/alertdescription";
 import "../Orders/add-order/add-order.css";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
 const InventoryUpdateForm = () => {
   const [formData, setFormData] = useState({
@@ -77,101 +76,98 @@ const InventoryUpdateForm = () => {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-2xl font-bold text-center">Update Inventory</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Item Name */}
-          <div className="space-y-2">
-            <Label htmlFor="itemName">Item Name</Label>
-            <Input
-              id="itemName"
-              name="itemName"
-              value={formData.itemName}
-              onChange={handleChange}
-              placeholder="Enter item name"
+    <div className="w-full p-4 mt-24">
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center">Update Inventory</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Item Name */}
+            <div className="space-y-2">
+              <Label htmlFor="itemName">Item Name</Label>
+              <Input
+                id="itemName"
+                name="itemName"
+                value={formData.itemName}
+                onChange={handleChange}
+                placeholder="Enter item name"
+                className="w-full"
+              />
+            </div>
+
+            {/* Purity */}
+            <div className="space-y-2">
+              <Label htmlFor="purity">Purity</Label>
+              <Input
+                id="purity"
+                name="purity"
+                value={formData.purity}
+                onChange={handleChange}
+                placeholder="Enter purity (e.g., 99.85%, 99.5%)"
+                className="w-full"
+              />
+            </div>
+
+            {/* Available Weight */}
+            <div className="space-y-2">
+              <Label htmlFor="availableWeight">Available Weight</Label>
+              <Input
+                id="availableWeight"
+                name="availableWeight"
+                type="number"
+                step="0.01"
+                value={formData.availableWeight}
+                onChange={handleChange}
+                placeholder="Enter available weight"
+                className="w-full"
+              />
+            </div>
+
+            {/* Unit of Measure */}
+            <div className="space-y-2">
+              <Label htmlFor="unitOfMeasure">Unit of Measure</Label>
+              <select
+                id="unitOfMeasure"
+                name="unitOfMeasure"
+                value={formData.unitOfMeasure}
+                onChange={handleChange}
+                className="w-full h-10 px-3 rounded-md border border-gray-300"
+              >
+                <option value="">Select Unit</option>
+                <option value="grams">Grams</option>
+                <option value="kilograms">Kilograms</option>
+                <option value="ounces">Ounces</option>
+              </select>
+            </div>
+
+            {/* Error Alert */}
+            {error && (
+              <Alert variant="destructive" className="mt-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {/* Success Alert */}
+            {success && (
+              <Alert className="mt-4 bg-green-50 text-green-700 border-green-200">
+                <AlertDescription>{success}</AlertDescription>
+              </Alert>
+            )}
+
+            {/* Submit Button */}
+            <Button 
+              type="submit" 
               className="w-full"
-            />
-          </div>
-
-          {/* Purity */}
-          <div className="space-y-2">
-            <Label htmlFor="purity">Purity</Label>
-            <select
-              id="purity"
-              name="purity"
-              value={formData.purity}
-              onChange={handleChange}
-              className="w-full h-10 px-3 rounded-md border border-gray-300"
+              disabled={isLoading}
             >
-              <option value="">Select Purity</option>
-              <option value="24K">24K</option>
-              <option value="22K">22K</option>
-              <option value="18K">18K</option>
-              <option value="14K">14K</option>
-            </select>
-          </div>
-
-          {/* Available Weight */}
-          <div className="space-y-2">
-            <Label htmlFor="availableWeight">Available Weight</Label>
-            <Input
-              id="availableWeight"
-              name="availableWeight"
-              type="number"
-              step="0.01"
-              value={formData.availableWeight}
-              onChange={handleChange}
-              placeholder="Enter available weight"
-              className="w-full"
-            />
-          </div>
-
-          {/* Unit of Measure */}
-          <div className="space-y-2">
-            <Label htmlFor="unitOfMeasure">Unit of Measure</Label>
-            <select
-              id="unitOfMeasure"
-              name="unitOfMeasure"
-              value={formData.unitOfMeasure}
-              onChange={handleChange}
-              className="w-full h-10 px-3 rounded-md border border-gray-300"
-            >
-              <option value="">Select Unit</option>
-              <option value="grams">Grams</option>
-              <option value="kilograms">Kilograms</option>
-              <option value="ounces">Ounces</option>
-            </select>
-          </div>
-
-          {/* Error Alert */}
-          {error && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Success Alert */}
-          {success && (
-            <Alert className="mt-4 bg-green-50 text-green-700 border-green-200">
-              <AlertDescription>{success}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Submit Button */}
-          <Button 
-            type="submit" 
-            className="w-full"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Updating...' : 'Update Inventory'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+              {isLoading ? 'Updating...' : 'Update Inventory'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

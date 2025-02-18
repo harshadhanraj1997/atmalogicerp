@@ -412,3 +412,40 @@ export interface ICreateProject {
   priority: string;
   status: string;
 }
+
+// Define an interface for the casting
+export interface ICasting {
+  id: string;
+  issuedWeight: number;
+  receivedWeight: number;
+  issuedDate: string;
+  receivedDate: string;
+  status: "Open" | "Completed" | "In Progress";
+  castingLoss: number;
+}
+
+// Define an interface for the casting form data
+export interface ICastingForm {
+  castingNumber: string;
+  date: string;
+  orders: string[];
+  waxTreeWeight: number;
+  purity: string;
+  calculatedWeight: number;
+  purityPercentages: {
+    pureGold: number;
+    alloy: number;
+  };
+  requiredMetals: {
+    pureGold: number;
+    alloy: number;
+  };
+  issuedItems: {
+    itemName: string;
+    purity: string;
+    issueWeight: number;
+    issuedGold: number;
+    issuedAlloy: number;
+  }[];
+  totalIssued: number;
+}

@@ -56,8 +56,8 @@ const sidebarData: SidebarCategory[] = [
         label: "Making Progress",
         icon: "fa-sharp fa-light fa-grid-2",
         subItems: [
-          { label: "Waxing", link: "/apps/calendar" },
-          { label: "Casting", link: "/apps/app-chat" },
+          { label: "Wax", link: "/apps/calendar" },
+          { label: "Casting", link: "/Departments/Casting/casting_table" },
           { label: "Grinding", link: "/apps/email-inbox" },
           { label: "Filing", link: "/apps/email-read" },
           { label: "Setting", link: "/apps/email-compose" },

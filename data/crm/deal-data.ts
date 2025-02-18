@@ -1,9 +1,10 @@
 import { IDeal } from "@/interface/table.interface";
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 // Function to fetch orders from the server
 export const fetchDealData = async (): Promise<IDeal[]> => {
   try {
-    const response = await fetch('https://needha-erp-server.onrender.com/api/orders');
+    const response = await fetch(`${apiUrl}/api/orders`);
     const result = await response.json();
     console.log("API Response:", result); // Log the entire response
 

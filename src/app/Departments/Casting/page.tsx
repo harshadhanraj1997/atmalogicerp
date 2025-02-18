@@ -1,0 +1,981 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert} from "@/components/ui/alert";
+import { AlertDescription } from "@/components/ui/alertdescription";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import "../../Orders/add-order/add-order.css";
+import CastingTable from "@/components/casting/castingtable";
+import { toast } from 'react-hot-toast';
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+interface InventoryItem {
+  id: string;
+  itemName: string;
+  issueWeight: number;
+  purity: string;
+  availableWeight: number;
+}
+
+interface Order {
+  id: string;
+  orderNumber: string;
+  partyName: string;
+}
+
+// Update the interface to match exact API response fields
+interface InventoryApiItem {
+  name: string;
+  availableWeight: number;  // Make sure this matches the API field name
+  purity: string;
+}
+
+const CastingForm = () => {
+  // Main form state
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [waxTreeWeight, setWaxTreeWeight] = useState<number>(0);
+  const [purity, setPurity] = useState<string>('');
+  const [calculatedWeight, setCalculatedWeight] = useState<number>(0);
+  
+  // Inventory items state
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  
+  // Form status
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Add state for showing/hiding dropdown
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Add state for inventory API items
+  const [inventoryApiItems, setInventoryApiItems] = useState<InventoryApiItem[]>([]);
+
+  // Add state for selected item
+  interface SelectedItem {
+    name: string;
+    purity: string;
+    availableWeight: number;
+    issueWeight: number;
+    metalToBeIssued: number;
+  }
+
+  const [selectedItem, setSelectedItem] = useState<SelectedItem>({
+    name: '',
+    purity: '',
+    availableWeight: 0,
+    issueWeight: 0,
+    metalToBeIssued: 0
+  });
+
+  // Add state for casting number
+  const [castingNumber, setCastingNumber] = useState<string>('');
+
+  // Add state for issued date
+  const [issuedDate, setIssuedDate] = useState<string>('');
+
+  // Add state for purity percentages
+  const [purityPercentages, setPurityPercentages] = useState({
+    pureGold: 0,
+    alloy: 0
+  });
+
+  // Default percentages with corrected 22K gold percentage
+  const defaultPercentages = {
+    '22K': { pureGold: 91.7, alloy: 8.3 },
+    '18K': { pureGold: 75.0, alloy: 25.0 },
+    '14K': { pureGold: 58.5, alloy: 41.5 },
+    '92.5%': { pureGold: 92.5, alloy: 7.5 }
+  };
+
+  // Update percentages when purity changes
+  useEffect(() => {
+    if (purity && defaultPercentages[purity as keyof typeof defaultPercentages]) {
+      setPurityPercentages(defaultPercentages[purity as keyof typeof defaultPercentages]);
+    }
+  }, [purity]);
+
+  // Calculate required metals (works for both gold and silver)
+  const calculateRequiredMetals = () => {
+    const totalWeight = calculatedWeight;
+    const purityDecimal = purityPercentages.pureGold / 100;
+    
+    return {
+      pureGold: totalWeight * purityDecimal,
+      alloy: totalWeight * (1 - purityDecimal)
+    };
+  };
+
+  // Fetch orders on component mount
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    try {
+      const response = await fetch(`${apiUrl}/api/orders`);
+      const data = await response.json();
+      console.log('Fetched Orders:', data);
+      if (data.success) {
+        console.log('Orders for selection:', data.data);
+        setOrders(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    }
+  };
+
+  // Also log when orders state changes
+  useEffect(() => {
+    console.log('Current orders in state:', orders);
+  }, [orders]);
+
+  // Log selected orders changes
+  useEffect(() => {
+    console.log('Selected orders:', selectedOrders);
+  }, [selectedOrders]);
+
+  // Fetch inventory items on component mount
+  useEffect(() => {
+    fetchInventoryItems();
+  }, []);
+
+  const fetchInventoryItems = async () => {
+    try {
+      const response = await fetch(`${apiUrl}/get-inventory`);
+      const data = await response.json();
+      console.log('Raw API Response:', data); // Log the raw response 
+      
+      if (data.success) {
+        // Log each item's structure
+        data.data.forEach((item: any) => {
+          console.log('Individual Item Structure:', {
+            name: item.name,
+            availableWeight: item.availableWeight,
+            purity: item.purity
+          });
+        });
+        
+        setInventoryApiItems(data.data);
+      } else {
+        console.log('Error Message:', data.message);
+        setError(data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching inventory:', error);
+      setError('Failed to fetch inventory items');
+    }
+  };
+
+  // Add log when inventory items state updates
+  useEffect(() => {
+    console.log('Current inventory API items in state:', inventoryApiItems);
+  }, [inventoryApiItems]);
+
+  // Calculate metal to be issued based on item name and purity
+  const calculateMetalToBeIssued = (itemName: string, itemPurity: string) => {
+    // Use remaining pure metal instead of total required pure metal
+    const remainingPureGold = remainingPureMetalRequired;
+    
+    // Convert item purity percentage to decimal (e.g., "91.7%" -> 0.917)
+    const purityDecimal = parseFloat(itemPurity.replace(/[^0-9.]/g, '')) / 100;
+    
+    // Check if item contains "gold" or "silver" (case insensitive)
+    if (itemName.toLowerCase().includes('gold'.toLowerCase()) && purity !== '92.5%' && remainingPureGold > 0) {
+      // Calculate metal to be issued based on remaining requirement and item's actual purity
+      if (purityDecimal > 0) {
+        return remainingPureGold / purityDecimal;
+      }
+    } 
+    // Handle silver calculations
+    else if (itemName.toLowerCase().includes('silver'.toLowerCase()) && purity === '92.5%' && remainingPureGold > 0) {
+      // Use the actual purity of the silver item
+      if (purityDecimal > 0) {
+        return remainingPureGold / purityDecimal;
+      }
+    }
+    return 0;
+  };
+
+  // Update handleItemSelection to recalculate when an item is selected
+  const handleItemSelection = (selectedItemName: string) => {
+    console.log('Selected Item Name:', selectedItemName);
+    
+    const foundItem = inventoryApiItems.find(item => item.name === selectedItemName);
+    console.log('Found Item:', foundItem);
+    
+    if (foundItem) {
+      const metalToBeIssued = calculateMetalToBeIssued(foundItem.name, foundItem.purity);
+      setSelectedItem({
+        name: foundItem.name,
+        purity: foundItem.purity,
+        availableWeight: foundItem.availableWeight,
+        issueWeight: 0,
+        metalToBeIssued: metalToBeIssued
+      });
+    }
+  };
+
+  // Add state to track remaining pure metal requirement
+  const [remainingPureMetalRequired, setRemainingPureMetalRequired] = useState<number>(0);
+  const [remainingAlloyRequired, setRemainingAlloyRequired] = useState<number>(0);
+
+  // Update both pure metal and alloy requirements when calculation changes
+  useEffect(() => {
+    const { pureGold, alloy } = calculateRequiredMetals();
+    setRemainingPureMetalRequired(pureGold);
+    setRemainingAlloyRequired(alloy);
+  }, [calculatedWeight, purityPercentages.pureGold, purityPercentages.alloy]);
+
+  const handleAddInventoryItem = () => {
+    if (!selectedItem.name) return;
+
+    // Convert purity to decimal (e.g., "91.7%" -> 0.917)
+    const purityDecimal = parseFloat(selectedItem.purity.replace(/[^0-9.]/g, '')) / 100;
+    
+    // Calculate pure metal content in the issued weight
+    const pureMetalContent = selectedItem.issueWeight * purityDecimal;
+    
+    // Calculate alloy content in the issued weight
+    const alloyContent = selectedItem.issueWeight * (1 - purityDecimal);
+    
+    // Update remaining requirements
+    const newRemainingPureMetal = remainingPureMetalRequired - pureMetalContent;
+    const newRemainingAlloy = remainingAlloyRequired - alloyContent;
+    
+    setRemainingPureMetalRequired(newRemainingPureMetal);
+    setRemainingAlloyRequired(newRemainingAlloy);
+
+    // Update available weight for the selected item
+    const updatedInventoryApiItems = inventoryApiItems.map(item => {
+      if (item.name === selectedItem.name) {
+        return {
+          ...item,
+          availableWeight: item.availableWeight - selectedItem.issueWeight
+        };
+      }
+      return item;
+    });
+    setInventoryApiItems(updatedInventoryApiItems);
+
+    const newItem: InventoryItem = {
+      id: Date.now().toString(),
+      itemName: selectedItem.name,
+      purity: selectedItem.purity,
+      availableWeight: selectedItem.availableWeight - selectedItem.issueWeight,
+      issueWeight: selectedItem.issueWeight
+    };
+
+    setInventoryItems([...inventoryItems, newItem]);
+    
+    // Reset selection
+    setSelectedItem({
+      name: '',
+      purity: '',
+      availableWeight: 0,
+      issueWeight: 0,
+      metalToBeIssued: 0
+    });
+  };
+
+  // Log inventory items state changes
+  useEffect(() => {
+    console.log('Updated Inventory Items:', inventoryItems);
+  }, [inventoryItems]);
+
+  // Add calculation function
+  const calculateWeight = (purity: string, weight: number) => {
+    switch(purity) {
+      case '22K':
+        return weight * 18;
+      case '18K':
+        return weight * 16;
+      case '14K':
+        return weight * 16;
+      case '92.5%':
+        return weight * 12; // Same calculation for silver
+      default:
+        return 0;
+    }
+  };
+
+  // Update calculation when purity or wax tree weight changes
+  useEffect(() => {
+    const result = calculateWeight(purity, waxTreeWeight);
+    setCalculatedWeight(result);
+  }, [purity, waxTreeWeight]);
+
+  // Update casting number generation
+  useEffect(() => {
+    const today = new Date();
+    const dateStr = today.toLocaleDateString('en-GB').split('/').join('/');
+    const storageKey = `castings_${dateStr}`;
+    
+    // Get the current count for today
+    const todayCastings = localStorage.getItem(storageKey);
+    let currentCount = todayCastings ? parseInt(todayCastings) : 0;
+    
+    // Format the next number with leading zeros
+    const nextCount = (currentCount + 1).toString().padStart(2, '0');
+    setCastingNumber(`${dateStr}/${nextCount}`);
+  }, []);
+
+  const generateCastingNumber = () => {
+    const today = new Date();
+    const dateStr = today.toLocaleDateString('en-GB').split('/').join('/');
+    const storageKey = `castings_${dateStr}`;
+    
+    // Get and increment the counter
+    const todayCastings = localStorage.getItem(storageKey);
+    let currentCount = todayCastings ? parseInt(todayCastings) : 0;
+    currentCount += 1;
+    
+    // Save the new count
+    localStorage.setItem(storageKey, currentCount.toString());
+    
+    // Format with leading zeros
+    return `${dateStr}/${currentCount.toString().padStart(2, '0')}`;
+  };
+
+  // Update the updateInventoryWeights function to prevent negative values
+  const updateInventoryWeights = async (issuedItems: any[]) => {
+    try {
+      const updatePromises = issuedItems.map(item => {
+        // Calculate new weight, if negative set to 0
+        const newWeight = Math.max(0, item.availableWeight - item.issueWeight);
+        
+        const updatedWeight = {
+          name: item.itemName,
+          availableWeight: newWeight
+        };
+
+        return fetch(`${apiUrl}/update-inventoryweights`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updatedWeight)
+        });
+      });
+
+      const responses = await Promise.all(updatePromises);
+      const results = await Promise.all(responses.map(res => res.json()));
+      
+      // Check if any updates failed
+      const failedUpdates = results.filter(result => !result.success);
+      if (failedUpdates.length > 0) {
+        throw new Error('Failed to update some inventory items');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error updating inventory weights:', error);
+      throw error;
+    }
+  };
+
+  // Update handleSubmit function
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      // Basic validations
+      if (selectedOrders.length === 0) {
+        throw new Error('Please select at least one order');
+      }
+      if (waxTreeWeight <= 0) {
+        throw new Error('Please enter valid wax tree weight');
+      }
+      if (inventoryItems.length === 0) {
+        throw new Error('Please add at least one inventory item');
+      }
+
+      console.log('Starting form submission...');
+
+      // First, update inventory weights
+      console.log('Updating inventory weights...');
+      await updateInventoryWeights(inventoryItems);
+
+      // Generate new casting number
+      const newCastingNumber = generateCastingNumber();
+      console.log('Generated casting number:', newCastingNumber);
+      
+      // Prepare casting data
+      const castingData = {
+        castingNumber: newCastingNumber,
+        date: issuedDate,
+        orders: selectedOrders,
+        waxTreeWeight: waxTreeWeight,
+        purity: purity,
+        calculatedWeight: calculatedWeight,
+        purityPercentages: {
+          pureGold: purityPercentages.pureGold,
+          alloy: purityPercentages.alloy
+        },
+        requiredMetals: {
+          pureGold: calculateRequiredMetals().pureGold,
+          alloy: calculateRequiredMetals().alloy
+        },
+        issuedItems: inventoryItems.map(item => ({
+          itemName: item.itemName,
+          purity: item.purity,
+          issueWeight: item.issueWeight,
+          updatedAvailableWeight: item.availableWeight - item.issueWeight
+        })),
+        totalIssued: inventoryItems.reduce((total, item) => total + item.issueWeight, 0)
+      };
+
+      console.log('Submitting casting data:', castingData);
+
+      // Submit casting data
+      const response = await fetch(`${apiUrl}/api/casting`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(castingData),
+      });
+
+      console.log('API Response:', response);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit casting form');
+      }
+
+      const data = await response.json();
+      console.log('API Response data:', data);
+
+      setSuccess('Casting form submitted successfully and inventory updated');
+      
+      // Reset form
+      setSelectedOrders([]);
+      setWaxTreeWeight(0);
+      setPurity('');
+      setInventoryItems([]);
+      setPurityPercentages({ pureGold: 0, alloy: 0 });
+      setRemainingPureMetalRequired(0);
+      setRemainingAlloyRequired(0);
+      
+      // Refresh inventory items
+      await fetchInventoryItems();
+
+    } catch (err: any) {
+      console.error('Form submission error:', err);
+      setError(err.message || 'An error occurred while submitting the form');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveInventoryItem = (id: string) => {
+    setInventoryItems(inventoryItems.filter(item => item.id !== id));
+  };
+
+  // Set current date on component mount
+  useEffect(() => {
+    const today = new Date();
+    const formattedDate = today.toLocaleDateString('en-GB'); // Format: dd/mm/yyyy
+    setIssuedDate(formattedDate);
+  }, []);
+
+  const [searchOrder, setSearchOrder] = useState('');
+  const [filteredOrders, setFilteredOrders] = useState(orders);
+
+  useEffect(() => {
+    const filtered = orders.filter(order => 
+      order.id.toLowerCase().includes(searchOrder.toLowerCase()) ||
+      order.partyName.toLowerCase().includes(searchOrder.toLowerCase())
+    );
+    setFilteredOrders(filtered);
+  }, [searchOrder, orders]);
+
+  // Handle pure metal percentage change
+  const handlePureGoldPercentageChange = (value: string) => {
+    const newPureGold = parseFloat(value) || 0;
+    if (newPureGold >= 0 && newPureGold <= 100) {
+      setPurityPercentages({
+        pureGold: newPureGold,
+        alloy: 100 - newPureGold
+      });
+    }
+  };
+
+  // Add new state for transfer modal
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferLoading, setTransferLoading] = useState(false);
+
+  // Add transfer function
+  const handleTransferToGrinding = async (castingId: string) => {
+    setTransferLoading(true);
+    try {
+      const response = await fetch(`${apiUrl}/api/transfer-to-grinding`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          castingId,
+          status: 'transferred',
+          department: 'grinding'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to transfer to grinding');
+      }
+
+      toast.success('Successfully transferred to grinding department');
+      setShowTransferModal(false);
+      // Optionally refresh the data
+      fetchData();
+    } catch (error) {
+      console.error('Transfer error:', error);
+      toast.error('Failed to transfer to grinding');
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
+  return (
+    <div className="h-screen overflow-hidden">
+      <div className="h-full overflow-y-auto p-4 pt-40 mt-[-30px] bg-gray-50">
+        <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-sm p-6 mr-[300px] md:mr-[300px]">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-semibold">Update Casting</h2>
+            <div className="text-sm font-medium">
+              Casting Number: <span className="text-blue-600">{castingNumber || '-'}</span>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm mb-1.5">Select Orders</Label>
+                <div className="relative">
+                  <Button 
+                    type="button"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="w-full h-10 text-sm justify-between bg-white border-gray-200"
+                    variant="outline"
+                  >
+                    {selectedOrders.length ? `${selectedOrders.length} orders selected` : 'Select Orders'}
+                    <span className="ml-2">▼</span>
+                  </Button>
+                  
+                  {isDropdownOpen && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-[400px] overflow-hidden">
+                      <div className="p-2 border-b sticky top-0 bg-white z-20">
+                        <Input
+                          type="text"
+                          placeholder="Search orders..."
+                          value={searchOrder}
+                          onChange={(e) => setSearchOrder(e.target.value)}
+                          className="h-8 text-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="overflow-y-auto max-h-[300px] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                        {filteredOrders.length > 0 ? (
+                          filteredOrders.map(order => (
+                            <div 
+                              key={order.id}
+                              className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100"
+                              onClick={() => {
+                                const isSelected = selectedOrders.includes(order.id);
+                                setSelectedOrders(isSelected 
+                                  ? selectedOrders.filter(id => id !== order.id)
+                                  : [...selectedOrders, order.id]
+                                );
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedOrders.includes(order.id)}
+                                onChange={() => {}}
+                                className="mr-2 h-4 w-4 rounded border-gray-300 text-blue-600"
+                              />
+                              <span>{`${order.id} - ${order.partyName}`}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-gray-500 text-center">
+                            No orders found
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Orders Display */}
+                {selectedOrders.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {selectedOrders.map(orderId => {
+                      const order = orders.find(o => o.id === orderId);
+                      return (
+                        <div 
+                          key={orderId}
+                          className="flex items-center justify-between bg-blue-50 px-3 py-1.5 rounded-md text-sm"
+                        >
+                          <span className="text-blue-700">
+                            {order ? `${order.id} - ${order.partyName}` : orderId}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedOrders(selectedOrders.filter(id => id !== orderId));
+                            }}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-sm mb-1.5">Purity *</Label>
+                <Select value={purity} onValueChange={setPurity}>
+                  <SelectTrigger className="h-10 bg-white border-gray-200 w-full">
+                    <SelectValue placeholder="Select Purity" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="22K">22K</SelectItem>
+                    <SelectItem value="18K">18K</SelectItem>
+                    <SelectItem value="14K">14K</SelectItem>
+                    <SelectItem value="92.5%">Silver (92.5%)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Wax Tree Weight */}
+            <div>
+              <Label className="text-sm mb-1.5">Wax Tree Weight (grams)</Label>
+              <Input
+                type="number"
+                step="0.0001"
+                value={waxTreeWeight || ''}
+                onChange={(e) => setWaxTreeWeight(parseFloat(e.target.value) || 0)}
+                className="h-10 bg-white border-gray-200"
+              />
+            </div>
+
+            {/* Inventory Items */}
+            <div className="space-y-3">
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="grid grid-cols-5 gap-4">
+                  <div>
+                    <Label className="text-sm mb-1.5">Item Name</Label>
+                    <Select
+                      value={selectedItem.name}
+                      onValueChange={handleItemSelection}
+                    >
+                      <SelectTrigger className="h-10 bg-white border-gray-200 w-full">
+                        <SelectValue placeholder="Select Item" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white">
+                        {inventoryApiItems.map((apiItem) => (
+                          <SelectItem key={apiItem.name} value={apiItem.name}>
+                            {apiItem.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label className="text-sm mb-1.5">Purity</Label>
+                    <Input
+                      type="text"
+                      value={selectedItem.purity}
+                      readOnly
+                      className="h-10 bg-gray-50 border-gray-200"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-sm mb-1.5">Available Weight (g)</Label>
+                    <Input
+                      type="number"
+                      value={selectedItem.availableWeight}
+                      readOnly
+                      className="h-10 bg-gray-50 border-gray-200"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-sm mb-1.5">Metal to be Issued (g)</Label>
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={selectedItem.metalToBeIssued.toFixed(4)}
+                      readOnly
+                      className="h-10 bg-gray-50 border-gray-200"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-sm mb-1.5">Issue Weight (g)</Label>
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={selectedItem.issueWeight}
+                      onChange={(e) => setSelectedItem({
+                        ...selectedItem,
+                        issueWeight: parseFloat(e.target.value) || 0
+                      })}
+                      className="h-10 bg-white border-gray-200"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Add Item Button */}
+              <Button
+                type="button"
+                onClick={handleAddInventoryItem}
+                className="w-full h-10 bg-blue-500 hover:bg-blue-600 text-white"
+                disabled={!selectedItem.name}
+              >
+                Add Item
+              </Button>
+            </div>
+
+              {/* Added Items Table */}
+              {inventoryItems.length > 0 && (
+                <div className="mt-12 mb-6 border rounded-lg overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purity</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issue Weight</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issued Gold</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issued Alloy</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {inventoryItems.map((item, index) => {
+                        const purityDecimal = parseFloat(item.purity.replace(/[^0-9.]/g, '')) / 100;
+                        const issuedGold = item.issueWeight * purityDecimal;
+                        const issuedAlloy = item.issueWeight * (1 - purityDecimal);
+                        
+                        return (
+                          <tr key={item.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-4 py-3 text-sm text-gray-900">{item.itemName}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900">{item.purity}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900">{item.issueWeight.toFixed(4)}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900">{issuedGold.toFixed(4)}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900">{issuedAlloy.toFixed(4)}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="flex items-center justify-start gap-[10px]">
+                                <Button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowTransferModal(true);
+                                  }}
+                                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1 rounded"
+                                >
+                                  <i className="fa-solid fa-share"></i>
+                                </Button>
+                                <Button
+                                  type="button"
+                                  onClick={() => handleRemoveInventoryItem(item.id)}
+                                  className="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 rounded"
+                                  size="sm"
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <div className="mt-6">
+                <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={loading}
+                >
+                  {loading ? 'Processing...' : 'Issue for Casting'}
+                </Button>
+              </div>
+
+              {/* Default Percentage Display */}
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div>
+                  <Label className="text-sm mb-1.5">
+                    Default {purity === '92.5%' ? 'Silver' : 'Gold'} Percentage
+                  </Label>
+                  <Input
+                    type="text"
+                    value={purity ? `${defaultPercentages[purity as keyof typeof defaultPercentages]?.pureGold}%` : '-'}
+                    readOnly
+                    className="h-10 bg-gray-50 border-gray-200"
+                  />
+                </div>
+              </div>
+
+              {/* Editable Percentages */}
+              {purity && (
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <Label className="text-sm mb-1.5">
+                      Pure {purity === '92.5%' ? 'Silver' : 'Gold'} Percentage
+                    </Label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      value={purityPercentages.pureGold}
+                      onChange={(e) => handlePureGoldPercentageChange(e.target.value)}
+                      className="h-10 bg-white border-gray-200"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm mb-1.5">
+                      {purity === '92.5%' ? 'Alloy' : 'Alloy'} Percentage
+                    </Label>
+                    <Input
+                      type="number"
+                      value={purityPercentages.alloy.toFixed(1)}
+                      readOnly
+                      className="h-10 bg-gray-50 border-gray-200"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Conditional Rendering based on Purity */}
+              {purity === '92.5%' ? (
+                <div className="mt-6 border rounded-lg overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Casting Number</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Required Purity</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Silver Tree Weight</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Required Metal</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Required Pure Metal</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Remaining Pure Metal</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Required Alloy</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Remaining Alloy</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Weight Issued</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Issued Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="px-3 py-2 text-sm font-medium text-blue-600">{castingNumber || '-'}</td>
+                        <td className="px-3 py-2 text-sm">{purity || '-'}</td>
+                        <td className="px-3 py-2 text-sm">{calculatedWeight.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-sm">{calculateRequiredMetals().pureGold.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-sm">{calculateRequiredMetals().pureGold.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-sm">{remainingPureMetalRequired.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-sm">{calculateRequiredMetals().alloy.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-sm">{remainingAlloyRequired.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-sm">
+                          {inventoryItems.reduce((total, item) => total + item.issueWeight, 0).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2 text-sm">{issuedDate}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                // Original Gold Table
+                <div className="mt-6 border rounded-lg overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Casting Number</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Required Purity</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Gold Tree Weight</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Required Metal</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Required Pure Metal</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Remaining Pure Metal</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Required Alloy</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Remaining Alloy</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Weight Issued</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Issued Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="px-3 py-2 text-sm font-medium text-blue-600">{castingNumber || '-'}</td>
+                        <td className="px-3 py-2 text-sm">{purity || '-'}</td>
+                        <td className="px-3 py-2 text-sm">{calculatedWeight.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-sm">{calculateRequiredMetals().pureGold.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-sm">{calculateRequiredMetals().pureGold.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-sm">{remainingPureMetalRequired.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-sm">{calculateRequiredMetals().alloy.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-sm">{remainingAlloyRequired.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-sm">
+                          {inventoryItems.reduce((total, item) => total + item.issueWeight, 0).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2 text-sm">{issuedDate}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+  
+      {/* Add Transfer Modal */}
+      {showTransferModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Transfer to Grinding</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to transfer this casting order to the grinding department?
+            </p>
+            <div className="flex justify-end gap-4">
+              <button
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                onClick={() => setShowTransferModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                onClick={() => handleTransferToGrinding(castingNumber)}
+                disabled={transferLoading}
+              >
+                {transferLoading ? 'Transferring...' : 'Transfer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CastingForm;
+
+
+

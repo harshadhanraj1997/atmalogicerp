@@ -1531,3 +1531,4 @@ const handleRemoveRow = (index: number) => {
 };
 
 export default AddModel;
+
