@@ -353,7 +353,7 @@ const CastingForm = () => {
           availableWeight: newWeight
         };
 
-        return fetch(`${apiUrl}/update-inventoryweights`, {
+        return fetch(`${apiUrl}/api/update-inventoryweights`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

@@ -14,7 +14,7 @@ import Paper from "@mui/material/Paper";
 import { visuallyHidden } from "@mui/utils";
 import useMaterialTableHook from "@/hooks/useMaterialTableHook";
 import { IDeal } from "@/interface/table.interface";
-import { ICasting } from "@/interface/table.interface";
+import { IFiling } from "@/interface/table.interface";              
 
 import { dealHeadCells } from "@/data/table-head-cell/table-head";
 import * as pdfjs from "pdfjs-dist";
@@ -26,12 +26,32 @@ import {
 import { Checkbox, Button } from "@mui/material";
 //import DealsDetailsModal from "./orderdeatilsModal";
 //import EditDealsModal from "./editorderModal";
-import { fetchDealData } from "@/data/crm/casting-data";
+import { fetchGrindingData } from "@/data/crm/filing-data";
 import TableControls from "@/components/elements/SharedInputs/TableControls";
 import DeleteModal from "@/components/common/DeleteModal";
 import { PDFDocument } from 'pdf-lib';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface Department {
+  value: string;
+  label: string;
+  path: string;
+}
+
+const departments: Department[] = [
+  { value: 'grinding', label: 'Grinding', path: '/Departments/Grinding/add_grinding_details' },
+  { value: 'setting', label: 'Setting', path: '/Departments/Setting/add_setting_details' },
+  { value: 'polish', label: 'Polish', path: '/Departments/Polish/add_polish_details' },
+  { value: 'dull', label: 'Dull', path: '/Departments/Dull/add_dull_details' }
+];
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 const downloadPDF = async (pdfUrl: string) => {
@@ -99,41 +119,13 @@ const getStatusClass = (status: string) => {
   }
 };
 
-const departments = [
-  { 
-    value: 'Grinding', 
-    label: 'Grinding',
-    path: '/Departments/Grinding/add_grinding_details'
-  },
-  { 
-    value: 'Filing', 
-    label: 'Filing',
-    path: '/Departments/Filing/add_filing_details'
-  },
-  { 
-    value: 'Setting', 
-    label: 'Setting',
-    path: '/Departments/Setting/add_setting_details'
-  },
-  { 
-    value: 'Polishing', 
-    label: 'Polishing',
-    path: '/Departments/Polishing/add_polishing_details'
-  },
-  { 
-    value: 'Dull', 
-    label: 'Dull',
-    path: '/Departments/Dull/add_dull_details'
-  },
-];
-
-const CastingTable = () => {
+const GrindingTable = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [editData, setEditData] = useState<IDeal | null>(null);
   const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number>(0);
-  const [deals, setDeals] = useState<ICasting[]>([]);
+  const [deals, setDeals] = useState<IFiling[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
@@ -141,13 +133,12 @@ const CastingTable = () => {
   const [showConfirmation, setShowConfirmation] = useState<number | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [showTransferMenu, setShowTransferMenu] = useState<string | null>(null);
 
   useEffect(() => {
     const loadDeals = async () => {
       try {
         setLoading(true);
-        const data = await fetchDealData();
+        const data = await fetchGrindingData();
         console.log("Fetched Deals:", data);
         setDeals(data);
       } catch (error) {
@@ -246,20 +237,6 @@ console.log("Deals State:", deals);
   const endIndex = startIndex + rowsPerPage;
   const paginatedRows = deals.slice(startIndex, endIndex);
 
-  // Add click-away listener
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showTransferMenu && !(event.target as HTMLElement).closest('.relative')) {
-        setShowTransferMenu(null);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showTransferMenu]);
-
   if (loading) return <div>Loading deals...</div>;
   if (error) return <div>Error: {error}</div>;
 
@@ -304,13 +281,13 @@ console.log("Deals State:", deals);
                             size="small"
                           />
                         </TableCell>
-                        <TableCell>Casting Id</TableCell>
+                        <TableCell>Filing Id</TableCell>
                         <TableCell>Issued Weight</TableCell>
                         <TableCell>Received Weight</TableCell>
                         <TableCell>Issued Date</TableCell>
                         <TableCell>Received Date</TableCell>
                         <TableCell>Status</TableCell>
-                        <TableCell>Casting Loss</TableCell>
+                        <TableCell>Filing Loss</TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -345,17 +322,17 @@ console.log("Deals State:", deals);
                                     padding: '4px 8px',
                                     borderRadius: '4px',
                                     color: 'white',
-                                    fontSize: '12px',
+                                    fontSize: '12px', 
                                     fontWeight: '500'
                                   }}
                                 >
                                   {deal.status}
                                 </span>
                               </TableCell>
-                              <TableCell>{deal.castingLoss}</TableCell>
+                              <TableCell>{deal.grindingLoss}</TableCell>
                               <TableCell className="table__icon-box">
                                 <div className="flex items-center justify-start gap-[10px]">
-                                  <Link href={`/Departments/Casting/show_casting_details?castingId=${deal.id}`} passHref>
+                                  <Link href={`/Departments/Filing/show_filing_details?filingId=${deal.id}`} passHref>
                                     <button
                                       type="button"
                                       className="table__icon edit"
@@ -375,12 +352,12 @@ console.log("Deals State:", deals);
                                     </button>
                                   </Link>
 
-                                  <Link href={`/Departments/Casting/casting_received_details?castingId=${deal.id}`} passHref>
+                                  <Link href={`/Departments/Filing/filing_received_details?filingId=${deal.id}`} passHref>
                                     <button
                                       type="button"
                                       className="table__icon edit"
                                       style={{
-                                        display: 'inline-block',
+                                        display: 'inline-block',      
                                         backgroundColor: 'green',
                                         color: 'white',
                                         borderRadius: '4px',
@@ -425,26 +402,37 @@ console.log("Deals State:", deals);
                                     <i className="fa-solid fa-check"></i>
                                   </button>
 
-                                  <div className="relative">
-                                    <select
-                                      className="form-select text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                                      onChange={(e) => {
-                                        e.preventDefault();
-                                        const selectedPath = departments.find(dept => dept.value === e.target.value)?.path;
-                                        if (selectedPath) {
-                                          window.location.href = `${selectedPath}?castingId=${deal.id}`;
-                                        }
+                                  <Select
+                                    onValueChange={(value) => {
+                                      const dept = departments.find(d => d.value === value);
+                                      if (dept) {
+                                        window.location.href = `${dept.path}?filingId=${deal.id}`;
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger 
+                                      className="w-[130px] h-8"
+                                      style={{
+                                        backgroundColor: '#6366F1',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
                                       }}
-                                      value=""
                                     >
-                                      <option value="" disabled>Transfer to</option>
+                                      <SelectValue placeholder="Transfer to" />
+                                    </SelectTrigger>
+                                    <SelectContent>
                                       {departments.map((dept) => (
-                                        <option key={dept.value} value={dept.value}>
-                                          Transfer to {dept.label}
-                                        </option>
+                                        <SelectItem 
+                                          key={dept.value} 
+                                          value={dept.value}
+                                          className="cursor-pointer hover:bg-gray-100"
+                                        >
+                                          {dept.label}
+                                        </SelectItem>
                                       ))}
-                                    </select>
-                                  </div>
+                                    </SelectContent>
+                                  </Select>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -618,4 +606,4 @@ console.log("Deals State:", deals);
     </>
   );
 }
-export default CastingTable
+export default GrindingTable;

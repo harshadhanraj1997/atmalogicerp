@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { degrees, PDFDocument, PDFImage, PDFPage, rgb,StandardFonts } from "pdf-lib";
 import {
   Dialog,
@@ -19,7 +19,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
+import Image from "next/image";
+import { toast } from "react-hot-toast";
+import { Trash2 } from "lucide-react";
 
 import COMPANY_LOGO from "@/assets/needhagoldlogo.png"
 import "./add-order.css"; // Ensure this import is present
@@ -71,6 +73,7 @@ interface OrderItem {
   size: string;
   quantity: string;
   remark: string;
+  designImage?: string;
 }
 
 const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
@@ -79,6 +82,9 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [partyLedgers, setPartyLedgers] = useState<string[]>([]);
   const [isOrderSaved, setIsOrderSaved] = useState(false);
+  const [designImage, setDesignImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* ---------------------- FORM DATA ---------------------- */
   const [formData, setFormData] = useState<FormData>({
@@ -232,55 +238,69 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
   };
 
   const handleAddItem = () => {
-    console.log('Adding new item:', {
+    if (!isOrderSaved) {
+      toast.error("Please save the order first");
+      return;
+    }
+
+    const newItem = {
       category: formData.category,
       weightRange: formData.wtRange,
       size: formData.size,
       quantity: formData.quantity,
-      remark: formData.itemRemark
-    });
-    
-    if (!orderInfo) {
-      console.log('Error: No order info saved yet');
-      alert("Please save the order information first.");
-      return;
-    }
-
-    const newItem: OrderItem = {
-      category: formData.category || "",
-      weightRange: formData.wtRange || "",
-      size: formData.size || "",
-      quantity: formData.quantity || "",
-      remark: formData.itemRemark || "",
+      remark: formData.itemRemark,
+      designImage: imagePreview
     };
 
-    console.log('Validating new item...');
-    if (!validateItem(newItem)) {
-      console.log('Item validation failed:', newItem);
-      alert("Please fill out all item fields (Category, Weight, Size, Quantity).");
-      return;
-    }
-
-    console.log('Adding item to order items list');
+    console.log('Adding new item with image:', newItem.designImage);
     setOrderItems([...orderItems, newItem]);
-    console.log('Current items count:', orderItems.length + 1);
-
-    // clear item fields
-    console.log('Clearing item form fields');
-    setFormData((prev) => ({
-      ...prev,
+    
+    setFormData({
+      ...formData,
       category: "",
       wtRange: "",
       size: "",
       quantity: "",
-      itemRemark: "",
-    }));
+      itemRemark: ""
+    });
+    setDesignImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleRemoveItem = (index: number) => {
     const updated = [...orderItems];
     updated.splice(index, 1);
     setOrderItems(updated);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        try {
+          const dataUrl = reader.result as string;
+          console.log('Image loaded:', {
+            type: file.type,
+            size: file.size,
+            dataUrl: dataUrl.substring(0, 100) // Log more of the data URL
+          });
+          setDesignImage(file);
+          setImagePreview(dataUrl);
+        } catch (error) {
+          console.error('Error processing uploaded image:', error);
+          toast.error('Failed to process image');
+        }
+      };
+      reader.onerror = () => {
+        console.error('Error reading file');
+        toast.error('Failed to read image file');
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmitOrder = async () => {
@@ -308,6 +328,10 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
       
       console.log('Order Data being sent:', orderData);
       formData.append('orderData', JSON.stringify(orderData));
+
+      if (designImage) {
+        formData.append('designImage', designImage);
+      }
 
       if (orderInfo.pdfBlob) {
         console.log('Adding PDF to form data');
@@ -344,8 +368,6 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
       alert(error.message);
     }
   };
-
- 
 
   const generatePDF = async () => {
     if (!orderInfo || orderItems.length === 0) {
@@ -568,11 +590,12 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
     });
     y -= lineHeight * 1.5;
   
-    // Table headers and columns
-    const headers = ["Design/Category", "Weight Range", "Size", "Quantity", "Total Weight", "Remarks"];
-    const columnWidths = [110, 90, 80, 60, 80, 100];
+    // Update headers and column widths
+    const headers = ["Design", "Category", "Weight Range", "Size", "Quantity", "Total Weight", "Remarks"];
+    const columnWidths = [80, 80, 80, 60, 60, 80, 80]; // Total should be around 520
+    const totalTableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
       
-    // Draw headers
+    // Draw table headers
     let currentX = margin;
     headers.forEach((header, index) => {
       drawTableCell(currentX, y, columnWidths[index], lineHeight, header, page, true);
@@ -580,53 +603,138 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
     });
     y -= lineHeight;
   
-    // Draw items  
+    // Draw items
     for (const item of orderItems) {
       const quantity = parseInt(item.quantity) || 0;
       const weightRange = item.weightRange || "0";
       let itemTotalWeight = 0;
-        
+      
       if (weightRange.includes("-")) {
         const [min, max] = weightRange.split("-").map((w) => parseFloat(w) || 0);
         itemTotalWeight = ((min + max) / 2) * quantity;
       } else {
         itemTotalWeight = (parseFloat(weightRange) || 0) * quantity;
       }
-        
+
+      const rowHeight = 60;
+      currentX = margin;
+      
+      // Draw the design cell border
+      drawTableCell(currentX, y, columnWidths[0], rowHeight, "", page);
+      
+      // Handle design image
+      if (item.designImage) {
+        try {
+          // Get image data
+          const imageData = item.designImage;
+          console.log('Processing image data:', imageData.substring(0, 100));
+
+          // Extract the base64 data and mime type
+          const matches = imageData.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+          
+          if (!matches || matches.length !== 3) {
+            console.error('Invalid image data format');
+            continue;
+          }
+
+          const [, mimeType, base64Data] = matches;
+          console.log('Image mime type:', mimeType);
+
+          try {
+            // Convert base64 to bytes
+            const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+            console.log('Converted to bytes:', imageBytes.length);
+
+            // Embed the image based on mime type
+            let pdfImage;
+            if (mimeType === 'image/png') {
+              pdfImage = await pdfDoc.embedPng(imageBytes);
+            } else if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+              pdfImage = await pdfDoc.embedJpg(imageBytes);
+            } else {
+              console.error('Unsupported image type:', mimeType);
+              continue;
+            }
+
+            if (pdfImage) {
+              // Calculate dimensions
+              const maxWidth = columnWidths[0] - 10;
+              const maxHeight = rowHeight - 10;
+              
+              const scale = Math.min(
+                maxWidth / pdfImage.width,
+                maxHeight / pdfImage.height
+              );
+              
+              const width = pdfImage.width * scale;
+              const height = pdfImage.height * scale;
+
+              // Center image in cell
+              const xOffset = margin + (columnWidths[0] - width) / 2;
+              const yOffset = y - rowHeight + (rowHeight - height) / 2;
+
+              // Draw image
+              page.drawImage(pdfImage, {
+                x: xOffset,
+                y: yOffset,
+                width,
+                height,
+              });
+
+              console.log('Image embedded successfully', {
+                dimensions: { width, height },
+                position: { x: xOffset, y: yOffset }
+              });
+            }
+          } catch (error) {
+            console.error('Error embedding image:', error);
+          }
+        } catch (error) {
+          console.error('Error processing image:', error);
+        }
+      }
+
+      // Draw other cells
+      currentX += columnWidths[0];
+      
       const values = [
         item.category || "N/A",
-        item.weightRange || "N/A", 
+        item.weightRange || "N/A",
         item.size || "N/A",
         quantity.toString(),
         itemTotalWeight.toFixed(2),
-        item.remark || "N/A",
+        item.remark || "N/A"
       ];
-        
-      const rowHeight = Math.max(
-        ...values.map((value, index) => getWrappedTextAndHeight(value, columnWidths[index], 10).height)  
-      );
-        
-      currentX = margin;  
+
       values.forEach((value, index) => {
-        drawTableCell(currentX, y, columnWidths[index], rowHeight, value, page);
-        currentX += columnWidths[index];
+        drawTableCell(currentX, y, columnWidths[index + 1], rowHeight, value, page);
+        currentX += columnWidths[index + 1];
       });
+
       y -= rowHeight;
-  
+
+      // Page break check
       if (y < 100) {
-        y = 800;
         page = pdfDoc.addPage([595.28, 841.89]);
         drawWatermark(page, logoImage);
+        y = 800;
+        
+        currentX = margin;
+        headers.forEach((header, index) => {
+          drawTableCell(currentX, y, columnWidths[index], lineHeight, header, page, true);
+          currentX += columnWidths[index];
+        });
+        y -= lineHeight;
       }
     }
   
     // Draw totals row
     currentX = margin;
-    const totalRow = ["TOTAL", "", "", totalQuantity.toString(), totalWeight.toFixed(2), ""];
+    const totalRow = ["", "TOTAL", "", "", totalQuantity.toString(), totalWeight.toFixed(2), ""];
       
     totalRow.forEach((value, index) => {
       drawTableCell(currentX, y, columnWidths[index], lineHeight, value, page, false, true);
-      currentX += columnWidths[index]; 
+      currentX += columnWidths[index];
     });
   
     // Generate PDF bytes
@@ -840,8 +948,65 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
                 disabled={!isOrderSaved}
               />
             </div>
+
+            {/* Update Design Image Upload UI with centered red icon */}
+            <div className="field-group">
+              <Label htmlFor="designImage">Design Image</Label>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="designImage"
+                  />
+                  {!imagePreview ? (
+                    <Button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full"
+                    >
+                      Upload Design Image
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-4 p-3 border rounded-md bg-white">
+                      <div className="relative w-20 h-20 flex-shrink-0">
+                        <Image
+                          src={imagePreview}
+                          alt="Design preview"
+                          fill
+                          className="object-contain rounded-md"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          setDesignImage(null);
+                          setImagePreview(null);
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = '';
+                          }
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-          <button className="add-item-button" onClick={handleAddItem}>Add Item</button>
+          <button 
+            className="add-item-button" 
+            onClick={handleAddItem}
+            disabled={!isOrderSaved}
+          >
+            Add Item
+          </button>
         </div>
       </div>
 
@@ -901,53 +1066,68 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
               <CardTitle>Order Items</CardTitle>
             </CardHeader>
             <CardContent>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th>Weight Range</th>
-                    <th>Size</th>
-                    <th>Quantity</th>
-                    <th>Remarks</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orderItems.map((item, index) => (
-                    <tr key={index}>
-                      <td>{item.category}</td>
-                      <td>{item.weightRange}</td>
-                      <td>{item.size}</td>
-                      <td>{item.quantity}</td>
-                      <td>{item.remark}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="remove-item-button"
-                          onClick={() => handleRemoveItem(index)}
-                        >
-                          Remove
-                        </button>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead>
+                    <tr>
+                      <th className="px-4 py-2">Design</th>
+                      <th className="px-4 py-2">Category</th>
+                      <th className="px-4 py-2">Weight Range</th>
+                      <th className="px-4 py-2">Size</th>
+                      <th className="px-4 py-2">Quantity</th>
+                      <th className="px-4 py-2">Remarks</th>
+                      <th className="px-4 py-2">Actions</th>
                     </tr>
-                  ))}
-                  <tr>
-                    <td
-                      colSpan={3}
-                      style={{ fontWeight: "bold", textAlign: "right" }}
-                    >
-                      Total:
-                    </td>
-                    <td style={{ fontWeight: "bold" }}>
-                      {orderItems.reduce(
-                        (sum, item) => sum + parseInt(item.quantity || "0", 10),
-                        0
-                      )}
-                    </td>
-                    <td colSpan={2}></td>
-                  </tr>
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {orderItems.map((item, index) => (
+                      <tr key={index}>
+                        <td className="px-4 py-2">
+                          {item.designImage && (
+                            <div className="relative w-20 h-20">
+                              <Image
+                                src={item.designImage}
+                                alt="Design"
+                                fill
+                                className="object-contain rounded-md"
+                              />
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">{item.category}</td>
+                        <td className="px-4 py-2">{item.weightRange}</td>
+                        <td className="px-4 py-2">{item.size}</td>
+                        <td className="px-4 py-2">{item.quantity}</td>
+                        <td className="px-4 py-2">{item.remark}</td>
+                        <td className="px-4 py-2">
+                          <button
+                            type="button"
+                            className="remove-item-button"
+                            onClick={() => handleRemoveItem(index)}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td
+                        colSpan={3}
+                        style={{ fontWeight: "bold", textAlign: "right" }}
+                      >
+                        Total:
+                      </td>
+                      <td style={{ fontWeight: "bold" }}>
+                        {orderItems.reduce(
+                          (sum, item) => sum + parseInt(item.quantity || "0", 10),
+                          0
+                        )}
+                      </td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
         )}

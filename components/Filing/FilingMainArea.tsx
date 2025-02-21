@@ -3,10 +3,10 @@
 import Link from "next/link";
 import React from "react";
 import { useRouter } from "next/navigation";
-import CastingTable from "./castingtable";
-import CastingSummary from "./castingSummary";
+import FilingTable from "./FilingTable";
+import FilingSummary from "./FilingSummary";
 
-const CastingMainArea = () => {
+const GrindingMainArea = () => {
   const router = useRouter();
 
   return (
@@ -20,23 +20,16 @@ const CastingMainArea = () => {
                 <li className="breadcrumb-item">
                   <Link href="/">Home</Link>
                 </li>
-                <li className="breadcrumb-item active">Casting</li>
+                <li className="breadcrumb-item active">Filing</li>
               </ol>
             </nav>
-            <div className="breadcrumb__btn">
-              <Link 
-                href="/Departments/Casting/"
-                className="btn btn-primary"
-              >
-                Create Casting order
-              </Link>
-            </div>
+            
           </div>
         </div>
         <div className="grid grid-cols-12 gap-x-6 maxXs:gap-x-0">
           {/* <DealsSummary /> */}
           {/* <CastingSummary /> */}
-          <CastingTable />
+          <FilingTable />
         </div>
       </div>
 
@@ -45,4 +38,4 @@ const CastingMainArea = () => {
   );
 };
 
-export default CastingMainArea;
+export default GrindingMainArea;

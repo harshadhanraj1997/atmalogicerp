@@ -415,6 +415,7 @@ export interface ICreateProject {
 
 // Define an interface for the casting
 export interface ICasting {
+  phase(phase: any): unknown;
   id: string;
   issuedWeight: number;
   receivedWeight: number;
@@ -448,4 +449,14 @@ export interface ICastingForm {
     issuedAlloy: number;
   }[];
   totalIssued: number;
+}
+
+export interface IFiling {
+  id: string;
+  issuedWeight: number;
+  issuedDate: string;
+  receivedWeight: number;
+  receivedDate: string;
+  status: string;
+  grindingLoss: number;
 }

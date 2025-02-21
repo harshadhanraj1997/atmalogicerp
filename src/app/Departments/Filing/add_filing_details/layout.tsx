@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import AddGrindingDetails from "@/src/app/Departments/Grinding/add_grinding_details/page";
+import AddFilingDetail from "@/src/app/Departments/Filing/add_filing_details/page";
 
 
 

@@ -56,13 +56,13 @@ const sidebarData: SidebarCategory[] = [
         label: "Making Progress",
         icon: "fa-sharp fa-light fa-grid-2",
         subItems: [
-          { label: "Wax", link: "/apps/calendar" },
           { label: "Casting", link: "/Departments/Casting/casting_table" },
-          { label: "Grinding", link: "/apps/email-inbox" },
-          { label: "Filing", link: "/apps/email-read" },
-          { label: "Setting", link: "/apps/email-compose" },
-
-          { label: "Rhodium", link: "/apps/contacts" },
+          { label: "Filing", link: "/Departments/Filing/add_filing_details/Grinding_Table" },
+          { label: "Grinding", link: "/Departments/Grinding/add_grinding_details/Grinding_Table" },
+          { label: "Setting", link: "/Departments/Setting/add_setting_details" },
+          { label: "Polishing", link: "/Departments/Polishing/add_polishing_details" },
+          { label: "Dull", link: "/Departments/Dull/add_dull_details" },
+          
           
         ],
       },
