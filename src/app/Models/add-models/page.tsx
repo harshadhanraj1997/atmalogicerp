@@ -270,24 +270,16 @@ const AddJewelryModel = () => {
         "location": ""
       };
 
-      // Append the model data as JSON string
       formDataToSend.append('jewelryModel', JSON.stringify(jewelryModelData));
-      
-      // Append stone details as JSON string
       formDataToSend.append('stoneDetails', JSON.stringify(formattedStoneDetails));
 
-      // Append the image file if it exists
       if (modelImage) {
         formDataToSend.append('item-image', modelImage);
       }
 
-      // Debug logs
-      console.log('JewelryModel data:', jewelryModelData);
-      console.log('Stone details:', formattedStoneDetails);
-
       const response = await fetch(`${apiBaseUrl}/api/add-jewelry`, {
         method: 'POST',
-        body: formDataToSend, // Send as FormData instead of JSON
+        body: formDataToSend,
       });
 
       const text = await response.text();
@@ -303,7 +295,24 @@ const AddJewelryModel = () => {
 
       if (result.success) {
         alert('Model added successfully!');
-        router.push('/add-models');
+        // Reset form data
+        setFormData({
+          itemGroup: '',
+          designSource: '',
+          category: '',
+          modelName: '',
+          size: '',
+          grossWeight: ''
+        });
+        // Reset stone details
+        setStoneDetails([]);
+        // Reset model image
+        setModelImage(null);
+        // Reset file input
+        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+        if (fileInput) {
+          fileInput.value = '';
+        }
       } else {
         throw new Error(result.message || 'Failed to add model');
       }

@@ -18,7 +18,7 @@ const sidebarData: SidebarCategory[] = [
           { label: "CRM Analytics", link: "/dashboard/crm-dashboard" },
         ],
       },
-      {
+      /*{
         id: 2,
         label: "HRM",
         icon: "icon-hrm",
@@ -39,7 +39,7 @@ const sidebarData: SidebarCategory[] = [
           { label: "Overtime", link: "/hrm/overtime" },
           { label: "Warning", link: "/hrm/warning" },
         ],
-      },
+      },*/
       {
         id: 3,
         label: "Orders",
@@ -58,30 +58,30 @@ const sidebarData: SidebarCategory[] = [
         subItems: [
           { label: "Casting", link: "/Departments/Casting/casting_table" },
           { label: "Filing", link: "/Departments/Filing/add_filing_details/Grinding_Table" },
-          { label: "Grinding", link: "/Departments/Grinding/add_grinding_details/Grinding_Table" },
-          { label: "Setting", link: "/Departments/Setting/add_setting_details" },
-          { label: "Polishing", link: "/Departments/Polishing/add_polishing_details" },
-          { label: "Dull", link: "/Departments/Dull/add_dull_details" },
+          { label: "Grinding", link: "/Departments/Grinding/Grinding_Table" },
+          { label: "Setting", link: "/Departments/Setting/Setting_Table" },
+          { label: "Polishing", link: "/Departments/Polishing/Polishing_Table" },
+          { label: "Dull", link: "/Departments/Dull/Dull_Table" },
           
           
         ],
       },
-      {
+     {
         id: 5,
-        label: "Payroll",
+        label:"Billing",
         icon: "fa-sharp fa-light fa-wallet",
         subItems: [
-          { label: "Pay List", link: "/payroll/payroll" },
-          { label: "Payslip", link: "/payroll/payroll-payslip" },
+          { label: "Tagging", link: "/Billing/Tagging" },
+          { label: "Receipt", link: "/Billing/Receipt" },
         ],
       },
-      {
+      /*
         id: 6,
         label: "Expense",
         icon: "icon-announcement",
         link: "/expense",
-      },
-      {
+      },*/
+      /*{
         id: 7,
         label: "Company",
         icon: "fa-sharp fa-light fa-wallet",
@@ -89,8 +89,8 @@ const sidebarData: SidebarCategory[] = [
           { label: "Company List", link: "/company/companies" },
           { label: "Company Details", link: "/company/company-details" },
         ],
-      },
-      {
+      },*/
+      /*{
         id: 8,
         label: "Clients",
         icon: "fa-sharp fa-light fa-wallet",
@@ -98,8 +98,8 @@ const sidebarData: SidebarCategory[] = [
           { label: "Clients", link: "/clients" },
           { label: "Client Details", link: "/clients/client-details" },
         ],
-      },
-      {
+      },*/
+      /*{
         id: 9,
         label: "Projects",
         icon: "icon-projects",
@@ -108,44 +108,44 @@ const sidebarData: SidebarCategory[] = [
           { label: "Projects Details", link: "/project/project-details" },
           { label: "Projects Create", link: "/project/project-create" },
         ],
-      },
-      {
+      },*/
+      /*{
         id: 10,
         label: "Activities",
         icon: "fa-sharp fa-regular fa-chart-network",
         link: "/activities",
-      },
-      {
+      },*/
+      /*{
         id: 11,
         label: "Training",
         icon: "icon-training",
         link: "/training",
-      },
-      {
+      },*/
+      /*{
         id: 12,
         label: "Resignation",
         icon: "icon-resignation",
         link: "/resignation",
-      },
-      {
+      },*/
+      /*{
         id: 13,
         label: "Promotion",
         icon: "icon-promotion",
         link: "/promotion",
-      },
-      {
+      },*/
+      /*{
         id: 14,
         label: "Award",
         icon: "icon-trophy",
         link: "/award",
-      },
-      {
+      },*/
+      /*{
         id: 15,
         label: "Meeting",
         icon: "icon-meeting",
         link: "/meeting",
-      },
-      {
+      },*/
+      /*{
         id: 16,
         label: "Tickets",
         icon: "icon-tickets1",
@@ -153,32 +153,32 @@ const sidebarData: SidebarCategory[] = [
           { label: "Tickets List", link: "/tickets" },
           { label: "Tickets Reply", link: "/tickets/tickets-reply" },
         ],
-      },
-      {
+      },*/
+      /*{
         id: 17,
         label: "Transfer",
         icon: "fa-sharp fa-regular fa-right-left",
         link: "/transfer",
-      },
-      {
+      },*/
+      /*{
         id: 18,
         label: "Termination",
         icon: "icon-termination",
         link: "/termination",
-      },
-      {
+      },*/
+      /*{
         id: 19,
         label: "Document",
         icon: "icon-document",
         link: "/document",
-      },
-      {
+      },*/
+      /*{
         id: 20,
         label: "Announcement",
         icon: "icon-announcement",
         link: "/announcement",
-      },
-      {
+      },*/
+      /*{
         id: 21,
         label: "Invoice",
         icon: "fa-light fa-book-blank",
@@ -188,10 +188,12 @@ const sidebarData: SidebarCategory[] = [
           { label: "Invoice Edit", link: "/invoice/app-invoice-edit" },
           { label: "Invoice List", link: "/invoice/app-invoice-list" },
         ],
-      },
+      },*/
     ],
   },
-  {
+
+  
+  /*{
     id: 2,
     category: "Pages",
     items: [
@@ -404,8 +406,9 @@ const sidebarData: SidebarCategory[] = [
         ],
       },
     ],
-  },
-  {
+  },*/
+  
+ /* {
     id: 6,
     category: "MultiLevel",
     items: [
@@ -433,7 +436,7 @@ const sidebarData: SidebarCategory[] = [
         ],
       },
     ],
-  },
+  },*/
 ];
 
 export default sidebarData;

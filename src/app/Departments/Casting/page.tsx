@@ -10,6 +10,7 @@ import { AlertDescription } from "@/components/ui/alertdescription";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import "../../Orders/add-order/add-order.css";
 import CastingTable from "@/components/casting/castingtable";
+import { toast } from "react-hot-toast";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 interface InventoryItem {
@@ -75,8 +76,14 @@ const CastingForm = () => {
   // Add state for casting number
   const [castingNumber, setCastingNumber] = useState<string>('');
 
-  // Add state for issued date
-  const [issuedDate, setIssuedDate] = useState<string>('');
+  // Initialize with current date in DD/MM/YYYY format
+  const [issuedDate, setIssuedDate] = useState<string>(() => {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    return `${day}/${month}/${year}`;
+  });
 
   // Add state for purity percentages
   const [purityPercentages, setPurityPercentages] = useState({
@@ -378,98 +385,139 @@ const CastingForm = () => {
     }
   };
 
-  // Update handleSubmit function
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      // Basic validations
-      if (selectedOrders.length === 0) {
-        throw new Error('Please select at least one order');
-      }
-      if (waxTreeWeight <= 0) {
-        throw new Error('Please enter valid wax tree weight');
-      }
-      if (inventoryItems.length === 0) {
-        throw new Error('Please add at least one inventory item');
-      }
-
-      console.log('Starting form submission...');
-
-      // First, update inventory weights
-      console.log('Updating inventory weights...');
-      await updateInventoryWeights(inventoryItems);
-
-      // Generate new casting number
-      const newCastingNumber = generateCastingNumber();
-      console.log('Generated casting number:', newCastingNumber);
+  const validateInventory = () => {
+    for (const item of inventoryItems) {
+      const inventoryItem = inventoryApiItems.find(
+        apiItem => apiItem.name === item.itemName
+      );
       
-      // Prepare casting data
+      if (!inventoryItem) {
+        throw new Error(`Item ${item.itemName} not found in inventory`);
+      }
+
+      if (inventoryItem.availableWeight < item.issueWeight) {
+        throw new Error(
+          `Insufficient inventory for ${item.itemName} (${item.purity}). ` +
+          `Available: ${inventoryItem.availableWeight}g, Required: ${item.issueWeight}g`
+        );
+      }
+    }
+    return true;
+  };
+
+  // Update handleSubmit function
+  const handleSubmit = async () => {
+    try {
+      console.log("Submit button clicked");
+      setLoading(true);
+
+      // Basic validation for required fields
+      if (!selectedOrders.length || !purity || !waxTreeWeight || inventoryItems.length === 0) {
+        toast.error('Please fill all required fields');
+        return;
+      }
+
+      // Calculate total issued weight
+      const totalIssued = inventoryItems.reduce((sum, item) => sum + Number(item.issueWeight), 0);
+
+      // Calculate required metals
+      const requiredMetals = calculateRequiredMetals();
+
+      // Prepare casting data matching the backend API structure
       const castingData = {
-        castingNumber: newCastingNumber,
-        date: issuedDate,
-        orders: selectedOrders,
-        waxTreeWeight: waxTreeWeight,
+        castingNumber: castingNumber,
+        date: issuedDate, // This is already in DD/MM/YYYY format
+        orders: selectedOrders, // Array of order IDs
+        waxTreeWeight: Number(waxTreeWeight),
         purity: purity,
-        calculatedWeight: calculatedWeight,
+        calculatedWeight: Number(calculatedWeight),
         purityPercentages: {
-          pureGold: purityPercentages.pureGold,
-          alloy: purityPercentages.alloy
+          pureGold: Number(purityPercentages.pureGold),
+          alloy: Number(purityPercentages.alloy)
         },
         requiredMetals: {
-          pureGold: calculateRequiredMetals().pureGold,
-          alloy: calculateRequiredMetals().alloy
+          pureGold: Number(requiredMetals.pureGold),
+          alloy: Number(requiredMetals.alloy)
         },
         issuedItems: inventoryItems.map(item => ({
           itemName: item.itemName,
           purity: item.purity,
-          issueWeight: item.issueWeight,
-          updatedAvailableWeight: item.availableWeight - item.issueWeight
+          issueWeight: Number(item.issueWeight),
+          issuedGold: Number(item.issueWeight) * (parseFloat(item.purity.replace(/[^0-9.]/g, '')) / 100),
+          issuedAlloy: Number(item.issueWeight) * (1 - parseFloat(item.purity.replace(/[^0-9.]/g, '')) / 100)
         })),
-        totalIssued: inventoryItems.reduce((total, item) => total + item.issueWeight, 0)
+        totalIssued: totalIssued
       };
 
-      console.log('Submitting casting data:', castingData);
-
-      // Submit casting data
-      const response = await fetch(`${apiUrl}/api/casting`, {
+      console.log("Making casting API call with data:", castingData);
+      
+      // Create casting record
+      const castingResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/casting`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(castingData),
+        body: JSON.stringify(castingData)
       });
 
-      console.log('API Response:', response);
+      const castingResult = await castingResponse.json();
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to submit casting form');
+      if (!castingResult.success) {
+        throw new Error(castingResult.message || 'Failed to create casting record');
       }
 
-      const data = await response.json();
-      console.log('API Response data:', data);
+      // Now update inventory weights
+      const inventoryUpdateResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/update-inventoryweights`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          issuedItems: inventoryItems.map(item => ({
+            itemName: item.itemName,
+            purity: item.purity,
+            issueWeight: Number(item.issueWeight)
+          }))
+        })
+      });
 
-      setSuccess('Casting form submitted successfully and inventory updated');
+      const inventoryResult = await inventoryUpdateResponse.json();
+      
+      if (!inventoryResult.success) {
+        throw new Error(inventoryResult.message || 'Failed to update inventory');
+      }
+
+      toast.success('Casting created successfully');
       
       // Reset form
-      setSelectedOrders([]);
-      setWaxTreeWeight(0);
-      setPurity('');
-      setInventoryItems([]);
-      setPurityPercentages({ pureGold: 0, alloy: 0 });
-      setRemainingPureMetalRequired(0);
-      setRemainingAlloyRequired(0);
+      const today = new Date();
+      const day = String(today.getDate()).padStart(2, '0');
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const year = today.getFullYear();
       
-      // Refresh inventory items
-      await fetchInventoryItems();
+      setSelectedOrders([]);
+      setPurity('');
+      setWaxTreeWeight(0);
+      setInventoryItems([]);
+      setSelectedItem({
+        id: '',
+        itemName: '',
+        purity: '',
+        availableWeight: 0,
+        metalToBeIssued: 0,
+        issueWeight: 0
+      });
+      setPurityPercentages({
+        pureGold: defaultPercentages[purity as keyof typeof defaultPercentages]?.pureGold || 0,
+        alloy: defaultPercentages[purity as keyof typeof defaultPercentages]?.alloy || 0
+      });
+      setIsDropdownOpen(false);
+      setCalculatedWeight(0);
+      setIssuedDate(`${day}/${month}/${year}`);
 
-    } catch (err: any) {
-      console.error('Form submission error:', err);
-      setError(err.message || 'An error occurred while submitting the form');
+    } catch (error) {
+      console.error('Error in handleSubmit:', error);
+      toast.error(error.message || 'Failed to process casting');
     } finally {
       setLoading(false);
     }
@@ -766,12 +814,25 @@ const CastingForm = () => {
               <div className="mt-6">
                 <Button
                   type="button"
-                  onClick={handleSubmit}
-                  className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={loading}
+                  onClick={() => {
+                    console.log("Button clicked"); // Debug log
+                    handleSubmit();
+                  }}
+                  disabled={loading || !selectedOrders.length || !purity || !waxTreeWeight || inventoryItems.length === 0}
+                  className={`w-full ${
+                    loading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
+                  } text-white py-2 px-4 rounded-md transition-colors`}
                 >
                   {loading ? 'Processing...' : 'Issue for Casting'}
                 </Button>
+              </div>
+
+              {/* Debug information */}
+              <div className="mt-4 text-sm text-gray-500">
+                <p>Selected Orders: {selectedOrders.length}</p>
+                <p>Purity: {purity}</p>
+                <p>Wax Tree Weight: {waxTreeWeight}</p>
+                <p>Inventory Items: {inventoryItems.length}</p>
               </div>
 
               {/* Default Percentage Display */}

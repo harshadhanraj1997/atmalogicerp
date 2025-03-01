@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Box from "@mui/material/Box";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -119,7 +119,7 @@ const getStatusClass = (status: string) => {
   }
 };
 
-const GrindingTable = () => {
+const FilingTable = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [editData, setEditData] = useState<IDeal | null>(null);
@@ -133,6 +133,8 @@ const GrindingTable = () => {
   const [showConfirmation, setShowConfirmation] = useState<number | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     const loadDeals = async () => {
@@ -154,6 +156,38 @@ const GrindingTable = () => {
   }, []);
   
 console.log("Deals State:", deals);
+
+  // Memoize the filtered deals to prevent infinite loops
+  const filteredDeals = useMemo(() => {
+    return deals.filter(deal => {
+      try {
+        // If no dates selected, show all records
+        if (!startDate && !endDate) {
+          return true;
+        }
+
+        // Parse the filing date and normalize to local midnight
+        const filingDate = new Date(deal.issuedDate);
+        const filingDateStr = filingDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+        // Apply start date filter if exists
+        if (startDate && filingDateStr < startDate) {
+          return false;
+        }
+
+        // Apply end date filter if exists
+        if (endDate && filingDateStr > endDate) {
+          return false;
+        }
+
+        return true;
+      } catch (error) {
+        console.error('Date filtering error for filing:', deal.id, error);
+        return true; // Include on error
+      }
+    });
+  }, [deals, startDate, endDate]);
+
   const {
     order,
     orderBy,
@@ -167,7 +201,34 @@ console.log("Deals State:", deals);
     handleChangePage,
     handleChangeRowsPerPage,
     handleSearchChange,
-  } = useMaterialTableHook<IDeal | any>(deals, 10);
+  } = useMaterialTableHook<IFiling>(filteredDeals, 10);
+
+  const handleDateChange = (type: 'start' | 'end', value: string) => {
+    if (type === 'start') {
+      setStartDate(value);
+    } else {
+      setEndDate(value);
+    }
+  };
+
+  const handleResetDates = () => {
+    setStartDate('');
+    setEndDate('');
+  };
+
+  // Add debug logging for filtered results
+  useEffect(() => {
+    console.log('Date Filter Debug:', {
+      totalFilings: deals.length,
+      filteredFilings: filteredRows.length,
+      startDate,
+      endDate,
+      sampleDates: deals.slice(0, 3).map(d => ({
+        id: d.id,
+        date: new Date(d.issuedDate).toISOString().split('T')[0]
+      }))
+    });
+  }, [deals, filteredRows, startDate, endDate]);
 
   const handlePrint = (pdfUrl: string | null) => {
     if (pdfUrl) {
@@ -250,6 +311,10 @@ console.log("Deals State:", deals);
               searchQuery={searchQuery}
               handleChangeRowsPerPage={handleChangeRowsPerPage}
               handleSearchChange={handleSearchChange}
+              startDate={startDate}
+              endDate={endDate}
+              handleDateChange={handleDateChange}
+              handleResetDates={handleResetDates}
             />
             <Box sx={{ width: "100%" }} className="table-responsive">
               <Paper sx={{ width: "100%", mb: 2 }}>
@@ -421,12 +486,17 @@ console.log("Deals State:", deals);
                                     >
                                       <SelectValue placeholder="Transfer to" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="bg-white border border-gray-200">
                                       {departments.map((dept) => (
                                         <SelectItem 
                                           key={dept.value} 
                                           value={dept.value}
                                           className="cursor-pointer hover:bg-gray-100"
+                                          style={{
+                                            backgroundColor: 'white',
+                                            color: 'black',
+                                            padding: '8px 12px'
+                                          }}
                                         >
                                           {dept.label}
                                         </SelectItem>
@@ -606,4 +676,4 @@ console.log("Deals State:", deals);
     </>
   );
 }
-export default GrindingTable;
+export default FilingTable;

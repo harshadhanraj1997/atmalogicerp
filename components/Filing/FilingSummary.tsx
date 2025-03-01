@@ -1,7 +1,7 @@
 import React from "react";
 import SummarySingleCard from "@/components/common/SummarySingleCard"; // Adjust the import path as necessary
 
-const castingSummary: React.FC = () => {
+const FilingSummary: React.FC = () => {
   const dealData = [
     {
       iconClass: "fa-light fa-ban",
@@ -48,4 +48,4 @@ const castingSummary: React.FC = () => {
   );
 };
 
-export default castingSummary;
+export default FilingSummary;

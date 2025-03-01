@@ -1,55 +1,73 @@
 import React from "react";
-import Box from "@mui/material/Box";
-import Select from "@mui/material/Select";
-import MenuItem from "@mui/material/MenuItem";
-import TextField from "@mui/material/TextField";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 interface TableControlsProps {
-  rowsPerPage: number;
   searchQuery: string;
-  handleChangeRowsPerPage: (value: number) => void;
-  handleSearchChange: (query: string) => void;
-  rowsPerPageOptions?: number[]; // Optional custom row options
+  handleSearchChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  startDate: string;
+  endDate: string;
+  handleDateChange: (type: 'start' | 'end', value: string) => void;
+  handleResetDates: () => void;
 }
 
 const TableControls: React.FC<TableControlsProps> = ({
-  rowsPerPage,
   searchQuery,
-  handleChangeRowsPerPage,
   handleSearchChange,
-  rowsPerPageOptions = [5, 10, 15, 20, 25, 50], // Default options
+  startDate,
+  endDate,
+  handleDateChange,
+  handleResetDates,
 }) => {
   return (
-    <Box className="table-search-box mb-[30px]" sx={{ p: 2}}>
-      <div className="flex justify-between items-center gap-2.5">
-        <span>Show</span>
-        <Select
-          value={rowsPerPage}
-          onChange={(e) => handleChangeRowsPerPage(+e.target.value)}
-          size="small"
-          sx={{ width: 100 }}
-          className="manaz-table-row-per-page"
-        >
-          {rowsPerPageOptions.map((option) => (
-            <MenuItem key={option} value={option} className="menu-item">
-              {option}
-            </MenuItem>
-          ))}
-        </Select>
-        <span>entries</span>
+    <div className="flex justify-between items-center mb-4 p-4 bg-white rounded-lg shadow-sm">
+      <div className="flex items-center gap-4">
+        <div>
+          <Label htmlFor="startDate">From Date</Label>
+          <Input
+            id="startDate"
+            type="date"
+            value={startDate}
+            onChange={(e) => handleDateChange('start', e.target.value)}
+            className="w-[200px]"
+          />
+        </div>
+        <div>
+          <Label htmlFor="endDate">To Date</Label>
+          <Input
+            id="endDate"
+            type="date"
+            value={endDate}
+            onChange={(e) => handleDateChange('end', e.target.value)}
+            className="w-[200px]"
+          />
+        </div>
+        <div className="self-end mb-[2px]">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleResetDates}
+            className="flex items-center gap-1"
+          >
+            <X className="h-4 w-4" />
+            Reset Dates
+          </Button>
+        </div>
       </div>
-      <div className="flex justify-between items-center gap-2.5">
-        <span>Search:</span>
-        <TextField
-          id="outlined-search"
+      <div>
+        <Label htmlFor="search">Search</Label>
+        <Input
+          id="search"
           type="search"
+          placeholder="Search..."
           value={searchQuery}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          size="small"
-          className="manaz-table-search-input"
+          onChange={handleSearchChange}
+          className="w-[250px]"
         />
       </div>
-    </Box>
+    </div>
   );
 };
 

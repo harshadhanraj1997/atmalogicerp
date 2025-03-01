@@ -97,7 +97,7 @@ const getStatusClass = (status: string) => {
   }
 };
 
-const DealsTable = () => {
+export default function DealsTable() {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [editData, setEditData] = useState<IDeal | null>(null);
@@ -106,11 +106,11 @@ const DealsTable = () => {
   const [deals, setDeals] = useState<IDeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [showConfirmation, setShowConfirmation] = useState<number | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     const loadDeals = async () => {
@@ -118,7 +118,12 @@ const DealsTable = () => {
         setLoading(true);
         const data = await fetchDealData();
         console.log("Fetched Deals:", data);
-        setDeals(data);
+        const sortedDeals = [...data].sort((a, b) => {
+          const dateA = new Date(a.createdDate).getTime();
+          const dateB = new Date(b.createdDate).getTime();
+          return dateB - dateA;
+        });
+        setDeals(sortedDeals);
       } catch (error) {
         console.error("Error loading deals:", error);
         setError("Failed to load deals");
@@ -128,16 +133,28 @@ const DealsTable = () => {
     };
 
     loadDeals();
-
   }, []);
-  
-console.log("Deals State:", deals);
+
+  const handleDateChange = (type: 'start' | 'end', value: string) => {
+    if (type === 'start') {
+      setStartDate(value);
+    } else {
+      setEndDate(value);
+    }
+  };
+
   const {
+    paginatedRows,
+    page,
+    rowsPerPage,
+    totalPages,
+    startIndex,
+    endIndex,
+    filteredRows,
     order,
     orderBy,
     selected,
     searchQuery,
-    filteredRows,
     handleDelete,
     handleRequestSort,
     handleSelectAllClick,
@@ -145,7 +162,72 @@ console.log("Deals State:", deals);
     handleChangePage,
     handleChangeRowsPerPage,
     handleSearchChange,
-  } = useMaterialTableHook<IDeal | any>(deals, 10);
+  } = useMaterialTableHook<IDeal>(
+    deals.filter(deal => {
+      try {
+        // Log the actual dates we're working with
+        console.log('Filtering Deal:', {
+          dealId: deal.id,
+          dealDate: deal.createdDate,
+          startDate,
+          endDate
+        });
+
+        // If no dates selected, show all records
+        if (!startDate && !endDate) {
+          return true;
+        }
+
+        // Parse the deal date and normalize to local midnight
+        const dealDate = new Date(deal.createdDate);
+        const dealDateStr = dealDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+        // Apply start date filter if exists
+        if (startDate) {
+          if (dealDateStr < startDate) {
+            console.log(`Deal ${deal.id} excluded: before start date`);
+            return false;
+          }
+        }
+
+        // Apply end date filter if exists
+        if (endDate) {
+          if (dealDateStr > endDate) {
+            console.log(`Deal ${deal.id} excluded: after end date`);
+            return false;
+          }
+        }
+
+        console.log(`Deal ${deal.id} included in filter`, {
+          dealDateStr,
+          startDate,
+          endDate,
+          isAfterStart: !startDate || dealDateStr >= startDate,
+          isBeforeEnd: !endDate || dealDateStr <= endDate
+        });
+        
+        return true;
+      } catch (error) {
+        console.error('Date filtering error for deal:', deal.id, error);
+        return true; // Include on error
+      }
+    }), 
+    10
+  );
+
+  // Add debug logging for filtered results
+  useEffect(() => {
+    console.log('Date Filter Debug:', {
+      totalDeals: deals.length,
+      filteredDeals: filteredRows.length,
+      startDate,
+      endDate,
+      sampleDates: deals.slice(0, 3).map(d => ({
+        id: d.id,
+        date: new Date(d.createdDate).toISOString().split('T')[0]
+      }))
+    });
+  }, [deals, filteredRows, startDate, endDate]);
 
   const handlePrint = (pdfUrl: string | null) => {
     if (pdfUrl) {
@@ -211,12 +293,52 @@ console.log("Deals State:", deals);
     }
   };
 
-  const startIndex = page * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const paginatedRows = deals.slice(startIndex, endIndex);
+  console.log('Filtered Deals:', {
+    total: deals.length,
+    filtered: filteredRows.length,
+    startDate,
+    endDate
+  });
+
+  const handleResetDates = () => {
+    setStartDate('');
+    setEndDate('');
+    console.log('Dates reset');
+  };
 
   if (loading) return <div>Loading deals...</div>;
   if (error) return <div>Error: {error}</div>;
+  if (!filteredRows.length) return <div>No orders found</div>;
+
+  const columns: Column[] = [
+    {
+      id: 'createdDate',
+      label: 'Created Date',
+      numeric: false,
+      format: (value: string) => {
+        return new Date(value).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+      }
+    },
+    {
+      id: 'createdBy',
+      label: 'Created By',
+      numeric: false
+    },
+    {
+      id: 'purity',
+      label: 'Purity',
+      numeric: false
+    },
+    {
+      id: 'remarks',
+      label: 'Remarks',
+      numeric: false
+    },
+  ];
 
   return (
     <>
@@ -224,10 +346,12 @@ console.log("Deals State:", deals);
         <div className="card__wrapper">
           <div className="manaz-common-mat-list w-full table__wrapper table-responsive">
             <TableControls
-              rowsPerPage={rowsPerPage}
               searchQuery={searchQuery}
-              handleChangeRowsPerPage={handleChangeRowsPerPage}
               handleSearchChange={handleSearchChange}
+              startDate={startDate}
+              endDate={endDate}
+              handleDateChange={handleDateChange}
+              handleResetDates={handleResetDates}
             />
             <Box sx={{ width: "100%" }} className="table-responsive">
               <Paper sx={{ width: "100%", mb: 2 }}>
@@ -260,6 +384,8 @@ console.log("Deals State:", deals);
                           />
                         </TableCell>
                         <TableCell>Order ID</TableCell>
+                        <TableCell>Created Date</TableCell>
+                        <TableCell>Created By</TableCell>
                         <TableCell>Party Name</TableCell>
                         <TableCell>Delivery Date</TableCell>
                         <TableCell>Status</TableCell>
@@ -269,128 +395,128 @@ console.log("Deals State:", deals);
                       </TableRow>
                     </TableHead>
                     <TableBody className="table__body">
-                      {paginatedRows.length > 0 ? (
-                        paginatedRows.map((deal, index) => {
-                          const stausClass = useTableStatusHook(deal?.status);
-                          const phaseClass = useTablePhaseHook(deal?.phase);
-                          return (
-                            <TableRow
-                              key={deal.id}
-                              selected={selected.includes(index)}
-                              onClick={() => handleClick(index)}
-                            >
-                              <TableCell padding="checkbox">
-                                <Checkbox
-                                  className="custom-checkbox checkbox-small"
-                                  checked={selected.includes(index)}
-                                  size="small"
-                                  onChange={() => handleClick(index)}
-                                />
-                              </TableCell>
-                              <TableCell>{deal.id}</TableCell>
-                              <TableCell>{deal.dealName}</TableCell>
-                              <TableCell>{deal.expectedEndDate}</TableCell>
-                              <TableCell>
-                                <span 
-                                  className={`bd-badge ${getStatusClass(deal.status)}`}
-                                  style={{
-                                    padding: '4px 8px',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '12px',
-                                    fontWeight: '500'
-                                  }}
-                                >
-                                  {deal.status}
-                                </span>
-                              </TableCell>
-                              <TableCell>{deal.AdvanceMetal}</TableCell>
-                              <TableCell>
-                                <span className="tag-badge">{deal.tags}</span>
-                              </TableCell>
-                              <TableCell className="table__icon-box">
-                                <div className="flex items-center justify-start gap-[10px]">
-                                  <Link href={`/Orders/show-models?orderId=${deal.id}`} passHref>
-                                    <button
-                                      type="button"
-                                      className="table__icon edit"
-                                      style={{
-                                        display: 'inline-block',
-                                        backgroundColor: 'green',
-                                        color: 'white',
-                                        borderRadius: '4px',
-                                        padding: '5px',
-                                        textDecoration: 'none',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                      }}
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <i className="fa-regular fa-eye"></i>
-                                    </button>
-                                  </Link>
-
-                                  <Link href={`/Orders/add-models?orderId=${deal.id}`} passHref>
-                                    <button
-                                      type="button"
-                                      className="table__icon edit"
-                                      style={{
-                                        display: 'inline-block',
-                                        backgroundColor: 'green',
-                                        color: 'white',
-                                        borderRadius: '4px',
-                                        padding: '5px',
-                                        textDecoration: 'none',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                      }}
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <i className="fa-sharp fa-light fa-pen"></i>
-                                    </button>
-                                  </Link>
-
+                      {paginatedRows.map((deal, index) => {
+                        const stausClass = useTableStatusHook(deal?.status);
+                        const phaseClass = useTablePhaseHook(deal?.phase);
+                        return (
+                          <TableRow
+                            key={deal.id}
+                            selected={selected.includes(startIndex + index)}
+                            onClick={() => handleClick(startIndex + index)}
+                          >
+                            <TableCell padding="checkbox">
+                              <Checkbox
+                                className="custom-checkbox checkbox-small"
+                                checked={selected.includes(startIndex + index)}
+                                size="small"
+                                onChange={() => handleClick(startIndex + index)}
+                              />
+                            </TableCell>
+                            <TableCell>{deal.id}</TableCell>
+                            <TableCell>
+                              {new Date(deal.createdDate).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </TableCell>
+                            <TableCell>{deal.createdBy}</TableCell>
+                            <TableCell>{deal.dealName}</TableCell>
+                            <TableCell>{deal.expectedEndDate}</TableCell>
+                            <TableCell>
+                              <span 
+                                className={`bd-badge ${getStatusClass(deal.status)}`}
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  color: 'white',
+                                  fontSize: '12px',
+                                  fontWeight: '500'
+                                }}
+                              >
+                                {deal.status}
+                              </span>
+                            </TableCell>
+                            <TableCell>{deal.AdvanceMetal}</TableCell>
+                            <TableCell>
+                              <span className="tag-badge">{deal.tags}</span>
+                            </TableCell>
+                            <TableCell className="table__icon-box">
+                              <div className="flex items-center justify-start gap-[10px]">
+                                <Link href={`/Orders/show-models?orderId=${deal.id}`} passHref>
                                   <button
                                     type="button"
-                                    className="table__icon delete"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDelete(deal.id);
-                                    }}
-                                  >
-                                    <i className="fa-solid fa-trash"></i>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    className="table__icon approve"
+                                    className="table__icon edit"
                                     style={{
-                                      backgroundColor: '#4CAF50',
+                                      display: 'inline-block',
+                                      backgroundColor: 'green',
                                       color: 'white',
                                       borderRadius: '4px',
                                       padding: '5px',
+                                      textDecoration: 'none',
                                       border: 'none',
                                       cursor: 'pointer',
                                     }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setShowConfirmation(deal.id);
-                                    }}
+                                    onClick={(e) => e.stopPropagation()}
                                   >
-                                    <i className="fa-solid fa-check"></i>
+                                    <i className="fa-regular fa-eye"></i>
                                   </button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={8} align="center">
-                            No data available
-                          </TableCell>
-                        </TableRow>
-                      )}
+                                </Link>
+
+                                <Link href={`/Orders/add-models?orderId=${deal.id}`} passHref>
+                                  <button
+                                    type="button"
+                                    className="table__icon edit"
+                                    style={{
+                                      display: 'inline-block',
+                                      backgroundColor: 'green',
+                                      color: 'white',
+                                      borderRadius: '4px',
+                                      padding: '5px',
+                                      textDecoration: 'none',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <i className="fa-sharp fa-light fa-pen"></i>
+                                  </button>
+                                </Link>
+
+                                <button
+                                  type="button"
+                                  className="table__icon delete"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDelete(deal.id);
+                                  }}
+                                >
+                                  <i className="fa-solid fa-trash"></i>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className="table__icon approve"
+                                  style={{
+                                    backgroundColor: '#4CAF50',
+                                    color: 'white',
+                                    borderRadius: '4px',
+                                    padding: '5px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowConfirmation(deal.id);
+                                  }}
+                                >
+                                  <i className="fa-solid fa-check"></i>
+                                </button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -398,13 +524,10 @@ console.log("Deals State:", deals);
             </Box>
             <Box className="table-search-box mt-[30px]" sx={{ p: 2 }}>
               <Box>
-                {`Showing ${(page - 1) * rowsPerPage + 1} to ${Math.min(
-                  page * rowsPerPage,
-                  filteredRows.length
-                )} of ${filteredRows.length} entries`}
+                {`Showing ${startIndex + 1} to ${Math.min(endIndex, filteredRows.length)} of ${filteredRows.length} entries`}
               </Box>
               <Pagination
-                count={Math.ceil(filteredRows.length / rowsPerPage)}
+                count={totalPages}
                 page={page}
                 onChange={(e, value) => handleChangePage(value)}
                 variant="outlined"
@@ -552,4 +675,3 @@ console.log("Deals State:", deals);
     </>
   );
 }
-export default DealsTable

@@ -2,7 +2,7 @@ import Wrapper from "@/components/layouts/DefaultWrapper";
 import FilingMainArea from "@/components/Filing/FilingMainArea";
 import React from "react";
 
-const castingMain = () => {
+const FilingMain = () => {
   return (
     <Wrapper>
       <FilingMainArea />
@@ -10,4 +10,4 @@ const castingMain = () => {
   );
 };
 
-export default castingMain;
+export default FilingMain;

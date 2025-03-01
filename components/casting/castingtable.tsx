@@ -100,31 +100,31 @@ const getStatusClass = (status: string) => {
 };
 
 const departments = [
-  { 
+  /*{ 
     value: 'Grinding', 
     label: 'Grinding',
     path: '/Departments/Grinding/add_grinding_details'
-  },
+  },*/
   { 
     value: 'Filing', 
     label: 'Filing',
     path: '/Departments/Filing/add_filing_details'
   },
-  { 
+ /* { 
     value: 'Setting', 
     label: 'Setting',
     path: '/Departments/Setting/add_setting_details'
-  },
-  { 
+  },*/
+ /* { 
     value: 'Polishing', 
     label: 'Polishing',
     path: '/Departments/Polishing/add_polishing_details'
-  },
-  { 
+  },*/
+  /*{ 
     value: 'Dull', 
     label: 'Dull',
     path: '/Departments/Dull/add_dull_details'
-  },
+  },*/
 ];
 
 const CastingTable = () => {
@@ -142,6 +142,8 @@ const CastingTable = () => {
   const [isApproved, setIsApproved] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showTransferMenu, setShowTransferMenu] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     const loadDeals = async () => {
@@ -176,7 +178,86 @@ console.log("Deals State:", deals);
     handleChangePage,
     handleChangeRowsPerPage,
     handleSearchChange,
-  } = useMaterialTableHook<IDeal | any>(deals, 10);
+  } = useMaterialTableHook<IDeal>(
+    deals.filter(deal => {
+      try {
+        // Log the actual dates we're working with
+        console.log('Filtering Casting:', {
+          castingId: deal.id,
+          castingDate: deal.issuedDate,
+          startDate,
+          endDate
+        });
+
+        // If no dates selected, show all records
+        if (!startDate && !endDate) {
+          return true;
+        }
+
+        // Parse the casting date and normalize to local midnight
+        const castingDate = new Date(deal.issuedDate);
+        const castingDateStr = castingDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+        // Apply start date filter if exists
+        if (startDate) {
+          if (castingDateStr < startDate) {
+            console.log(`Casting ${deal.id} excluded: before start date`);
+            return false;
+          }
+        }
+
+        // Apply end date filter if exists
+        if (endDate) {
+          if (castingDateStr > endDate) {
+            console.log(`Casting ${deal.id} excluded: after end date`);
+            return false;
+          }
+        }
+
+        console.log(`Casting ${deal.id} included in filter`, {
+          castingDateStr,
+          startDate,
+          endDate,
+          isAfterStart: !startDate || castingDateStr >= startDate,
+          isBeforeEnd: !endDate || castingDateStr <= endDate
+        });
+        
+        return true;
+      } catch (error) {
+        console.error('Date filtering error for casting:', deal.id, error);
+        return true; // Include on error
+      }
+    }), 
+    10
+  );
+
+  const handleDateChange = (type: 'start' | 'end', value: string) => {
+    if (type === 'start') {
+      setStartDate(value);
+    } else {
+      setEndDate(value);
+    }
+  };
+
+  const handleResetDates = () => {
+    setStartDate('');
+    setEndDate('');
+    console.log('Dates reset');
+  };
+
+  // Add debug logging for filtered results
+  useEffect(() => {
+    console.log('Date Filter Debug:', {
+      totalCastings: deals.length,
+      filteredCastings: filteredRows.length,
+      startDate,
+      endDate,
+      sampleDates: deals.slice(0, 3).map(d => ({
+        id: d.id,
+        date: new Date(d.issuedDate).toISOString().split('T')[0]
+      }))
+    });
+  }, [deals, filteredRows, startDate, endDate]);
 
   const handlePrint = (pdfUrl: string | null) => {
     if (pdfUrl) {
@@ -273,6 +354,10 @@ console.log("Deals State:", deals);
               searchQuery={searchQuery}
               handleChangeRowsPerPage={handleChangeRowsPerPage}
               handleSearchChange={handleSearchChange}
+              startDate={startDate}
+              endDate={endDate}
+              handleDateChange={handleDateChange}
+              handleResetDates={handleResetDates}
             />
             <Box sx={{ width: "100%" }} className="table-responsive">
               <Paper sx={{ width: "100%", mb: 2 }}>

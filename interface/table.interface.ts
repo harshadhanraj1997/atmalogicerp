@@ -139,14 +139,15 @@ export interface ILead {
 export interface IDeal {
   id: string;
   dealName: string;
-  AdvanceMetal: string | number; // Assuming AdvanceMetal can be a string or number
+  AdvanceMetal: number;
   tags: string;
   expectedEndDate: string;
-  status: string | null;
-  clientSheetPdf?: string | null; // Optional, as it can be null
-  orderId?: string | null; // Optional, as it can be null
-  open?: boolean;
-  setOpen?: (open: boolean) => void;
+  createdDate: string;
+  createdBy: string;
+  status: string;
+  clientSheetPdf: string | null;
+  purity: string;
+  remarks: string;
 }
 // Define an interface for the deal statistic
 
@@ -460,3 +461,34 @@ export interface IFiling {
   status: string;
   grindingLoss: number;
 }
+
+export interface ISetting {
+  id: string;
+  issuedWeight: number;
+  issuedDate: string;
+  receivedWeight: number;
+  receivedDate: string;
+  status: string;
+  settingLoss: number;
+}
+
+export interface IPolishing {
+  id: string;
+  issuedWeight: number;
+  issuedDate: string;
+  receivedWeight: number;
+  receivedDate: string;
+  status: string;
+  polishingLoss: number;
+}
+
+export interface IDull {
+  id: string;
+  issuedWeight: number;
+  issuedDate: string;
+  receivedWeight: number;
+  receivedDate: string;
+  status: string;
+  dullLoss: number;
+}
+
