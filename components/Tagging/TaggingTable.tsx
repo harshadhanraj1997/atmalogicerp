@@ -14,7 +14,7 @@ import Paper from "@mui/material/Paper";
 import { visuallyHidden } from "@mui/utils";
 import useMaterialTableHook from "@/hooks/useMaterialTableHook";
 import { IDeal } from "@/interface/table.interface";
-import { ICasting } from "@/interface/table.interface";
+import { ITagging } from "@/interface/table.interface";
 
 import { dealHeadCells } from "@/data/table-head-cell/table-head";
 import * as pdfjs from "pdfjs-dist";
@@ -26,12 +26,13 @@ import {
 import { Checkbox, Button } from "@mui/material";
 //import DealsDetailsModal from "./orderdeatilsModal";
 //import EditDealsModal from "./editorderModal";
-import { fetchDealData } from "@/data/crm/casting-data";
 import TableControls from "@/components/elements/SharedInputs/TableControls";
 import DeleteModal from "@/components/common/DeleteModal";
 import { PDFDocument } from 'pdf-lib';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+import { fetchTaggingData } from "@/data/crm/tagging-data";
+import * as XLSX from 'xlsx';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 const downloadPDF = async (pdfUrl: string) => {
@@ -99,42 +100,15 @@ const getStatusClass = (status: string) => {
   }
 };
 
-const departments = [
-  /*{ 
-    value: 'Grinding', 
-    label: 'Grinding',
-    path: '/Departments/Grinding/add_grinding_details'
-  },*/
-  { 
-    value: 'Filing', 
-    label: 'Filing',
-    path: '/Departments/Filing/add_filing_details'
-  },
- /* { 
-    value: 'Setting', 
-    label: 'Setting',
-    path: '/Departments/Setting/add_setting_details'
-  },*/
- /* { 
-    value: 'Polishing', 
-    label: 'Polishing',
-    path: '/Departments/Polishing/add_polishing_details'
-  },*/
-  /*{ 
-    value: 'Dull', 
-    label: 'Dull',
-    path: '/Departments/Dull/add_dull_details'
-  },*/
-];
 
-export default function CastingTable() {
+export default function TaggingTable() {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [editData, setEditData] = useState<IDeal | null>(null);
   const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number>(0);
-  const [deals, setDeals] = useState<ICasting[]>([]);
-  const [filteredDeals, setFilteredDeals] = useState<ICasting[]>([]);
+  const [deals, setDeals] = useState<ITagging[]>([]);
+  const [filteredDeals, setFilteredDeals] = useState<ITagging[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
@@ -151,7 +125,7 @@ export default function CastingTable() {
     const loadDeals = async () => {
       try {
         setLoading(true);
-        const data = await fetchDealData();
+        const data = await fetchTaggingData();
         setDeals(data);
         setFilteredDeals(data);
       } catch (error) {
@@ -337,38 +311,22 @@ console.log("Deals State:", deals);
                           <Checkbox
                             className="custom-checkbox checkbox-small"
                             color="primary"
-                            indeterminate={
-                              selected.length > 0 &&
-                              selected.length < filteredDeals.length
-                            }
-                            checked={
-                              filteredDeals.length > 0 &&
-                              selected.length === filteredDeals.length
-                            }
-                            onChange={(e) =>
-                              handleSelectAllClick(
-                                e.target.checked,
-                                filteredDeals
-                              )
-                            }
+                            indeterminate={selected.length > 0 && selected.length < filteredDeals.length}
+                            checked={filteredDeals.length > 0 && selected.length === filteredDeals.length}
+                            onChange={(e) => handleSelectAllClick(e.target.checked, filteredDeals)}
                             size="small"
                           />
                         </TableCell>
-                        <TableCell>Casting Id</TableCell>
-                        <TableCell>Issued Weight</TableCell>
-                        <TableCell>Received Weight</TableCell>
-                        <TableCell>Issued Date</TableCell>
-                        <TableCell>Received Date</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Casting Loss</TableCell>
+                        <TableCell>Tagging Id</TableCell>
+                        <TableCell>Party Name</TableCell>
+                        <TableCell>Created Date</TableCell>
+                        <TableCell>Total Weight</TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody className="table__body">
                       {paginatedRows.length > 0 ? (
                         paginatedRows.map((deal, index) => {
-                          const stausClass = useTableStatusHook(deal?.status);
-                          const phaseClass = useTablePhaseHook(deal?.phase);
                           return (
                             <TableRow
                               key={deal.id}
@@ -384,28 +342,12 @@ console.log("Deals State:", deals);
                                 />
                               </TableCell>
                               <TableCell>{deal.id}</TableCell>
-                              <TableCell>{deal.issuedWeight}</TableCell>
-                              <TableCell>{deal.receivedWeight}</TableCell>
-                              <TableCell>{deal.issuedDate}</TableCell>
-                              <TableCell>{deal.receivedDate}</TableCell>
-                              <TableCell>
-                                <span 
-                                  className={`bd-badge ${getStatusClass(deal.status)}`}
-                                  style={{
-                                    padding: '4px 8px',
-                                    borderRadius: '4px',
-                                    color: 'white',
-                                    fontSize: '12px',
-                                    fontWeight: '500'
-                                  }}
-                                >
-                                  {deal.status}
-                                </span>
-                              </TableCell>
-                              <TableCell>{deal.castingLoss}</TableCell>
+                              <TableCell>{deal.PartyName}</TableCell>
+                              <TableCell>{deal.createdDate}</TableCell>
+                              <TableCell>{deal.TotalWeight}</TableCell>
                               <TableCell className="table__icon-box">
                                 <div className="flex items-center justify-start gap-[10px]">
-                                  <Link href={`/Departments/Casting/show_casting_details?castingId=${deal.id}`} passHref>
+                                  <Link href={`/Departments/Tagging/show_tagging_details?taggingId=${deal.id}`} passHref>
                                     <button
                                       type="button"
                                       className="table__icon edit"
@@ -425,25 +367,35 @@ console.log("Deals State:", deals);
                                     </button>
                                   </Link>
 
-                                  <Link href={`/Departments/Casting/casting_received_details?castingId=${deal.id}`} passHref>
-                                    <button
-                                      type="button"
-                                      className="table__icon edit"
-                                      style={{
-                                        display: 'inline-block',
-                                        backgroundColor: 'green',
-                                        color: 'white',
-                                        borderRadius: '4px',
-                                        padding: '5px',
-                                        textDecoration: 'none',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                      }}
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <i className="fa-sharp fa-light fa-pen"></i>
-                                    </button>
-                                  </Link>
+                                  <button
+                                    type="button"
+                                    className="table__icon excel"
+                                    style={{
+                                      display: 'inline-block',
+                                      backgroundColor: '#217346',
+                                      color: 'white',
+                                      borderRadius: '4px',
+                                      padding: '5px',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                    }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const data = {
+                                        id: deal.id,
+                                        PartyName: deal.PartyName,
+                                        createdDate: deal.createdDate,
+                                        TotalWeight: deal.TotalWeight
+                                      };
+                                      
+                                      const worksheet = XLSX.utils.json_to_sheet([data]);
+                                      const workbook = XLSX.utils.book_new();
+                                      XLSX.utils.book_append_sheet(workbook, worksheet, "Tagging Data");
+                                      XLSX.writeFile(workbook, `Tagging_${deal.id}.xlsx`);
+                                    }}
+                                  >
+                                    <i className="fa-solid fa-file-excel"></i>
+                                  </button>
 
                                   <button
                                     type="button"
@@ -455,46 +407,6 @@ console.log("Deals State:", deals);
                                   >
                                     <i className="fa-solid fa-trash"></i>
                                   </button>
-
-                                  <button
-                                    type="button"
-                                    className="table__icon approve"
-                                    style={{
-                                      backgroundColor: '#4CAF50',
-                                      color: 'white',
-                                      borderRadius: '4px',
-                                      padding: '5px',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                    }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setShowConfirmation(deal.id);
-                                    }}
-                                  >
-                                    <i className="fa-solid fa-check"></i>
-                                  </button>
-
-                                  <div className="relative">
-                                    <select
-                                      className="form-select text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                                      onChange={(e) => {
-                                        e.preventDefault();
-                                        const selectedPath = departments.find(dept => dept.value === e.target.value)?.path;
-                                        if (selectedPath) {
-                                          window.location.href = `${selectedPath}?castingId=${deal.id}`;
-                                        }
-                                      }}
-                                      value=""
-                                    >
-                                      <option value="" disabled>Transfer to</option>
-                                      {departments.map((dept) => (
-                                        <option key={dept.value} value={dept.value}>
-                                          Transfer to {dept.label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -502,7 +414,7 @@ console.log("Deals State:", deals);
                         })
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={8} align="center">
+                          <TableCell colSpan={6} align="center">
                             No data available
                           </TableCell>
                         </TableRow>

@@ -5,12 +5,7 @@ import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-interface StatusOption {
-  value: string;
-  label: string;
-}
-
-interface TableControlsProps {
+interface OrderTableControlsProps {
   searchQuery: string;
   handleSearchChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   startDate: string;
@@ -19,16 +14,12 @@ interface TableControlsProps {
   handleResetDates: () => void;
   statusFilter: string;
   handleStatusChange: (value: string) => void;
-  statusOptions?: StatusOption[];
+  partyNameFilter: string;
+  handlePartyNameChange: (value: string) => void;
+  partyNameOptions: { value: string; label: string; }[];
 }
 
-const defaultStatusOptions: StatusOption[] = [
-  { value: 'all', label: 'All Status' },
-  { value: 'open', label: 'Open' },
-  { value: 'closed', label: 'Closed' }
-];
-
-const TableControls: React.FC<TableControlsProps> = ({
+const OrderTableControls: React.FC<OrderTableControlsProps> = ({
   searchQuery,
   handleSearchChange,
   startDate,
@@ -37,7 +28,9 @@ const TableControls: React.FC<TableControlsProps> = ({
   handleResetDates,
   statusFilter,
   handleStatusChange,
-  statusOptions = defaultStatusOptions,
+  partyNameFilter,
+  handlePartyNameChange,
+  partyNameOptions,
 }) => {
   return (
     <div className="flex justify-between items-center mb-4 p-4 bg-white rounded-lg shadow-sm">
@@ -78,7 +71,29 @@ const TableControls: React.FC<TableControlsProps> = ({
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
               }}
             >
-              {statusOptions.map((option) => (
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="ml-4 flex items-center gap-2">
+          <Label htmlFor="party-filter" className="whitespace-nowrap mb-0">Party:</Label>
+          <Select value={partyNameFilter} onValueChange={handlePartyNameChange}>
+            <SelectTrigger 
+              className="w-[200px] bg-white border border-gray-200"
+            >
+              <SelectValue placeholder="Select party" />
+            </SelectTrigger>
+            <SelectContent 
+              className="bg-white border border-gray-200 shadow-lg z-50"
+              style={{
+                backgroundColor: 'white',
+                borderRadius: '6px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+              }}
+            >
+              {partyNameOptions.map((option) => (
                 <SelectItem 
                   key={option.value} 
                   value={option.value}
@@ -116,5 +131,4 @@ const TableControls: React.FC<TableControlsProps> = ({
     </div>
   );
 };
-
-export default TableControls;
+export default OrderTableControls; 

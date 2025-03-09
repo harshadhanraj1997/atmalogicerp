@@ -125,7 +125,10 @@ const DashBoardSidebar = () => {
         className={`app-sidebar ${isCollapse ? "collapsed close_sidebar" : ""}`}
       >
         <div className="main-sidebar-header">
-          <Link href="/" className="header-logo">
+          <button 
+            onClick={() => window.location.href = '/'}
+            className="header-logo cursor-pointer transition-transform active:scale-95"
+          >
             <Image
               className="main-logo"
               src={sidebarMainLogo}
@@ -138,7 +141,7 @@ const DashBoardSidebar = () => {
               priority
               alt="logo"
             />
-          </Link>
+          </button>
         </div>
 
         <div className="common-scrollbar max-h-screen overflow-y-auto">
@@ -154,20 +157,20 @@ const DashBoardSidebar = () => {
                       key={item.id}
                       className={
                         item.subItems?.length
-                          ? `slide has-sub ${linkId === item.id ? "open" : ""}` // Toggle based on first-level active state
+                          ? `slide has-sub ${linkId === item.id ? "open" : ""}`
                           : ""
                       }
                     >
-                      <Link
-                        // onClick={() => handleClick(item.id)}
+                      <button
                         onClick={(e) => {
                           if (!item.link || item.link === "#") {
-                            e.preventDefault(); // Prevent navigation when the link is "#"
+                            e.preventDefault();
+                          } else {
+                            window.location.href = item.link;
                           }
-                          handleClick(item.id); // Handle the menu toggle
+                          handleClick(item.id);
                         }}
-                        href={item.link || "#"}
-                        className={`sidebar__menu-item ${
+                        className={`sidebar__menu-item transition-all active:scale-95 ${
                           linkId === item.id ? "active" : ""
                         }`}
                       >
@@ -182,7 +185,7 @@ const DashBoardSidebar = () => {
                         {item.subItems && (
                           <i className="fa-regular fa-angle-down side-menu__angle"></i>
                         )}
-                      </Link>
+                      </button>
 
                       {item.subItems && (
                         <ul
@@ -202,10 +205,14 @@ const DashBoardSidebar = () => {
                                 linkIdTwo === index ? "open" : ""
                               }`}
                             >
-                              <Link
-                                onClick={() => handleClickTwo(index)}
-                                href={subOne.link || "/"}
-                                className={`sidebar__menu-item ${
+                              <button
+                                onClick={() => {
+                                  if (subOne.link) {
+                                    window.location.href = subOne.link;
+                                  }
+                                  handleClickTwo(index);
+                                }}
+                                className={`sidebar__menu-item transition-all active:scale-95 ${
                                   linkIdTwo === index ? "active" : ""
                                 }`}
                               >
@@ -213,7 +220,7 @@ const DashBoardSidebar = () => {
                                 {subOne.subItems && (
                                   <i className="fa-regular fa-angle-down side-menu__angle"></i>
                                 )}
-                              </Link>
+                              </button>
                               {subOne.subItems && (
                                 <ul
                                   className="sidebar-menu child2"
@@ -229,12 +236,11 @@ const DashBoardSidebar = () => {
                                         linkIdThree === subIndex ? "open" : ""
                                       }`}
                                     >
-                                      <Link
+                                      <button
                                         onClick={() =>
                                           handleClickThree(subIndex)
                                         }
-                                        href={subTwo.link || "#"}
-                                        className={`sidebar__menu-item ${
+                                        className={`sidebar__menu-item transition-all active:scale-95 ${
                                           linkIdThree === subIndex
                                             ? "active"
                                             : ""
@@ -244,7 +250,7 @@ const DashBoardSidebar = () => {
                                         {subTwo.subItems && (
                                           <i className="fa-regular fa-angle-down side-menu__angle"></i>
                                         )}
-                                      </Link>
+                                      </button>
                                       {subTwo.subItems && (
                                         <ul
                                           className="sidebar-menu child3"
@@ -265,12 +271,15 @@ const DashBoardSidebar = () => {
                                                     : ""
                                                 }`}
                                               >
-                                                <Link
-                                                  href={subThree.link || "#"}
-                                                  className="sidebar__menu-item"
+                                                <button
+                                                  className={`sidebar__menu-item transition-all active:scale-95 ${
+                                                    subThree.subItems
+                                                      ? ""
+                                                      : ""
+                                                  }`}
                                                 >
                                                   {subThree.label}
-                                                </Link>
+                                                </button>
                                               </li>
                                             )
                                           )}
@@ -290,6 +299,26 @@ const DashBoardSidebar = () => {
               ))}
             </ul>
           </nav>
+
+          <style jsx>{`
+            .sidebar__menu-item {
+              cursor: pointer;
+              transition: all 0.2s ease;
+              width: 100%;
+              text-align: left;
+              display: flex;
+              align-items: center;
+            }
+            .sidebar__menu-item:active {
+              transform: scale(0.98);
+            }
+            .sidebar__menu-item:hover {
+              background-color: rgba(0, 0, 0, 0.04);
+            }
+            .sidebar__menu-item.active {
+              background-color: rgba(0, 0, 0, 0.08);
+            }
+          `}</style>
 
           <div
             className="sidebar__thumb sidebar-bg"

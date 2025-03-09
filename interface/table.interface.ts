@@ -492,3 +492,9 @@ export interface IDull {
   dullLoss: number;
 }
 
+export interface ITagging {
+  id: string;
+  PartyName: string;
+  createdDate: string;
+  TotalWeight: number;
+}

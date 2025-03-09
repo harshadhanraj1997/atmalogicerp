@@ -72,7 +72,7 @@ const sidebarData: SidebarCategory[] = [
         icon: "fa-sharp fa-light fa-wallet",
         subItems: [
           { label: "Tagging", link: "/Billing/Tagging" },
-          { label: "Receipt", link: "/Billing/Receipt" },
+          { label: "Billing", link: "/Billing/Billing" },
         ],
       },
       /*

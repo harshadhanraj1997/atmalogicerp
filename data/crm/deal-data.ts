@@ -21,9 +21,7 @@ export const fetchDealData = async (): Promise<IDeal[]> => {
             createdDate: order.created_date || new Date().toISOString(),
             createdBy: order.created_by || '',
             status: order.status || 'Open',
-            clientSheetPdf: order.pdfUrl || null,
-            purity: order.purity || '',
-            remarks: order.remarks || '',
+            clientSheetPdf: order.pdfUrl || null
           };
         });
       } else {

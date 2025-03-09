@@ -1,3 +1,4 @@
+
 import { StaticImageData } from "next/image";
 import serviceImg1 from "../../public/assets/img/service/service-img-st2-1.jpg";
 import serviceImg2 from "../../public/assets/img/service/service-img-st2-2.jpg";

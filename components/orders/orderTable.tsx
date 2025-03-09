@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useReducer, useMemo } from "react";
 import Box from "@mui/material/Box";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -27,9 +27,13 @@ import EditDealsModal from "./editorderModal";
 import { fetchDealData } from "@/data/crm/deal-data";
 import TableControls from "@/components/elements/SharedInputs/TableControls";
 import DeleteModal from "@/components/common/DeleteModal";
-import { PDFDocument } from 'pdf-lib';
+import { appendBezierCurve, mergeLines, numberToString, PDFDocument } from 'pdf-lib';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+import OrderTableControls from './OrderTableControls';
+import { Podcast, WheatOffIcon, WholeWord } from "lucide-react";
+import { measureMemory } from "vm";
+import { ppid } from "process";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 const downloadPDF = async (pdfUrl: string) => {
@@ -98,61 +102,30 @@ const getStatusClass = (status: string) => {
 };
 
 export default function DealsTable() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
-  const [editData, setEditData] = useState<IDeal | null>(null);
-  const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState<number>(0);
+  // All hooks must be at the top level
   const [deals, setDeals] = useState<IDeal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showConfirmation, setShowConfirmation] = useState<number | null>(null);
-  const [isApproved, setIsApproved] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [filteredDeals, setFilteredDeals] = useState<IDeal[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [partyNameFilter, setPartyNameFilter] = useState('all');
+  const [showConfirmation, setShowConfirmation] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
+  
+  // Modal states
+  const [modalOpen, setModalOpen] = useState(false);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
+  const [editData, setEditData] = useState<IDeal | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadDeals = async () => {
-      try {
-        setLoading(true);
-        const data = await fetchDealData();
-        console.log("Fetched Deals:", data);
-        const sortedDeals = [...data].sort((a, b) => {
-          const dateA = new Date(a.createdDate).getTime();
-          const dateB = new Date(b.createdDate).getTime();
-          return dateB - dateA;
-        });
-        setDeals(sortedDeals);
-      } catch (error) {
-        console.error("Error loading deals:", error);
-        setError("Failed to load deals");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadDeals();
-  }, []);
-
-  const handleDateChange = (type: 'start' | 'end', value: string) => {
-    if (type === 'start') {
-      setStartDate(value);
-    } else {
-      setEndDate(value);
-    }
-  };
-
+  // Table hook
   const {
     paginatedRows,
     page,
-    rowsPerPage,
     totalPages,
     startIndex,
     endIndex,
-    filteredRows,
-    order,
-    orderBy,
     selected,
     searchQuery,
     handleDelete,
@@ -162,72 +135,70 @@ export default function DealsTable() {
     handleChangePage,
     handleChangeRowsPerPage,
     handleSearchChange,
-  } = useMaterialTableHook<IDeal>(
-    deals.filter(deal => {
-      try {
-        // Log the actual dates we're working with
-        console.log('Filtering Deal:', {
-          dealId: deal.id,
-          dealDate: deal.createdDate,
-          startDate,
-          endDate
-        });
+  } = useMaterialTableHook(filteredDeals, 10);
 
-        // If no dates selected, show all records
-        if (!startDate && !endDate) {
-          return true;
-        }
-
-        // Parse the deal date and normalize to local midnight
-        const dealDate = new Date(deal.createdDate);
-        const dealDateStr = dealDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-
-        // Apply start date filter if exists
-        if (startDate) {
-          if (dealDateStr < startDate) {
-            console.log(`Deal ${deal.id} excluded: before start date`);
-            return false;
-          }
-        }
-
-        // Apply end date filter if exists
-        if (endDate) {
-          if (dealDateStr > endDate) {
-            console.log(`Deal ${deal.id} excluded: after end date`);
-            return false;
-          }
-        }
-
-        console.log(`Deal ${deal.id} included in filter`, {
-          dealDateStr,
-          startDate,
-          endDate,
-          isAfterStart: !startDate || dealDateStr >= startDate,
-          isBeforeEnd: !endDate || dealDateStr <= endDate
-        });
-        
-        return true;
-      } catch (error) {
-        console.error('Date filtering error for deal:', deal.id, error);
-        return true; // Include on error
-      }
-    }), 
-    10
-  );
-
-  // Add debug logging for filtered results
-  useEffect(() => {
-    console.log('Date Filter Debug:', {
-      totalDeals: deals.length,
-      filteredDeals: filteredRows.length,
-      startDate,
-      endDate,
-      sampleDates: deals.slice(0, 3).map(d => ({
-        id: d.id,
-        date: new Date(d.createdDate).toISOString().split('T')[0]
+  // Memoized party name options
+  const partyNameOptions = useMemo(() => {
+    const uniquePartyNames = Array.from(new Set(deals.map(deal => deal.dealName)))
+      .filter(Boolean)
+      .sort();
+    return [
+      { value: 'all', label: 'All Parties' },
+      ...uniquePartyNames.map(name => ({
+        value: name,
+        label: name
       }))
+    ];
+  }, [deals]);
+
+  // Fetch data effect
+  useEffect(() => {
+    fetchDealData().then(data => {
+      setDeals(data);
+      setFilteredDeals(data);
+    }).catch(console.error);
+  }, []);
+
+  // Filter effect
+  useEffect(() => {
+    const newFilteredDeals = deals.filter(deal => {
+      if (statusFilter !== 'all' && 
+          deal.status?.toLowerCase() !== statusFilter.toLowerCase()) {
+        return false;
+      }
+      if (startDate || endDate) {
+        const dealDate = new Date(deal.createdDate).toISOString().split('T')[0];
+        if (startDate && dealDate < startDate) return false;
+        if (endDate && dealDate > endDate) return false;
+      }
+      if (partyNameFilter !== 'all' && deal.dealName !== partyNameFilter) {
+        return false;
+      }
+      return true;
     });
-  }, [deals, filteredRows, startDate, endDate]);
+    setFilteredDeals(newFilteredDeals);
+  }, [deals, startDate, endDate, statusFilter, partyNameFilter]);
+
+  // Handler functions (not hooks, can be after hooks)
+  const handleDateChange = (type: 'start' | 'end', value: string) => {
+    if (type === 'start') setStartDate(value);
+    else setEndDate(value);
+  };
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value);
+  };
+
+  const handlePartyNameChange = (value: string) => {
+    setPartyNameFilter(value);
+  };
+
+  const handleResetFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setStatusFilter('all');
+    setPartyNameFilter('all');
+  };
 
   const handlePrint = (pdfUrl: string | null) => {
     if (pdfUrl) {
@@ -265,7 +236,6 @@ export default function DealsTable() {
 
   const handleApproveOrder = async (orderId: string) => {
     try {
-      setIsUpdating(true);
       const response = await fetch(`${apiBaseUrl}/api/update-order-status`, {
         method: 'POST',
         headers: {
@@ -287,28 +257,179 @@ export default function DealsTable() {
     } catch (error) {
       console.error('Error approving order:', error);
       toast.error('Failed to approve order');
-    } finally {
-      setIsUpdating(false);
-      setShowConfirmation(null);
     }
   };
 
-  console.log('Filtered Deals:', {
-    total: deals.length,
-    filtered: filteredRows.length,
-    startDate,
-    endDate
-  });
-
-  const handleResetDates = () => {
-    setStartDate('');
-    setEndDate('');
-    console.log('Dates reset');
+  // Handler functions
+  const handleEdit = (deal: IDeal) => {
+    setEditData(deal);
+    setModalOpen(true);
   };
 
-  if (loading) return <div>Loading deals...</div>;
-  if (error) return <div>Error: {error}</div>;
-  if (!filteredRows.length) return <div>No orders found</div>;
+  const handleDetails = (deal: IDeal) => {
+    setEditData(deal);
+    setDetailsModalOpen(true);
+  };
+
+  const handleDeleteClick = (id: string) => {
+    setDeleteId(id);
+    setModalDeleteOpen(true);
+  };
+
+  // Calculate total weight for each row
+  const calculateTotalWeight = (weightRange: string, quantity: number) => {
+    try {
+      // If weight range contains a hyphen (e.g., "10-12")
+      if (weightRange.includes('-')) {
+        const [min, max] = weightRange.split('-').map(w => parseFloat(w.trim()));
+        const avgWeight = (min + max) / 2;
+        return (avgWeight * quantity).toFixed(2);
+      } 
+      // If it's a single number
+      else {
+        const weight = parseFloat(weightRange);
+        return (weight * quantity).toFixed(2);
+      }
+    } catch (error) {
+      console.error('Error calculating weight:', error);
+      return '0.00';
+    }
+  };
+
+  // Update your table rows rendering
+  const renderTableRows = () => {
+    return paginatedRows.map((row, index) => (
+      <TableRow
+        key={row.id}
+        selected={selected.includes(startIndex + index)}
+        onClick={() => handleClick(startIndex + index)}
+      >
+        <TableCell padding="checkbox">
+          <Checkbox
+            className="custom-checkbox checkbox-small"
+            checked={selected.includes(startIndex + index)}
+            size="small"
+            onChange={() => handleClick(startIndex + index)}
+          />
+        </TableCell>
+        <TableCell>{row.id}</TableCell>
+        <TableCell>
+          {new Date(row.createdDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          })}
+        </TableCell>
+        <TableCell>{row.createdBy}</TableCell>
+        <TableCell>{row.dealName}</TableCell>
+        <TableCell>{row.expectedEndDate}</TableCell>
+        <TableCell>
+          <span 
+            className={`bd-badge ${getStatusClass(row.status)}`}
+            style={{
+              padding: '4px 8px',
+              borderRadius: '4px',
+              color: 'white',
+              fontSize: '12px',
+              fontWeight: '500'
+            }}
+          >
+            {row.status}
+          </span>
+        </TableCell>
+        <TableCell>{row.AdvanceMetal}</TableCell>
+        <TableCell>
+          <span className="tag-badge">{row.tags}</span>
+        </TableCell>
+        <TableCell>
+          {row.weightRange ? calculateTotalWeight(row.weightRange, Number(row.quantity)) : '0.00'}
+        </TableCell>
+        <TableCell className="table__icon-box">
+          <div className="flex items-center justify-start gap-[10px]">
+            <Link href={`/Orders/show-models?orderId=${row.id}`} passHref>
+              <button
+                type="button"
+                className="table__icon edit"
+                style={{
+                  display: 'inline-block',
+                  backgroundColor: 'green',
+                  color: 'white',
+                  borderRadius: '4px',
+                  padding: '5px',
+                  textDecoration: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <i className="fa-regular fa-eye"></i>
+              </button>
+            </Link>
+
+            <Link href={`/Orders/add-models?orderId=${row.id}`} passHref>
+              <button
+                type="button"
+                className="table__icon edit"
+                style={{
+                  display: 'inline-block',
+                  backgroundColor: 'green',
+                  color: 'white',
+                  borderRadius: '4px',
+                  padding: '5px',
+                  textDecoration: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <i className="fa-sharp fa-light fa-pen"></i>
+              </button>
+            </Link>
+
+            <button
+              type="button"
+              className="table__icon delete"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteClick(row.id);
+              }}
+            >
+              <i className="fa-solid fa-trash"></i>
+            </button>
+
+            <button
+              type="button"
+              className="table__icon approve"
+              style={{
+                backgroundColor: '#4CAF50',
+                color: 'white',
+                borderRadius: '4px',
+                padding: '5px',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowConfirmation(row.id);
+              }}
+            >
+              <i className="fa-solid fa-check"></i>
+            </button>
+          </div>
+        </TableCell>
+      </TableRow>
+    ));
+  };
+
+  // If you have a total weight calculation
+  const calculateTotalWeightForAllRows = () => {
+    return filteredDeals.reduce((total, row) => {
+      const weight = parseFloat(calculateTotalWeight(row.weightRange || '0', Number(row.quantity)));
+      return total + weight;
+    }, 0).toFixed(2);
+  };
+
+  if (!paginatedRows.length) return <div>No orders found</div>;
 
   const columns: Column[] = [
     {
@@ -345,13 +466,18 @@ export default function DealsTable() {
       <div className="col-span-12">
         <div className="card__wrapper">
           <div className="manaz-common-mat-list w-full table__wrapper table-responsive">
-            <TableControls
+            <OrderTableControls
               searchQuery={searchQuery}
               handleSearchChange={handleSearchChange}
               startDate={startDate}
               endDate={endDate}
               handleDateChange={handleDateChange}
-              handleResetDates={handleResetDates}
+              handleResetDates={handleResetFilters}
+              statusFilter={statusFilter}
+              handleStatusChange={handleStatusChange}
+              partyNameFilter={partyNameFilter}
+              handlePartyNameChange={handlePartyNameChange}
+              partyNameOptions={partyNameOptions}
             />
             <Box sx={{ width: "100%" }} className="table-responsive">
               <Paper sx={{ width: "100%", mb: 2 }}>
@@ -368,16 +494,16 @@ export default function DealsTable() {
                             color="primary"
                             indeterminate={
                               selected.length > 0 &&
-                              selected.length < filteredRows.length
+                              selected.length < paginatedRows.length
                             }
                             checked={
-                              filteredRows.length > 0 &&
-                              selected.length === filteredRows.length
+                              paginatedRows.length > 0 &&
+                              selected.length === paginatedRows.length
                             }
                             onChange={(e) =>
                               handleSelectAllClick(
                                 e.target.checked,
-                                filteredRows
+                                paginatedRows
                               )
                             }
                             size="small"
@@ -391,132 +517,12 @@ export default function DealsTable() {
                         <TableCell>Status</TableCell>
                         <TableCell>Advance Metal</TableCell>
                         <TableCell>Tags</TableCell>
+                        <TableCell>Total Weight</TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody className="table__body">
-                      {paginatedRows.map((deal, index) => {
-                        const stausClass = useTableStatusHook(deal?.status);
-                        const phaseClass = useTablePhaseHook(deal?.phase);
-                        return (
-                          <TableRow
-                            key={deal.id}
-                            selected={selected.includes(startIndex + index)}
-                            onClick={() => handleClick(startIndex + index)}
-                          >
-                            <TableCell padding="checkbox">
-                              <Checkbox
-                                className="custom-checkbox checkbox-small"
-                                checked={selected.includes(startIndex + index)}
-                                size="small"
-                                onChange={() => handleClick(startIndex + index)}
-                              />
-                            </TableCell>
-                            <TableCell>{deal.id}</TableCell>
-                            <TableCell>
-                              {new Date(deal.createdDate).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </TableCell>
-                            <TableCell>{deal.createdBy}</TableCell>
-                            <TableCell>{deal.dealName}</TableCell>
-                            <TableCell>{deal.expectedEndDate}</TableCell>
-                            <TableCell>
-                              <span 
-                                className={`bd-badge ${getStatusClass(deal.status)}`}
-                                style={{
-                                  padding: '4px 8px',
-                                  borderRadius: '4px',
-                                  color: 'white',
-                                  fontSize: '12px',
-                                  fontWeight: '500'
-                                }}
-                              >
-                                {deal.status}
-                              </span>
-                            </TableCell>
-                            <TableCell>{deal.AdvanceMetal}</TableCell>
-                            <TableCell>
-                              <span className="tag-badge">{deal.tags}</span>
-                            </TableCell>
-                            <TableCell className="table__icon-box">
-                              <div className="flex items-center justify-start gap-[10px]">
-                                <Link href={`/Orders/show-models?orderId=${deal.id}`} passHref>
-                                  <button
-                                    type="button"
-                                    className="table__icon edit"
-                                    style={{
-                                      display: 'inline-block',
-                                      backgroundColor: 'green',
-                                      color: 'white',
-                                      borderRadius: '4px',
-                                      padding: '5px',
-                                      textDecoration: 'none',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <i className="fa-regular fa-eye"></i>
-                                  </button>
-                                </Link>
-
-                                <Link href={`/Orders/add-models?orderId=${deal.id}`} passHref>
-                                  <button
-                                    type="button"
-                                    className="table__icon edit"
-                                    style={{
-                                      display: 'inline-block',
-                                      backgroundColor: 'green',
-                                      color: 'white',
-                                      borderRadius: '4px',
-                                      padding: '5px',
-                                      textDecoration: 'none',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <i className="fa-sharp fa-light fa-pen"></i>
-                                  </button>
-                                </Link>
-
-                                <button
-                                  type="button"
-                                  className="table__icon delete"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDelete(deal.id);
-                                  }}
-                                >
-                                  <i className="fa-solid fa-trash"></i>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className="table__icon approve"
-                                  style={{
-                                    backgroundColor: '#4CAF50',
-                                    color: 'white',
-                                    borderRadius: '4px',
-                                    padding: '5px',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowConfirmation(deal.id);
-                                  }}
-                                >
-                                  <i className="fa-solid fa-check"></i>
-                                </button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      {renderTableRows()}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -524,7 +530,8 @@ export default function DealsTable() {
             </Box>
             <Box className="table-search-box mt-[30px]" sx={{ p: 2 }}>
               <Box>
-                {`Showing ${startIndex + 1} to ${Math.min(endIndex, filteredRows.length)} of ${filteredRows.length} entries`}
+                {`Showing ${startIndex + 1} to ${Math.min(endIndex, paginatedRows.length)} of ${paginatedRows.length} entries`}
+                {statusFilter !== 'all' && ` (filtered by ${statusFilter})`}
               </Box>
               <Pagination
                 count={totalPages}
@@ -554,7 +561,7 @@ export default function DealsTable() {
         />
       )}
 
-      {modalDeleteOpen && (
+      {modalDeleteOpen && deleteId && (
         <DeleteModal
           open={modalDeleteOpen}
           setOpen={setModalDeleteOpen}
@@ -612,7 +619,6 @@ export default function DealsTable() {
                   <button
                     onClick={async () => {
                       try {
-                        console.log('Making API call with orderId:', showConfirmation);
                         const response = await fetch(`${apiBaseUrl}/api/update-order-status`, {
                           method: 'POST',
                           headers: {
@@ -627,7 +633,7 @@ export default function DealsTable() {
                             setShowConfirmation(null);
                             setIsApproved(false);
                             window.location.reload();
-                          }, 1500); // Show success message for 1.5 seconds
+                          }, 1500);
                         } else {
                           toast.error(result.message || 'Failed to approve order');
                           setShowConfirmation(null);
@@ -675,3 +681,5 @@ export default function DealsTable() {
     </>
   );
 }
+
+

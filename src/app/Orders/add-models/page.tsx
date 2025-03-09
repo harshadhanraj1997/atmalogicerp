@@ -5,11 +5,12 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, PDFFont, StandardFonts, rgb } from 'pdf-lib';
 import { useSearchParams } from 'next/navigation';
 import "../add-order/add-order.css";
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+
 
 // Add this at the top of the file, with other component-level constants
 const margin = 30;
@@ -748,9 +749,9 @@ const generatePDF = async (pdfDoc) => {
         const rowData = [
           category,
           data.quantity.toString(),
-          '0.000',
-          data.netWeight.toFixed(3),
-          data.grossWeight.toFixed(3)
+          '',   // Blank stone weight
+          '',   // Blank net weight
+          ''    // Blank gross weight
         ];
 
         rowData.forEach(text => {
@@ -779,15 +780,15 @@ const generatePDF = async (pdfDoc) => {
 
       // Add total row with same alignment
       summaryXPos = margin + 100; // Match header indent
-      const totalRow = [
+      const plainTotalRow = [
         'Total',
         Object.values(categorySummary.plain).reduce((sum, data) => sum + data.quantity, 0).toString(),
-        '0.000',
-        Object.values(categorySummary.plain).reduce((sum, data) => sum + data.netWeight, 0).toFixed(3),
-        Object.values(categorySummary.plain).reduce((sum, data) => sum + data.grossWeight, 0).toFixed(3)
+        '',   // Blank stone weight
+        '',   // Blank net weight
+        '',   // Blank gross weight
       ];
 
-      totalRow.forEach((text, index) => {
+      plainTotalRow.forEach((text, index) => {
         const width = summaryHeaderWidth * 0.8;
         page.drawRectangle({
           x: summaryXPos,
@@ -894,8 +895,8 @@ const generatePDF = async (pdfDoc) => {
         const rowData = [
           data.quantity.toString(),
           '',  // Blank stone weight
-          data.netWeight.toFixed(3),
-          ''   // Blank gross weight
+          '',   // Blank net weight
+          '',   // Blank gross weight
         ];
 
         summaryXPos += width;
@@ -925,15 +926,15 @@ const generatePDF = async (pdfDoc) => {
 
       // Add total row with matching width
       summaryXPos = margin + 100;
-      const totalRow = [
+      const stoneTotalRow = [
         'Total',
         Object.values(categorySummary.stone).reduce((sum, data) => sum + data.quantity, 0).toString(),
-        '',  // Blank stone weight
-        Object.values(categorySummary.stone).reduce((sum, data) => sum + data.netWeight, 0).toFixed(3),
-        ''   // Blank gross weight
+        '',   // Blank stone weight
+        '',   // Blank net weight
+        '',   // Blank gross weight
       ];
 
-      totalRow.forEach((text, index) => {
+      stoneTotalRow.forEach((text, index) => {
         const width = summaryHeaderWidth * 0.8; // Match plain items cell width
         page.drawRectangle({
           x: summaryXPos,
@@ -1203,6 +1204,178 @@ const generatePDF = async (pdfDoc) => {
 
     // After all rows
     console.log("All rows drawn");
+
+    // Inside generatePDF function, after the main table and before any other summary
+    const weightSummary = {};
+
+    // Debug log the initial models
+    console.log('Initial models:', models);
+
+    // Calculate totals dynamically
+    models.forEach(model => {
+      const category = model.category || 'Uncategorized';
+      const quantity = Number(model.quantity) || 0;
+
+      if (!weightSummary[category]) {
+        weightSummary[category] = {
+          quantity: 0,
+          stoneWeight: '',    // Empty string for stone weight
+          netWeight: '',      // Empty string for net weight
+          grossWeight: ''     // Empty string for gross weight
+        };
+      }
+
+      weightSummary[category].quantity += quantity;
+    });
+
+    // Debug log final summary
+    console.log('Final summary before drawing:', weightSummary);
+
+    // Move to position for summary table
+    y = y - 100;  // Ensure enough space
+
+    // Draw the summary table title
+    page.drawText('Summary', {
+      x: margin + 20,
+      y: y + 20,
+      size: 12,
+      font: boldFont
+    });
+
+    // Draw headers
+    const headers = [
+      { text: 'Category', x: margin + 20 },
+      { text: 'Quantity', x: margin + 150 },
+      { text: 'Stone Weight', x: margin + 250 },
+      { text: 'Net Weight', x: margin + 350 },
+      { text: 'Gross Weight', x: margin + 450 }
+    ];
+
+    headers.forEach(header => {
+      page.drawText(header.text, {
+        x: header.x,
+        y,
+        size: 10,
+        font: boldFont
+      });
+    });
+
+    // Draw line under headers
+    page.drawLine({
+      start: { x: margin, y: y },
+      end: { x: margin + 550, y: y },
+      thickness: 0.5,
+      color: rgb(0, 0, 0)
+    });
+
+    // Initialize totals
+    let totalQuantity = 0;
+    let totalStoneWeight = 0;
+    let totalNetWeight = 0;
+    let totalGrossWeight = 0;
+
+    // Draw data rows
+    Object.entries(weightSummary).forEach(([category, data]) => {
+      console.log('Drawing category row:', category, data);
+
+      // Draw category
+      page.drawText(category, {
+        x: margin + 20,
+        y,
+        size: 10,
+        font: font
+      });
+
+      // Draw quantity
+      page.drawText(data.quantity.toString(), {
+        x: margin + 150,
+        y,
+        size: 10,
+        font: font
+      });
+
+      // Draw blank spaces for weights
+      page.drawText('', {
+        x: margin + 250,
+        y,
+        size: 10,
+        font: font
+      });
+
+      page.drawText('', {
+        x: margin + 350,
+        y,
+        size: 10,
+        font: font
+      });
+
+      page.drawText('', {
+        x: margin + 450,
+        y,
+        size: 10,
+        font: font
+      });
+
+      // Update totals
+      totalQuantity += data.quantity;
+      totalStoneWeight += data.stoneWeight;
+      totalNetWeight += data.netWeight;
+      totalGrossWeight += data.grossWeight;
+
+      y -= 20;
+    });
+
+    // Draw line before totals
+    page.drawLine({
+      start: { x: margin, y: y + 10 },
+      end: { x: margin + 550, y: y + 10 },
+      thickness: 0.5,
+      color: rgb(0, 0, 0)
+    });
+
+    // Draw totals row
+    page.drawText('Total', {
+      x: margin + 20,
+      y: y,
+      size: 10,
+      font: boldFont
+    });
+
+    page.drawText(totalQuantity.toString(), {
+      x: margin + 150,
+      y,
+      size: 10,
+      font: boldFont
+    });
+
+    page.drawText(totalStoneWeight.toFixed(3), {
+      x: margin + 250,
+      y,
+      size: 10,
+      font: boldFont
+    });
+
+    page.drawText(totalNetWeight.toFixed(3), {
+      x: margin + 350,
+      y,
+      size: 10,
+      font: boldFont
+    });
+
+    page.drawText(totalGrossWeight.toFixed(3), {
+      x: margin + 450,
+      y,
+      size: 10,
+      font: boldFont
+    });
+
+    // Final line
+    page.drawLine({
+      start: { x: margin, y: y - 10 },
+      end: { x: margin + 550, y: y - 10 },
+      thickness: 0.5,
+      color: rgb(0, 0, 0)
+    });
 
     return pdfDoc;
   } catch (error) {
@@ -1653,4 +1826,5 @@ const handleRemoveRow = (index: number) => {
 };
 
 export default AddModel;
+
 
