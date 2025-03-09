@@ -332,7 +332,7 @@ const NewTagging = () => {
           formData.append('pdf', new Blob([pdfBytes], { type: 'application/pdf' }));
           formData.append('modelName', model.modelName);
           
-          const response = await fetch(`${apiBaseUrl}/api/upload-to-salesforce`, {
+          const response = await fetch(`${apiBaseUrl}/api/submit-tagging`, {
             method: 'POST',
             body: formData
           });
