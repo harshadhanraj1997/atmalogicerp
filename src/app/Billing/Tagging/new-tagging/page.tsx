@@ -129,34 +129,23 @@ const NewTagging = () => {
           const result = await response.json();
           
           if (result.success && Array.isArray(result.data)) {
-            // Fetch image for each model
+            // Fetch image URL for each model
             const formattedModels = await Promise.all(result.data.map(async (modelCode) => {
               try {
                 const imageResponse = await fetch(`${apiBaseUrl}/api/model-image?modelCode=${modelCode}`);
+                const imageData = await imageResponse.json();
                 
-                if (!imageResponse.ok) {
-                  throw new Error('Image not found');
-                }
-
-                // Convert blob to base64 for storage
-                const blob = await imageResponse.blob();
-                const base64 = await new Promise((resolve) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => resolve(reader.result);
-                  reader.readAsDataURL(blob);
-                });
-
                 return {
                   id: modelCode,
                   modelName: modelCode,
-                  imageData: base64 as string
+                  imageUrl: imageData.success ? imageData.imageUrl : null
                 };
               } catch (error) {
                 console.error(`Error fetching image for model ${modelCode}:`, error);
                 return {
                   id: modelCode,
                   modelName: modelCode,
-                  imageData: null
+                  imageUrl: null
                 };
               }
             }));
@@ -267,46 +256,18 @@ const NewTagging = () => {
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
       // Add model image if available
-      if (model.imageData) {
-        try {
-          // Convert base64 to array buffer
-          const imageData = await fetch(model.imageData).then(res => res.arrayBuffer());
-          let image;
-          
-          // Determine image type from base64 string
-          if (model.imageData.includes('data:image/jpeg')) {
-            image = await pdfDoc.embedJpg(imageData);
-          } else if (model.imageData.includes('data:image/png')) {
-            image = await pdfDoc.embedPng(imageData);
-          } else {
-            throw new Error('Unsupported image format');
-          }
-
-          // Calculate image dimensions to fit in PDF
-          const maxWidth = width - 100; // 50px margin on each side
-          const maxHeight = 200; // Maximum height for image
-          const imgDims = image.scale(1);
-          let scaleFactor = Math.min(
-            maxWidth / imgDims.width,
-            maxHeight / imgDims.height
-          );
-          
-          page.drawImage(image, {
-            x: 50,
-            y: height - 150,
-            width: imgDims.width * scaleFactor,
-            height: imgDims.height * scaleFactor,
-          });
-        } catch (imageError) {
-          console.error('Error embedding image in PDF:', imageError);
-          page.drawText('Image not available', {
-            x: 50,
-            y: height - 100,
-            font,
-            size: 12,
-            color: rgb(0.7, 0, 0),
-          });
-        }
+      if (model.imageUrl) {
+        const imageResponse = await fetch(model.imageUrl);
+        const imageArrayBuffer = await imageResponse.arrayBuffer();
+        const image = await pdfDoc.embedJpg(imageArrayBuffer);
+        const imageDims = image.scale(0.5); // Scale image to 50%
+        
+        page.drawImage(image, {
+          x: 50,
+          y: height - 150,
+          width: imageDims.width,
+          height: imageDims.height,
+        });
       }
 
       // Add model details
