@@ -181,11 +181,12 @@ const NewTagging = () => {
   // Add the getImageData helper function
   const getImageData = async (url) => {
     try {
-      const response = await fetch(url, {
-        headers: {
-          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SALESFORCE_ACCESS_TOKEN}`
-        }
-      });
+      // No need for authorization header as we're using our proxy endpoint
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Image not found');
+      }
+
       const blob = await response.blob();
       return new Promise((resolve) => {
         const reader = new FileReader();
@@ -222,8 +223,9 @@ const NewTagging = () => {
           const imageUrlData = await imageUrlResponse.json();
           
           if (imageUrlData.success && imageUrlData.data) {
-            console.log("Image URL received:", imageUrlData.data);
-            imageData = await getImageData(imageUrlData.data);
+            console.log("Download URL received:", imageUrlData.data);
+            // Use the download URL directly as it's already pointing to our proxy
+            imageData = await getImageData(`${apiBaseUrl}${imageUrlData.data}`);
           } else {
             console.warn("No image URL returned for model:", modelCode);
           }
