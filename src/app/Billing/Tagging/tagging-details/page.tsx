@@ -166,8 +166,8 @@ export default function TaggingDetailsPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200 text-sm">
               {details.taggedItems.map((item) => {
-                // Calculate stone charges: (stone weight * 600) / 1000
-                const calculatedStoneCharge = (item.stoneWeight * 600) / 1000;
+                // Calculate stone charges: (stone weight * 600)
+                const calculatedStoneCharge = (item.stoneWeight * 600);
                 
                 return (
                   <tr key={item.id}>
@@ -201,7 +201,7 @@ export default function TaggingDetailsPage() {
                 <td className="px-4 py-2 font-semibold">{details.summary.totalNetWeight.toFixed(3)}</td>
                 <td className="px-4 py-2 font-semibold">{details.summary.totalStoneWeight.toFixed(3)}</td>
                 <td className="px-4 py-2 font-semibold">
-                  {((details.summary.totalStoneWeight * 600) / 1000).toFixed(2)}
+                  {((details.summary.totalStoneWeight * 600)).toFixed(2)}
                 </td>
                 <td className="px-4 py-2"></td>
               </tr>

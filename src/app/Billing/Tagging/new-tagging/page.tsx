@@ -9,9 +9,9 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { PDFDocument, StandardFonts } from 'pdf-lib';
 import * as XLSX from 'xlsx';
 import Image from 'next/image';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 interface PartyLedger {
   id: string;
@@ -388,17 +388,20 @@ const NewTagging = () => {
     setSelectedModels(updatedModels);
   };
 
-  // Generate PDF document for tagging
+  // Update the generatePDF function for individual models
   const generatePDF = async (model: TaggingModel): Promise<Uint8Array> => {
     try {
       const pdfDoc = await PDFDocument.create();
       const page = pdfDoc.addPage([600, 800]); // Larger page size
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const black = rgb(0, 0, 0);
       
       // If there's an image, add it first
       if (model.imageData) {
         try {
-          const imageBytes = await fetch(model.imageData).then(res => res.arrayBuffer());
+          // Remove the data:image/jpeg;base64, prefix if it exists
+          const imageDataString = model.imageData.replace(/^data:image\/\w+;base64,/, '');
+          const imageBytes = Buffer.from(imageDataString, 'base64');
           const image = await pdfDoc.embedJpg(imageBytes);
           
           // Calculate image dimensions to fit within 300x300 box
@@ -431,10 +434,10 @@ const NewTagging = () => {
         `Model Name: ${model.modelName}`,
         `Model ID: ${model.modelId}`,
         `Unique Number: ${model.uniqueNumber}`,
-        `Gross Weight: ${model.grossWeight} g`,
-        `Net Weight: ${model.netWeight} g`,
-        `Stone Weight: ${model.stoneWeight} g`,
-        `Stone Charges: ${model.stoneCharges}`
+        `Gross Weight: ${model.grossWeight.toFixed(3)} g`,
+        `Net Weight: ${model.netWeight.toFixed(3)} g`,
+        `Stone Weight: ${model.stoneWeight.toFixed(3)} g`,
+        `Stone Charges: ${model.stoneCharges.toFixed(2)}`
       ];
 
       // Start text below image or at fixed position if no image
@@ -445,7 +448,8 @@ const NewTagging = () => {
           x: 50,
           y: yPosition,
           size: 12,
-          font
+          font,
+          color: black
         });
         yPosition -= 30; // Space between lines
       });
@@ -616,7 +620,7 @@ const NewTagging = () => {
         netWeight: totals.netWeight.toFixed(3),
         stoneWeight: totals.stoneWeight.toFixed(3),
         stoneCharges: totals.stoneCharges.toFixed(2),
-        stoneRate: '600₹ per kg',
+        stoneRate: '600₹ per g',
         totalModels: selectedModels.length
       });
 
@@ -739,7 +743,7 @@ const NewTagging = () => {
     }
   };
 
-  // Add this new function for generating summary PDF
+  // Update the generateSummaryPDF function
   const generateSummaryPDF = async (models: TaggingModel[]): Promise<Uint8Array> => {
     try {
       const pdfDoc = await PDFDocument.create();
@@ -748,265 +752,79 @@ const NewTagging = () => {
       const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
       const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const black = rgb(0, 0, 0);
-
-      // Draw borders for the entire invoice
-      page.drawRectangle({
-        x: 30,
-        y: 30,
-        width: width - 60,
-        height: height - 60,
-        borderColor: black,
-        borderWidth: 1,
-      });
-
-      // Title Bar
-      page.drawRectangle({
-        x: 30,
-        y: height - 60,
-        width: width - 60,
-        height: 40,
-        borderColor: black,
-        borderWidth: 1,
-      });
-
-      page.drawText('Tax-Invoice', {
-        x: width / 2 - 40,
-        y: height - 40,
-        size: 20,
-        font: helveticaBold
-      });
-
-      // Company and Buyer Information Sections
-      // Left side box (Seller)
-      page.drawRectangle({
-        x: 30,
-        y: height - 160,
-        width: (width - 60) / 2,
-        height: 100,
-        borderColor: black,
-        borderWidth: 1,
-      });
-
-      // Right side box (Buyer)
-      page.drawRectangle({
-        x: 30 + (width - 60) / 2,
-        y: height - 160,
-        width: (width - 60) / 2,
-        height: 100,
-        borderColor: black,
-        borderWidth: 1,
-      });
-
-      // Seller Information
-      page.drawText('NEEDHA GOLD PRIVATE LIMITED', {
+    
+      // Add title
+      page.drawText('Tagging Summary', {
         x: 50,
-        y: height - 80,
-        size: 12,
-        font: helveticaBold
+        y: height - 50,
+        size: 16,
+        font: helveticaBold,
+        color: black
       });
 
-      // Model Details Table
-      const tableTop = height - 200;
-      const columnWidths = [30, 80, 80, 40, 60, 60, 60, 60, 60, 60, 40, 100];
-      let xPos = 30;
+      // Add table headers
+      const headers = ['Model', 'Unique #', 'Net Weight', 'Stone Weight', 'Gross Weight', 'Stone Charges'];
+      let yPos = height - 100;
+      let xPos = 50;
 
-      // Table Headers
-      const headers = [
-        'Sr. No.',
-        'Item Name',
-        'Item Narr.',
-        'HSN Code',
-        'Pcs',
-        'Gross Wt',
-        'Stone Wt',
-        'Other Wt',
-        'Net Wt',
-        'Stone Amt',
-        'Other Amt',
-        'Purity'
-      ];
-
-      // Draw table headers
       headers.forEach((header, index) => {
         page.drawText(header, {
-          x: xPos + 5,
-          y: tableTop - 15,
-          size: 8,
-          font: helveticaBold
+          x: xPos,
+          y: yPos,
+          size: 12,
+          font: helveticaBold,
+          color: black
         });
-        xPos += columnWidths[index];
+        xPos += 90;
       });
 
-      // Draw table rows
-      let yPos = tableTop - 35;
+      // Add table rows
       models.forEach((model, index) => {
-        xPos = 30;
-        const rowData = [
-          (index + 1).toString(),
-          model.modelName,
-          '', // Item narr
-          '7113', // HSN code
-          '1', // Pcs
-          model.grossWeight.toFixed(3),
-          model.stoneWeight.toFixed(3),
-          '0.000', // Other weight
-          model.netWeight.toFixed(3),
-          model.stoneCharges.toFixed(2),
-          '0.00', // Other amount
-          '91.60' // Purity
-        ];
-
-        rowData.forEach((text, colIndex) => {
-          page.drawText(text, {
-            x: xPos + 5,
-            y: yPos,
-            size: 8,
-            font: helvetica
-          });
-          xPos += columnWidths[colIndex];
+        yPos -= 30;
+        page.drawText(model.modelName, {
+          x: 50,
+          y: yPos,
+          size: 10,
+          font: helvetica,
+          color: black
         });
-
-        yPos -= 20;
-      });
-
-      // Add totals row
-      const totals = models.reduce((acc, model) => ({
-        grossWeight: acc.grossWeight + model.grossWeight,
-        stoneWeight: acc.stoneWeight + model.stoneWeight,
-        netWeight: acc.netWeight + model.netWeight,
-        stoneCharges: acc.stoneCharges + model.stoneCharges
-      }), { grossWeight: 0, stoneWeight: 0, netWeight: 0, stoneCharges: 0 });
-
-      // Draw Rate Details section
-      const rateDetailsY = yPos - 40;
-      page.drawText('Rate Details:', {
-        x: 50,
-        y: rateDetailsY,
-        size: 10,
-        font: helveticaBold
-      });
-
-      // After drawing the main table and totals, add the description table
-      const descriptionTableY = yPos - 80; // Position below the main table
-      
-      // Description Table Header
-      page.drawRectangle({
-        x: 30,
-        y: descriptionTableY,
-        width: width - 60,
-        height: 25,
-        borderColor: black,
-        borderWidth: 1,
-      });
-
-      page.drawText('Description', {
-        x: width / 2 - 40,
-        y: descriptionTableY + 8,
-        size: 12,
-        font: helveticaBold
-      });
-
-      // Description Table Content
-      const descriptionData = [
-        { label: 'Description', value: 'Amount', igst: 'IGST', cgst: 'CGST', sgst: 'SGST', total: 'Final Amount' },
-        { label: 'HUID', value: '0.00', igst: '0.00', cgst: '0.00', sgst: '0.00', total: '0.00' },
-        { label: 'Stone Amount', value: totals.stoneCharges.toFixed(2), igst: '0.00', cgst: '0.00', sgst: '0.00', total: totals.stoneCharges.toFixed(2) },
-        { label: 'Other Amount', value: '0.00', igst: '0.00', cgst: '0.00', sgst: '0.00', total: '0.00' },
-        { label: 'Making Charges', value: '0.00', igst: '0.00', cgst: '0.00', sgst: '0.00', total: '0.00' }
-      ];
-
-      // Draw Description Table
-      let descY = descriptionTableY - 25;
-      const colWidths = [150, 80, 80, 80, 80, 80];
-      let startX = 30;
-
-      // Draw table headers
-      descriptionData[0].label && Object.keys(descriptionData[0]).forEach((key, index) => {
-        page.drawText(descriptionData[0][key], {
-          x: startX + 5 + (index * colWidths[0]),
-          y: descY,
-          size: 9,
-          font: helveticaBold
+        page.drawText(model.uniqueNumber.toString(), {
+          x: 140,
+          y: yPos,
+          size: 10,
+          font: helvetica,
+          color: black
+        });
+        page.drawText(model.netWeight.toFixed(3), {
+          x: 230,
+          y: yPos,
+          size: 10,
+          font: helvetica,
+          color: black
+        });
+        page.drawText(model.stoneWeight.toFixed(3), {
+          x: 320,
+          y: yPos,
+          size: 10,
+          font: helvetica,
+          color: black
+        });
+        page.drawText(model.grossWeight.toFixed(3), {
+          x: 410,
+          y: yPos,
+          size: 10,
+          font: helvetica,
+          color: black
+        });
+        page.drawText(model.stoneCharges.toFixed(2), {
+          x: 500,
+          y: yPos,
+          size: 10,
+          font: helvetica,
+          color: black
         });
       });
 
-      // Draw horizontal line after headers
-      page.drawLine({
-        start: { x: 30, y: descY - 5 },
-        end: { x: width - 30, y: descY - 5 },
-        thickness: 1,
-        color: black,
-      });
-
-      // Draw table rows
-      descY -= 20;
-      descriptionData.slice(1).forEach((row, rowIndex) => {
-        startX = 30;
-        Object.values(row).forEach((value, colIndex) => {
-          const xPos = startX + (colIndex * colWidths[0]);
-          const alignment = colIndex === 0 ? 'left' : 'right';
-          const textX = alignment === 'right' ? 
-            xPos + colWidths[0] - 5 - helvetica.widthOfTextAtSize(value, 9) : 
-            xPos + 5;
-
-          page.drawText(value, {
-            x: textX,
-            y: descY,
-            size: 9,
-            font: helvetica
-          });
-        });
-
-        // Draw horizontal line after each row
-        page.drawLine({
-          start: { x: 30, y: descY - 5 },
-          end: { x: width - 30, y: descY - 5 },
-          thickness: 1,
-          color: black,
-        });
-
-        descY -= 20;
-      });
-
-      // Draw vertical lines for columns
-      const tableHeight = (descriptionData.length * 20) + 5;
-      for (let i = 0; i <= colWidths.length; i++) {
-        const xLine = 30 + (i * colWidths[0]);
-        page.drawLine({
-          start: { x: xLine, y: descriptionTableY },
-          end: { x: xLine, y: descriptionTableY - tableHeight },
-          thickness: 1,
-          color: black,
-        });
-      }
-
-      // Add total row with bold font
-      const totalRow = {
-        label: 'Total',
-        value: totals.stoneCharges.toFixed(2),
-        igst: '0.00',
-        cgst: '0.00',
-        sgst: '0.00',
-        total: totals.stoneCharges.toFixed(2)
-      };
-
-      startX = 30;
-      Object.values(totalRow).forEach((value, colIndex) => {
-        const xPos = startX + (colIndex * colWidths[0]);
-        const alignment = colIndex === 0 ? 'left' : 'right';
-        const textX = alignment === 'right' ? 
-          xPos + colWidths[0] - 5 - helveticaBold.widthOfTextAtSize(value, 9) : 
-          xPos + 5;
-
-        page.drawText(value, {
-          x: textX,
-          y: descY,
-          size: 9,
-          font: helveticaBold
-        });
-      });
-
-      // Save PDF
       return pdfDoc.save();
     } catch (error) {
       console.error('Error generating summary PDF:', error);
@@ -1075,9 +893,9 @@ const NewTagging = () => {
   const uniqueModels = Array.from(new Map(orderModels.map(model => [model.id, model])).values());
 
   return (
-    <div className="flex justify-center pl-80 gap-6">
+    <div className="flex justify-center gap-6">
       {/* Form container - Added left padding */}
-      <div className="max-w-4xl p-6  mx-auto bg-white rounded-lg shadow-md mt-[200px]">
+      <div className="max-w-4xl p-6 pl-20 mx-auto bg-white rounded-lg shadow-md mt-[200px]">
         <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">New Tagging</h1>
         
         <form className="space-y-6 max-w-3xl mx-auto" onSubmit={(e) => {
@@ -1523,5 +1341,6 @@ const NewTagging = () => {
     </div>
   );
 };
-
 export default NewTagging;
+
+
