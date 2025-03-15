@@ -1075,16 +1075,16 @@ const NewTagging = () => {
   const uniqueModels = Array.from(new Map(orderModels.map(model => [model.id, model])).values());
 
   return (
-    <div className="flex justify-center gap-6">
-      {/* Form container */}
-      <div className="max-w-2xl p-6 pl-80 mx-auto bg-white rounded-lg shadow-md mt-[200px]">
+    <div className="flex justify-center pl-80 gap-6">
+      {/* Form container - Added left padding */}
+      <div className="max-w-4xl p-6  mx-auto bg-white rounded-lg shadow-md mt-[200px]">
         <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">New Tagging</h1>
         
-        <form className="space-y-6" onSubmit={(e) => {
+        <form className="space-y-6 max-w-3xl mx-auto" onSubmit={(e) => {
           e.preventDefault();
           handleSubmitTagging();
         }}>
-          {/* Party & Order Selection */}
+          {/* Party & Order Selection - Centered grid */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="form-group">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1095,7 +1095,6 @@ const NewTagging = () => {
                   const selectedParty = partyLedgers.find(party => party.code === value);
                   if (selectedParty) {
                     setSelectedParty(selectedParty.code);
-                    // Reset selections when party changes
                     setSelectedOrder('');
                     setSelectedModels([]);
                     setSubmittedItems([]);
@@ -1160,10 +1159,9 @@ const NewTagging = () => {
             </div>
           </div>
 
-          {/* Order Models */}
+          {/* Model Selection - Centered */}
           {selectedOrder && (
-            <div className="space-y-4">
-              {/* Model Selection Dropdown */}
+            <div className="space-y-4 mx-auto">
               <div className="form-group relative z-10">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Select Model
@@ -1193,152 +1191,152 @@ const NewTagging = () => {
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Selected Models Details */}
-              {selectedModels.length > 0 && (
-                <div className="space-y-4">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Selected Models Details
-                  </label>
-                  {selectedModels.map((model, index) => {
-                    // Calculate stone charges
-                    const stoneRate = 600; // Rs per 1000 grams
-                    const calculatedStoneCharge = (model.stoneWeight * stoneRate);
-
-                    return (
-                      <div 
-                        key={`${model.modelId}-${model.uniqueNumber}-${index}`}
-                        className="border rounded-lg p-4 bg-white shadow-sm"
-                      >
-                        <div className="flex justify-between items-center mb-3">
-                          <p className="font-medium text-gray-800">
-                            {model.modelName} 
-                            <span className="ml-2 text-sm text-gray-500">
-                              (#{model.uniqueNumber})
-                            </span>
-                          </p>
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              onClick={() => {
-                                const newModel = {
-                                  ...model,
-                                  uniqueNumber: generateUniqueNumber(),
-                                  stoneWeight: 0,
-                                  netWeight: 0,
-                                  grossWeight: 0,
-                                  stoneCharges: 0
-                                };
-                                setSelectedModels([...selectedModels, newModel]);
-                              }}
-                              className="h-15 w-20 text-xs text-green-600 bg-green-50 hover:bg-green-100 border-green-200"
-                            >
-                              Add Again
-                            </Button>
-                            <Button
-                              type="button"
-                              onClick={() => {
-                                const updatedModels = selectedModels.filter((_, i) => i !== index);
-                                setSelectedModels(updatedModels);
-                              }}
-                              className="h-7 w-20 text-xs text-white bg-red-500 hover:bg-red-600 border-none rounded"
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-xs text-gray-600">Stone Weight (g)</label>
-                            <input
-                              type="number"
-                              step="0.001"
-                              min="0"
-                              value={model.stoneWeight}
-                              onChange={(e) => {
-                                const stoneWeight = parseFloat(e.target.value) || 0;
-                                const updatedModels = [...selectedModels];
-                                updatedModels[index] = {
-                                  ...model,
-                                  stoneWeight: stoneWeight,
-                                  grossWeight: stoneWeight + (model.netWeight || 0),
-                                  stoneCharges: (stoneWeight * stoneRate)// Auto calculate stone charges
-                                };
-                                setSelectedModels(updatedModels);
-                              }}
-                              className="w-full h-8 text-sm mt-1 px-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="0.000"
-                            />
-                            <span className="text-xs text-gray-500 mt-1">
-                              (Stone Rate: {stoneRate}₹/g)
-                            </span>
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-600">Net Weight (g)</label>
-                            <input
-                              type="number"
-                              step="0.001"
-                              min="0"
-                              value={model.netWeight}
-                              onChange={(e) => {
-                                const netWeight = parseFloat(e.target.value) || 0;
-                                const updatedModels = [...selectedModels];
-                                updatedModels[index] = {
-                                  ...model,
-                                  netWeight: netWeight,
-                                  grossWeight: (model.stoneWeight || 0) + netWeight
-                                };
-                                setSelectedModels(updatedModels);
-                              }}
-                              className="w-full h-8 text-sm mt-1 px-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="0.000"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-600">Gross Weight (Auto)</label>
-                            <input
-                              type="number"
-                              step="0.001"
-                              value={model.grossWeight}
-                              disabled
-                              className="w-full h-8 text-sm mt-1 px-2 border border-gray-300 rounded bg-gray-50"
-                              placeholder="0.000"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-600">Stone Charges (Auto)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={calculatedStoneCharge}
-                              disabled
-                              className="w-full h-8 text-sm mt-1 px-2 border border-gray-300 rounded bg-gray-50"
-                              placeholder="0.00"
-                            />
-                            <span className="text-xs text-gray-500 mt-1">₹</span>
-                          </div>
-                        </div>
-                        <div className="col-span-2 flex justify-end mt-2">
-                          <Button
-                            type="button"
-                            onClick={() => previewModelPDF(model)}
-                            className="h-7 w-20 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-200"
-                          >
-                            Preview
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           )}
 
-          {/* Summary Table */}
+          {/* Selected Models Details - Centered */}
           {selectedModels.length > 0 && (
-            <div className="mt-8">
-              <h2 className="text-lg font-medium text-gray-800 mb-4">Summary Table</h2>
+            <div className="space-y-4 mx-auto">
+              <label className="block text-sm font-medium text-gray-700">
+                Selected Models Details
+              </label>
+              {selectedModels.map((model, index) => {
+                // Calculate stone charges
+                const stoneRate = 600; // Rs per 1000 grams
+                const calculatedStoneCharge = (model.stoneWeight * stoneRate);
+
+                return (
+                  <div 
+                    key={`${model.modelId}-${model.uniqueNumber}-${index}`}
+                    className="border rounded-lg p-4 bg-white shadow-sm"
+                  >
+                    <div className="flex justify-between items-center mb-3">
+                      <p className="font-medium text-gray-800">
+                        {model.modelName} 
+                        <span className="ml-2 text-sm text-gray-500">
+                          (#{model.uniqueNumber})
+                        </span>
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            const newModel = {
+                              ...model,
+                              uniqueNumber: generateUniqueNumber(),
+                              stoneWeight: 0,
+                              netWeight: 0,
+                              grossWeight: 0,
+                              stoneCharges: 0
+                            };
+                            setSelectedModels([...selectedModels, newModel]);
+                          }}
+                          className="h-15 w-20 text-xs text-green-600 bg-green-50 hover:bg-green-100 border-green-200"
+                        >
+                          Add Again
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            const updatedModels = selectedModels.filter((_, i) => i !== index);
+                            setSelectedModels(updatedModels);
+                          }}
+                          className="h-7 w-20 text-xs text-white bg-red-500 hover:bg-red-600 border-none rounded"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-600">Stone Weight (g)</label>
+                        <input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          value={model.stoneWeight}
+                          onChange={(e) => {
+                            const stoneWeight = parseFloat(e.target.value) || 0;
+                            const updatedModels = [...selectedModels];
+                            updatedModels[index] = {
+                              ...model,
+                              stoneWeight: stoneWeight,
+                              grossWeight: stoneWeight + (model.netWeight || 0),
+                              stoneCharges: (stoneWeight * stoneRate)// Auto calculate stone charges
+                            };
+                            setSelectedModels(updatedModels);
+                          }}
+                          className="w-full h-8 text-sm mt-1 px-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="0.000"
+                        />
+                        <span className="text-xs text-gray-500 mt-1">
+                          (Stone Rate: {stoneRate}₹/g)
+                        </span>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Net Weight (g)</label>
+                        <input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          value={model.netWeight}
+                          onChange={(e) => {
+                            const netWeight = parseFloat(e.target.value) || 0;
+                            const updatedModels = [...selectedModels];
+                            updatedModels[index] = {
+                              ...model,
+                              netWeight: netWeight,
+                              grossWeight: (model.stoneWeight || 0) + netWeight
+                            };
+                            setSelectedModels(updatedModels);
+                          }}
+                          className="w-full h-8 text-sm mt-1 px-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="0.000"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Gross Weight (Auto)</label>
+                        <input
+                          type="number"
+                          step="0.001"
+                          value={model.grossWeight}
+                          disabled
+                          className="w-full h-8 text-sm mt-1 px-2 border border-gray-300 rounded bg-gray-50"
+                          placeholder="0.000"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Stone Charges (Auto)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={calculatedStoneCharge}
+                          disabled
+                          className="w-full h-8 text-sm mt-1 px-2 border border-gray-300 rounded bg-gray-50"
+                          placeholder="0.00"
+                        />
+                        <span className="text-xs text-gray-500 mt-1">₹</span>
+                      </div>
+                    </div>
+                    <div className="col-span-2 flex justify-end mt-2">
+                      <Button
+                        type="button"
+                        onClick={() => previewModelPDF(model)}
+                        className="h-7 w-20 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-200"
+                      >
+                        Preview
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Summary Table - Centered */}
+          {selectedModels.length > 0 && (
+            <div className="mt-8 mx-auto">
+              <h2 className="text-lg font-medium text-gray-800 mb-4 text-center">Summary Table</h2>
               <div className="overflow-x-auto">
                 <table className="min-w-full bg-white border border-gray-200">
                   <thead className="bg-gray-50">
@@ -1412,8 +1410,8 @@ const NewTagging = () => {
             </div>
           )}
 
-          {/* Submit Buttons */}
-          <div className="mt-6 flex gap-2 justify-end">
+          {/* Submit Buttons - Centered */}
+          <div className="mt-6 flex gap-2 justify-center">
             <Button
               type="button"
               onClick={handleSubmitModels}
@@ -1450,27 +1448,79 @@ const NewTagging = () => {
         </form>
       </div>
 
-      {/* Preview Section */}
+      {/* Preview Section - Kept the same width */}
       <div className="w-[400px] mt-[200px] space-y-4">
         <div className="sticky top-[220px] bg-white rounded-lg shadow-md p-4">
           <h2 className="text-lg font-semibold mb-4">Model Preview</h2>
           {selectedModels.length > 0 ? (
             <div className="space-y-4">
               {/* Image Preview */}
-              {/* Image Preview */}
-            <div className="aspect-square w-full relative rounded-lg overflow-hidden border border-gray-200">
-              <img
-                src={selectedModels[selectedModels.length - 1].imageUrl || '/placeholder.png'}
-                alt={`Model ${selectedModels[selectedModels.length - 1].modelName}`}
-                className="w-full h-full object-contain"
-              />
+              <div className="aspect-square w-full relative rounded-lg overflow-hidden border border-gray-200">
+                {selectedModels[selectedModels.length - 1].imageData ? (
+                  <img
+                    src={selectedModels[selectedModels.length - 1].imageData}
+                    alt={`Model ${selectedModels[selectedModels.length - 1].modelName}`}
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.src = '/placeholder.png';
+                      console.error('Error loading image');
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                    <span className="text-gray-400">No image available</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Model Details */}
+              <div className="text-sm text-gray-600">
+                <p className="font-medium">{selectedModels[selectedModels.length - 1].modelName}</p>
+                <p>Unique #: {selectedModels[selectedModels.length - 1].uniqueNumber}</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-gray-500">Net Weight:</span>
+                    <p>{selectedModels[selectedModels.length - 1].netWeight.toFixed(3)}g</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Stone Weight:</span>
+                    <p>{selectedModels[selectedModels.length - 1].stoneWeight.toFixed(3)}g</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Gross Weight:</span>
+                    <p>{selectedModels[selectedModels.length - 1].grossWeight.toFixed(3)}g</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Stone Charges:</span>
+                    <p>₹{selectedModels[selectedModels.length - 1].stoneCharges.toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* PDF Preview Button */}
+              <div className="mt-4">
+                <Button
+                  onClick={async () => {
+                    const currentModel = selectedModels[selectedModels.length - 1];
+                    const pdfBytes = await generatePDF(currentModel);
+                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                    const url = window.URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                  }}
+                  className="w-full text-sm"
+                >
+                  Preview PDF
+                </Button>
+              </div>
             </div>
-              
-              
-             
-        
+          ) : (
+            <div className="aspect-square w-full flex items-center justify-center border border-gray-200 rounded-lg bg-gray-50">
+              <p className="text-gray-500 text-sm">Select a model to preview</p>
+            </div>
+          )}
+        </div>
       </div>
-    
+    </div>
   );
 };
 

@@ -50,7 +50,10 @@ const SettingDetailsPage = () => {
   const [data, setData] = useState<SettingData | null>(null);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
-  const settingId = searchParams.get('settingId');
+  
+  // Get settingId from URL and parse it
+  const settingId = searchParams.get('settingId'); // Example: "SETTING/15/03/2024/01"
+
   const [receivedDate, setReceivedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [receivedWeight, setReceivedWeight] = useState<number>(0);
   const [settingLoss, setSettingLoss] = useState<number>(0);
@@ -83,46 +86,56 @@ const SettingDetailsPage = () => {
     }
   }, [receivedWeight, data]);
 
-  // Update fetch details to include pouches
   useEffect(() => {
+    console.log('useEffect triggered with settingId:', settingId);
+    
     const fetchSettingDetails = async () => {
       if (!settingId) {
-        toast.error('No setting ID provided');
+        console.log('No settingId provided');
+        toast.error('Setting ID is required');
         setLoading(false);
         return;
       }
 
       try {
+        // Split the settingId into components
         const [prefix, date, month, year, number] = settingId.split('/');
         
-        // Use the correct API endpoint
-        const response = await fetch(
-          `${apiBaseUrl}/api/setting/${prefix}/${date}/${month}/${year}/${number}/pouches`
-        );
+        if (!prefix || !date || !month || !year || !number) {
+          throw new Error('Invalid setting ID format');
+        }
 
-        console.log('[Setting Details] Fetching from:', 
-          `${apiBaseUrl}/api/setting/${prefix}/${date}/${month}/${year}/${number}/pouches`
-        );
+        const url = `${apiBaseUrl}/api/setting/${prefix}/${date}/${month}/${year}/${number}`;
+        console.log('Fetching from URL:', url);
 
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const result = await response.json();
+        console.log('API Response:', result);
 
         if (!result.success) {
           throw new Error(result.message || 'Failed to fetch setting details');
         }
 
-        // Initialize received weights from existing data
-        const initialWeights: { [key: string]: number } = {};
-        result.data.pouches.forEach((pouch: Pouch) => {
-          initialWeights[pouch.Id] = pouch.Received_Weight_Setting__c || 0;
-        });
-
-        setPouchReceivedWeights(initialWeights);
+        // Set the data directly from the API response
         setData(result.data);
 
-        // Calculate initial total weight
-        const total = Object.values(initialWeights).reduce((sum, weight) => sum + (weight || 0), 0);
-        setTotalReceivedWeight(total);
-        setReceivedWeight(total);
+        // Initialize received weights from existing data
+        const initialWeights: { [key: string]: number } = {};
+        if (result.data.pouches) {
+          result.data.pouches.forEach((pouch: Pouch) => {
+            initialWeights[pouch.Id] = pouch.Received_Weight_Setting__c || 0;
+          });
+
+          setPouchReceivedWeights(initialWeights);
+
+          const total = Object.values(initialWeights).reduce((sum, weight) => sum + (weight || 0), 0);
+          setTotalReceivedWeight(total);
+          setReceivedWeight(total);
+        }
 
       } catch (error) {
         console.error('[Setting Details] Error fetching details:', error);
@@ -133,7 +146,10 @@ const SettingDetailsPage = () => {
     };
 
     fetchSettingDetails();
-  }, [settingId]);
+  }, [settingId]); // Only depend on settingId
+
+  console.log('Current data:', data);
+  console.log('Loading state:', loading);
 
   // Validate form data
   const validateForm = (data: UpdateFormData) => {
@@ -212,7 +228,7 @@ const SettingDetailsPage = () => {
     );
   }
 
-  if (!data) {
+  if (!data || !data.setting) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-red-500 text-xl">Failed to load setting details</div>
@@ -290,7 +306,7 @@ const SettingDetailsPage = () => {
                       </div>
                       <div>
                         <Label>Issued Weight</Label>
-                        <div className="mt-1">{pouch.Isssued_Weight_Setting__c}g</div>
+                        <div className="mt-1">{pouch.Issued_weight_setting__c}g</div>
                       </div>
                       <div>
                         <Label>Received Weight</Label>
