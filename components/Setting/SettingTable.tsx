@@ -352,7 +352,7 @@ console.log("Deals State:", deals);
                                     </button>
                                   </Link>
 
-                                  <Link href={`/Departments/Polishing/polishing_received_details?polishingId=${deal.id}`} passHref>
+                                  <Link href={`/Departments/Setting/setting_received_details?settingId=${deal.id}`} passHref>
                                     <button
                                       type="button"
                                       className="table__icon edit"

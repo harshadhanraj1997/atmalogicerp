@@ -2,14 +2,58 @@ import { app, BrowserWindow, ipcMain, protocol } from 'electron';
 import serve from 'electron-serve';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fetch from 'node-fetch';  // Add this if you need fetch in Node.js environment
+import fetch from 'node-fetch';
+import fs from 'fs';
 
 // Define __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize electron serve for production
-const loadURL = serve({ directory: 'out' });
+// Change how we set up loadURL to make sure it finds the right directory
+let loadURL;
+if (app.isPackaged) {
+  console.log('[DEBUG] App is packaged, setting up loadURL with absolute path');
+  const outPath = path.join(__dirname, 'out');
+  console.log('[DEBUG] Looking for out directory at:', outPath);
+  
+  if (fs.existsSync(outPath)) {
+    console.log('[DEBUG] Found out directory at expected path');
+    loadURL = serve({ directory: 'out' });
+  } else {
+    console.log('[DEBUG] Out directory not found at expected path, trying alternatives');
+    
+    // Try a few common locations for packaged apps
+    const possiblePaths = [
+      path.join(app.getAppPath(), 'out'),
+      path.join(app.getAppPath(), '..', 'out'),
+      path.join(app.getPath('exe'), '..', 'resources', 'app', 'out')
+    ];
+    
+    let foundPath = null;
+    for (const testPath of possiblePaths) {
+      console.log('[DEBUG] Checking:', testPath);
+      if (fs.existsSync(testPath)) {
+        foundPath = testPath;
+        console.log('[DEBUG] Found out directory at:', foundPath);
+        break;
+      }
+    }
+    
+    if (foundPath) {
+      // Use a relative path from app directory
+      const relativePath = path.relative(app.getAppPath(), foundPath);
+      console.log('[DEBUG] Using relative path for loadURL:', relativePath);
+      loadURL = serve({ directory: relativePath });
+    } else {
+      console.log('[DEBUG] Could not find out directory, using default');
+      loadURL = serve({ directory: 'out' });
+    }
+  }
+} else {
+  console.log('[DEBUG] App is in development mode, using default out directory');
+  loadURL = serve({ directory: 'out' });
+}
 
 // Backend API URL
 const BACKEND_URL = 'https://needha-erp-server.onrender.com';

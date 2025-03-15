@@ -24,7 +24,7 @@ const HeaderUserProfile = ({handleShowUserDrowdown, isOpenUserDropdown}:TUserPro
                             <Image src={avatarImg} alt="img not found" />
                         </div>
                         <div className="user__content">
-                            <h5>Jhon Smith</h5>
+                            <h5>Issue Counter</h5>
                             <span>online</span>
                         </div>
                     </div>

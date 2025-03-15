@@ -13,10 +13,15 @@ export const fetchTaggingData = async (): Promise<ITagging[]> => {
       if (Array.isArray(result.data)) {
         return result.data.map((tagging: any) => {
           return {
-            id: tagging.id,
-            PartyName: tagging.PartyName || '',
+            id: tagging.taggingId,
+            PartyName: tagging.partyCode || '',
             createdDate: tagging.createdDate || '',
-            TotalWeight: tagging.TotalWeight || 0
+            TotalWeight: tagging.totalGrossWeight || 0,
+            TotalNetWeight: tagging.totalNetWeight || 0,
+            TotalStoneWeight: tagging.totalStoneWeight || 0,  
+            TotalStoneCharges: tagging.totalStoneCharges || 0,
+            pdfUrl: tagging.pdfUrl || '',
+            excelUrl: tagging.excelUrl || ''
           };
         });
       } else {

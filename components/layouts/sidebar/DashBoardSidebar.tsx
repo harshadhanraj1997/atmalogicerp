@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import sidebarMainLogo from "../../../assets/needhgoldlogo.jpg";
+import sidebarMainLogo from "../../../assets/needhagoldlogo.png";
 import sidebarDarkLogo from "../../../public/assets/images/logo/logo-white.svg";
 import useGlobalContext from "@/hooks/use-context";
 import sidebarImg from "../../../public/assets/images/bg/side-bar.png";
@@ -124,24 +124,23 @@ const DashBoardSidebar = () => {
       <div
         className={`app-sidebar ${isCollapse ? "collapsed close_sidebar" : ""}`}
       >
-        <div className="main-sidebar-header">
-          <button 
-            onClick={() => window.location.href = '/'}
-            className="header-logo cursor-pointer transition-transform active:scale-95"
-          >
+        <div className="main-sidebar-header max-w-[300px] overflow-hidden">
+         
             <Image
-              className="main-logo"
+              className="main-logo w-200 h-[85px]"
               src={sidebarMainLogo}
               priority
               alt="logo"
+              width={200}
+              height={50}
+              style={{ 
+                objectFit: 'contain',
+                maxWidth: '100%',
+                maxHeight: '85px'
+              }}
             />
-            <Image
-              className="dark-logo"
-              src={sidebarDarkLogo}
-              priority
-              alt="logo"
-            />
-          </button>
+            
+      
         </div>
 
         <div className="common-scrollbar max-h-screen overflow-y-auto">

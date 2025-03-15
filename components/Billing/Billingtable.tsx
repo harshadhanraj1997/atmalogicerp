@@ -14,7 +14,7 @@ import Paper from "@mui/material/Paper";
 import { visuallyHidden } from "@mui/utils";
 import useMaterialTableHook from "@/hooks/useMaterialTableHook";
 import { IDeal } from "@/interface/table.interface";
-import { ITagging } from "@/interface/table.interface";
+import { Billing } from "@/interface/table.interface";
 
 import { dealHeadCells } from "@/data/table-head-cell/table-head";
 import * as pdfjs from "pdfjs-dist";
@@ -31,9 +31,10 @@ import DeleteModal from "@/components/common/DeleteModal";
 import { PDFDocument } from 'pdf-lib';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
-import { fetchTaggingData } from "@/data/crm/tagging-data";
+import { fetchBillingData } from "@/data/crm/billing-data";
 import * as XLSX from 'xlsx';
-import TaggingTableControls from "./TaggingTableControl";
+import BillingTableControls from "./BillingTableControls";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 const downloadPDF = async (pdfUrl: string) => {
@@ -101,15 +102,24 @@ const getStatusClass = (status: string) => {
   }
 };
 
+const getUniqueParties = (deals: Billing[]) => {
+  const uniqueParties = new Set<string>();
+  deals.forEach(deal => {
+    if (deal.PartyName && deal.PartyName.trim()) {
+      uniqueParties.add(deal.PartyName);
+    }
+  });
+  return Array.from(uniqueParties);
+};
 
-export default function TaggingTable() {
+export default function BillingTable() {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
-  const [editData, setEditData] = useState<IDeal | null>(null);
+  const [editData, setEditData] = useState<Billing | null>(null);
   const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number>(0);
-  const [deals, setDeals] = useState<ITagging[]>([]);
-  const [filteredDeals, setFilteredDeals] = useState<ITagging[]>([]);
+  const [deals, setDeals] = useState<Billing[]>([]);
+  const [filteredDeals, setFilteredDeals] = useState<Billing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
@@ -127,7 +137,8 @@ export default function TaggingTable() {
     const loadDeals = async () => {
       try {
         setLoading(true);
-        const data = await fetchTaggingData();
+        const data = await fetchBillingData();
+        console.log("Raw Billing Data from API:", data);
         setDeals(data);
         setFilteredDeals(data);
       } catch (error) {
@@ -139,23 +150,27 @@ export default function TaggingTable() {
     };
 
     loadDeals();
-
   }, []);
   
-console.log("Deals State:", deals);
+  console.log("Current Deals State:", deals);
+  console.log("Current Filtered Deals:", filteredDeals);
+  console.log("Selected Party:", selectedParty);
 
   useEffect(() => {
     const newFilteredDeals = deals.filter(deal => {
       try {
+        console.log("Filtering deal:", deal);
         // Party filter
         if (selectedParty !== 'all' && 
             deal.PartyName !== selectedParty) {
+          console.log("Deal filtered out by party:", deal.PartyName);
           return false;
         }
 
         // Date filter
         if (startDate || endDate) {
           const dealDate = new Date(deal.createdDate).toISOString().split('T')[0];
+          console.log("Deal date:", dealDate, "Start:", startDate, "End:", endDate);
           if (startDate && dealDate < startDate) return false;
           if (endDate && dealDate > endDate) return false;
         }
@@ -163,6 +178,7 @@ console.log("Deals State:", deals);
         // Search filter
         if (searchQuery) {
           const searchLower = searchQuery.toLowerCase();
+          console.log("Searching:", searchLower, "in:", deal.id, deal.PartyName);
           return (
             deal.id.toLowerCase().includes(searchLower) ||
             deal.PartyName.toLowerCase().includes(searchLower)
@@ -171,10 +187,11 @@ console.log("Deals State:", deals);
 
         return true;
       } catch (error) {
-        console.error('Filtering error:', error);
+        console.error('Filtering error for deal:', deal, error);
         return true;
       }
     });
+    console.log("New filtered deals:", newFilteredDeals);
     setFilteredDeals(newFilteredDeals);
   }, [deals, startDate, endDate, selectedParty, searchQuery]);
 
@@ -296,7 +313,7 @@ console.log("Deals State:", deals);
       <div className="col-span-12">
         <div className="card__wrapper">
           <div className="manaz-common-mat-list w-full table__wrapper table-responsive">
-            <TaggingTableControls
+                <BillingTableControls
               searchQuery={searchQuery}
               handleSearchChange={handleSearchChange}
               startDate={startDate}
@@ -326,13 +343,10 @@ console.log("Deals State:", deals);
                             size="small"
                           />
                         </TableCell>
-                        <TableCell>Tagging Id</TableCell>
+                        <TableCell>Billing Id</TableCell>
                         <TableCell>Party Name</TableCell>
                         <TableCell>Created Date</TableCell>
-                        <TableCell>Total Gross Weight</TableCell>
-                        <TableCell>Total Net Weight</TableCell>
-                        <TableCell>Total Stone Weight</TableCell>
-                        <TableCell>Total Stone Charges</TableCell>
+                        <TableCell>Total Fine Weight</TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -356,13 +370,11 @@ console.log("Deals State:", deals);
                               <TableCell>{deal.id}</TableCell>
                               <TableCell>{deal.PartyName}</TableCell>
                               <TableCell>{deal.createdDate}</TableCell>
-                              <TableCell>{deal.TotalWeight}</TableCell>
-                              <TableCell>{deal.TotalNetWeight}</TableCell>
-                              <TableCell>{deal.TotalStoneWeight}</TableCell>
-                              <TableCell>{deal.TotalStoneCharges}</TableCell>
+                              <TableCell>{deal.totalFineWeight}</TableCell>
+                             
                               <TableCell className="table__icon-box">
                                 <div className="flex items-center justify-start gap-[10px]">
-                                  <Link href={`/Billing/Tagging/tagging-details?taggingId=${deal.id}`} passHref>
+                                { /* <Link href={`/Billing/Billing/billing-details?billingId=${deal.id}`} passHref>
                                     <button
                                       type="button"
                                       className="table__icon edit"
@@ -380,9 +392,9 @@ console.log("Deals State:", deals);
                                     >
                                       <i className="fa-regular fa-eye"></i>
                                     </button>
-                                  </Link>
+                                  </Link>*/}
 
-                                  {deal.pdfUrl && (
+                                  {deal.DeliveryChallanUrl && (
                                     <button
                                       type="button"
                                       className="table__icon pdf"
@@ -397,15 +409,15 @@ console.log("Deals State:", deals);
                                       }}
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        window.open(deal.pdfUrl, '_blank');
+                                        window.open(deal.DeliveryChallanUrl, '_blank');
                                       }}
-                                      title="View PDF"
+                                      title="Download Delivery Challan"
                                     >
                                       <i className="fa-solid fa-file-pdf"></i>
                                     </button>
                                   )}
 
-                                  {deal.excelUrl && (
+                                  {deal.TaxInvoiceUrl && (
                                     <button
                                       type="button"
                                       className="table__icon excel"
@@ -420,15 +432,15 @@ console.log("Deals State:", deals);
                                       }}
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        window.open(deal.excelUrl, '_blank');
+                                        window.open(deal.TaxInvoiceUrl, '_blank');
                                       }}
-                                      title="Download Excel"
+                                      title="Download Tax Invoice"
                                     >
-                                      <i className="fa-solid fa-file-excel"></i>
+                                      <i className="fa-solid fa-file-pdf"></i>
                                     </button>
                                   )}
 
-                                  <button
+                                 {/* <button
                                     type="button"
                                     className="table__icon delete"
                                     style={{
@@ -448,6 +460,7 @@ console.log("Deals State:", deals);
                                   >
                                     <i className="fa-solid fa-trash"></i>
                                   </button>
+                                  */}
                                 </div>
                               </TableCell>
                             </TableRow>

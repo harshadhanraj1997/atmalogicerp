@@ -34,12 +34,16 @@ const CastingMainArea = () => {
           </div>
         </div>
         <div className="grid grid-cols-12 gap-x-6 maxXs:gap-x-0">
-          {/* <DealsSummary /> */}
-          {/* <CastingSummary /> */}
-          <CastingTable />
+          {/* Summary section - full width */}
+          <div className="col-span-12 mb-6">
+            <CastingSummary />
+          </div>
+          {/* Table section - full width */}
+          <div className="col-span-12">
+            <CastingTable />
+          </div>
         </div>
       </div>
-
       {/* -- App side area end -- */}
     </>
   );

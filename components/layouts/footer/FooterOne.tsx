@@ -17,7 +17,7 @@ const DashboardFooter = () => {
               <p>
                 Copyright © {getCurrentYear()}{' '}
                 <span className="text-black dark:text-black-dark">Atma Logic.</span> Designed by{' '}
-                <Link href="https://themeforest.net/user/bdevs" target="_blank">
+                <Link href="/" target="_blank">
                   Sai Charan
                 </Link> All rights reserved
               </p>

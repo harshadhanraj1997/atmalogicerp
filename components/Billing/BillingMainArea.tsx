@@ -3,11 +3,14 @@
 import Link from "next/link";
 import React from "react";
 import { useRouter } from "next/navigation";
-import PolishingTable from "./PolishingTable";
-import PolishingSummary from "./PolishingSummary";
+import BillingTable from "./Billingtable";
 
-        const PolishingMainArea = () => {
+const BillingMainArea = () => {
   const router = useRouter();
+
+  const handleNewBilling = () => {
+    router.push("/Billing/Billing/new-billing");
+  };
 
   return (
     <>
@@ -20,26 +23,29 @@ import PolishingSummary from "./PolishingSummary";
                 <li className="breadcrumb-item">
                   <Link href="/">Home</Link>
                 </li>
-                <li className="breadcrumb-item active">Polishing</li>
+                <li className="breadcrumb-item active">Billing</li>
               </ol>
             </nav>
-                
+            <div className="breadcrumb__btn">
+              <button 
+                onClick={handleNewBilling}
+                className="btn btn-primary"
+              >
+                New Billing
+              </button>
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-12 gap-x-6 maxXs:gap-x-0">
-          {/* Summary section - full width */}
-          <div className="col-span-12 mb-6">
-            <PolishingSummary />
-          </div>
-          {/* Table section - full width */}
-          <div className="col-span-12">
-            <PolishingTable />
-          </div>
+          {/* <DealsSummary /> */}
+          {/* <CastingSummary /> */}
+          <BillingTable />
         </div>
       </div>
+
       {/* -- App side area end -- */}
     </>
   );
 };
 
-export default PolishingMainArea;  
+export default BillingMainArea;

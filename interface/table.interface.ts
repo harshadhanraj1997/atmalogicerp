@@ -497,4 +497,15 @@ export interface ITagging {
   PartyName: string;
   createdDate: string;
   TotalWeight: number;
+  pdfUrl: string;
+  excelUrl: string;
+}
+
+export interface Billing {
+  id: string;
+  PartyName: string;
+  totalFineWeight: number;
+  DeliveryChallanUrl: string;
+  TaxInvoiceUrl: string;
+  CreatedDate: string;
 }

@@ -8,7 +8,7 @@ const sidebarData: SidebarCategory[] = [
       {
         id: 1,
         label: "Dashboards",
-        icon: "icon-house",
+        icon: "fa-solid fa-gauge",
         subItems: [
           { label: "HRM Dashboard", link: "/dashboard/hrm-dashboard" },
           {
@@ -41,20 +41,28 @@ const sidebarData: SidebarCategory[] = [
         ],
       },*/
       {
+        id: 2,
+        label: "Master",
+        icon: "fa-solid fa-gear",
+        subItems: [
+          { label: "Add Inventory", link: "/Inventory" },
+          { label: "Add Models", link: "/Models/add-models" }
+        ],
+      },
+      {
         id: 3,
         label: "Orders",
         icon: "icon-crm",
         subItems: [
-          { label: "Add Models", link: "/Models/add-models" },
-          { label: "Orders", link: "/Orders" },
-          { label: "Add Inventory", link: "/Inventory" },
+           { label: "Orders", link: "/Orders" },
+          
 
         ],
       },
       {
         id: 4,
         label: "Making Progress",
-        icon: "fa-sharp fa-light fa-grid-2",
+        icon: "fa-solid fa-arrow-progress",
         subItems: [
           { label: "Casting", link: "/Departments/Casting/casting_table" },
           { label: "Filing", link: "/Departments/Filing/add_filing_details/Grinding_Table" },

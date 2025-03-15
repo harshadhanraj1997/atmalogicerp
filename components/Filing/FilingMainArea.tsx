@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import FilingTable from "./FilingTable";
 import FilingSummary from "./FilingSummary";
 
-const GrindingMainArea = () => {
+const FilingMainArea = () => {
   const router = useRouter();
 
   return (
@@ -20,22 +20,25 @@ const GrindingMainArea = () => {
                 <li className="breadcrumb-item">
                   <Link href="/">Home</Link>
                 </li>
-                <li className="breadcrumb-item active">Filing</li>
+                <li className="breadcrumb-item active">Casting</li>
               </ol>
             </nav>
-            
           </div>
         </div>
         <div className="grid grid-cols-12 gap-x-6 maxXs:gap-x-0">
-          {/* <DealsSummary /> */}
-          {/* <CastingSummary /> */}
-          <FilingTable />
+          {/* Summary section - full width */}
+          <div className="col-span-12 mb-6">
+            <FilingSummary />
+          </div>
+          {/* Table section - full width */}
+          <div className="col-span-12">
+            <FilingTable />
+          </div>
         </div>
       </div>
-
       {/* -- App side area end -- */}
     </>
   );
 };
 
-export default GrindingMainArea;
+export default FilingMainArea;
