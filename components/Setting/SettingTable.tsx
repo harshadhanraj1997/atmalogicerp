@@ -288,6 +288,7 @@ console.log("Deals State:", deals);
                         <TableCell>Received Date</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell> Setting Loss</TableCell>
+                        <TableCell>Stone Weight</TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -330,6 +331,7 @@ console.log("Deals State:", deals);
                                 </span>
                               </TableCell>
                               <TableCell>{deal.grindingLoss}</TableCell>
+                              <TableCell>{deal.stoneWeight}</TableCell>
                               <TableCell className="table__icon-box">
                                 <div className="flex items-center justify-start gap-[10px]">
                                   <Link href={`/Departments/Setting/show_setting_details?settingId=${deal.id}`} passHref>

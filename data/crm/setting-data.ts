@@ -19,10 +19,11 @@ export const fetchSettingData = async (): Promise<ISetting[]> => {
             id: setting.Name,
             issuedWeight: setting.Issued_Weight__c || 0,  // Updated to match server field
             issuedDate: setting.Issued_Date__c || '-',    // Updated to match server field
-            receivedWeight: setting.Received_Weight__c || 0, // Updated to match server field
+            receivedWeight: setting.Returned_weight__c || 0,
             receivedDate: setting.Received_Date__c || '-',  // Updated to match server field
-            status: setting.Status__c || 'Open',           // Updated to match server field
-            grindingLoss: setting.Setting_loss__c || 0 // Calculate loss
+            status: setting.Status__c || 'Open',  
+            stoneWeight: setting.Stone_Weight__c || 0,
+            grindingLoss: setting.Setting_l__c || 0 // Calculate loss
           };
         });
       } else {

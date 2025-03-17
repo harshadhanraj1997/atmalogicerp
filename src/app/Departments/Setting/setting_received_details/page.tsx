@@ -61,6 +61,10 @@ const SettingDetailsPage = () => {
   const [formErrors, setFormErrors] = useState<Partial<UpdateFormData>>({});
   const [pouchReceivedWeights, setPouchReceivedWeights] = useState<{ [key: string]: number }>({});
   const [totalReceivedWeight, setTotalReceivedWeight] = useState<number>(0);
+  const [manualStoneWeight, setManualStoneWeight] = useState<number>(0);
+  const [pouchStoneWeights, setPouchStoneWeights] = useState<{ [key: string]: number }>({});
+  const [totalStoneWeight, setTotalStoneWeight] = useState<number>(0);
+  const [stoneWeightAdded, setStoneWeightAdded] = useState<number>(0);
 
   // Add pouch weight change handler
   const handlePouchWeightChange = (pouchId: string, weight: number) => {
@@ -85,6 +89,45 @@ const SettingDetailsPage = () => {
       setSettingLoss(loss);
     }
   }, [receivedWeight, data]);
+
+  // Update useEffect to separate received weight and setting loss calculations
+  useEffect(() => {
+    // Calculate total received weight (including stones)
+    const totalReceived = Object.keys(pouchReceivedWeights).reduce((sum, pouchId) => {
+      const receivedWeight = pouchReceivedWeights[pouchId] || 0;
+      const stoneWeight = pouchStoneWeights[pouchId] || 0;
+      return sum + receivedWeight + stoneWeight;
+    }, 0);
+    
+    setTotalReceivedWeight(totalReceived);
+    
+    // Calculate setting loss (Issued - Received without stones)
+    if (data) {
+      const issuedWeight = data.setting.Issued_Weight__c;
+      const totalReceivedWithoutStones = Object.values(pouchReceivedWeights).reduce((sum, weight) => sum + (weight || 0), 0);
+      const loss = Number((issuedWeight - totalReceivedWithoutStones).toFixed(4));
+      setSettingLoss(loss);
+    }
+  }, [pouchReceivedWeights, pouchStoneWeights, data]);
+
+  // Update useEffect to calculate total stone weight from pouches
+  useEffect(() => {
+    const total = Object.values(pouchStoneWeights).reduce((sum, weight) => sum + (weight || 0), 0);
+    setTotalStoneWeight(total);
+  }, [pouchStoneWeights]);
+
+  // Update handlePouchStoneWeightChange
+  const handlePouchStoneWeightChange = (pouchId: string, weight: number) => {
+    setPouchStoneWeights(prev => ({
+      ...prev,
+      [pouchId]: weight
+    }));
+  };
+
+  // Remove manual stone weight distribution logic
+  const handleManualStoneWeightChange = (weight: number) => {
+    setStoneWeightAdded(weight);
+  };
 
   useEffect(() => {
     console.log('useEffect triggered with settingId:', settingId);
@@ -179,12 +222,19 @@ const SettingDetailsPage = () => {
       
       if (!data) return;
 
-      // Prepare pouch data
-      const pouchesData = data.pouches.map(pouch => ({
-        pouchId: pouch.Id,
-        receivedWeight: pouchReceivedWeights[pouch.Id] || 0,
-        settingLoss: pouch.Isssued_Weight_Setting__c - (pouchReceivedWeights[pouch.Id] || 0)
-      }));
+      // Calculate total received without stones for each pouch
+      const pouchesData = data.pouches.map(pouch => {
+        const receivedWeight = pouchReceivedWeights[pouch.Id] || 0;
+        const stoneWeight = pouchStoneWeights[pouch.Id] || 0;
+        const pouchSettingLoss = pouch.Isssued_Weight_Setting__c - receivedWeight; // Loss calculation without stone weight
+
+        return {
+          pouchId: pouch.Id,
+          receivedWeight,
+          stoneWeight,
+          settingLoss: Number(pouchSettingLoss.toFixed(4))
+        };
+      });
 
       const [prefix, date, month, year, number] = data.setting.Name.split('/');
 
@@ -198,7 +248,8 @@ const SettingDetailsPage = () => {
           body: JSON.stringify({
             receivedDate,
             receivedWeight: totalReceivedWeight,
-            settingLoss,
+            settingLoss, // This is now calculated correctly (Issued - Received without stones)
+            totalStoneWeight,
             pouches: pouchesData
           })
         }
@@ -299,14 +350,14 @@ const SettingDetailsPage = () => {
                 <h3 className="text-lg font-semibold">Pouch Weights</h3>
                 {pouches.map((pouch) => (
                   <div key={pouch.Id} className="border rounded-lg p-4">
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-4 gap-4">
                       <div>
                         <Label>Pouch Number</Label>
                         <div className="mt-1">{pouch.Name}</div>
                       </div>
                       <div>
                         <Label>Issued Weight</Label>
-                        <div className="mt-1">{pouch.Issued_weight_setting__c}g</div>
+                        <div className="mt-1">{pouch.Isssued_Weight_Setting__c}g</div>
                       </div>
                       <div>
                         <Label>Received Weight</Label>
@@ -319,15 +370,31 @@ const SettingDetailsPage = () => {
                           required
                         />
                       </div>
+                      <div>
+                        <Label>Stone Weight</Label>
+                        <Input
+                          type="number"
+                          step="0.0001"
+                          value={pouchStoneWeights[pouch.Id] || ''}
+                          onChange={(e) => handlePouchStoneWeightChange(pouch.Id, parseFloat(e.target.value) || 0)}
+                          className="mt-1"
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label>Total Received Weight</Label>
                   <div className="mt-1 font-semibold">{totalReceivedWeight.toFixed(4)}g</div>
+                  <div className="text-xs text-gray-500">(Received + Stone Weight)</div>
+                </div>
+                <div>
+                  <Label>Total Stone Weight</Label>
+                  <div className="mt-1 font-semibold">{totalStoneWeight.toFixed(4)}g</div>
                 </div>
                 <div>
                   <Label>Setting Loss</Label>

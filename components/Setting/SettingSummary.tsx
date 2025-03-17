@@ -96,10 +96,8 @@ import "react-datepicker/dist/react-datepicker.css";
       (sum, item) => sum + Number(item.receivedWeight || 0),
       0
     );
-    const totalSettingLoss = filteredData.reduce(
-            (sum, item) => sum + Number(item.settingLoss || 0),
-      0
-    );
+    // Calculate setting loss as the difference between issued and received weight
+    const totalSettingLoss = totalIssuedWeight - totalReceivedWeight;
 
     // Calculate percentages
     const settingLossPercentage = totalIssuedWeight
