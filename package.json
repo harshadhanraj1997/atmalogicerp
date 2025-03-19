@@ -16,6 +16,7 @@
     "generate-icons": "electron-icon-builder --input=./assets/needhagoldlogo.png --output=build --flatten"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.12.5",
     "@emotion/cache": "^11.11.0",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",

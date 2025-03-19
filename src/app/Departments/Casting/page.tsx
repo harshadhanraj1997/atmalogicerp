@@ -328,6 +328,10 @@ const CastingForm = () => {
     
     // Format the next number with leading zeros
     const nextCount = (currentCount + 1).toString().padStart(2, '0');
+    
+    // Save the updated count back to localStorage
+    localStorage.setItem(storageKey, (currentCount + 1).toString());
+    
     setCastingNumber(`${dateStr}/${nextCount}`);
   }, []);
 
@@ -405,6 +409,22 @@ const CastingForm = () => {
     return true;
   };
 
+  // Custom rounding function that rounds a value to the nearest whole number
+  // and ensures values like 179.5 or higher round up to 180
+  const customRound = (value: number): number => {
+    // Get the integer part
+    const integerPart = Math.floor(value);
+    // Get the decimal part
+    const decimalPart = value - integerPart;
+    
+    // If decimal part is 0.5 or higher, round up
+    if (decimalPart >= 0.5) {
+      return integerPart + 1;
+    }
+    
+    return integerPart;
+  };
+
   // Update handleSubmit function
   const handleSubmit = async () => {
     try {
@@ -423,6 +443,9 @@ const CastingForm = () => {
       // Calculate required metals
       const requiredMetals = calculateRequiredMetals();
 
+      // Round the received weight using our custom function
+      const roundedReceivedWeight = customRound(calculatedWeight);
+
       // Prepare casting data matching the backend API structure
       const castingData = {
         castingNumber: castingNumber,
@@ -430,7 +453,7 @@ const CastingForm = () => {
         orders: selectedOrders, // Array of order IDs
         waxTreeWeight: Number(waxTreeWeight),
         purity: purity,
-        calculatedWeight: Number(calculatedWeight),
+        calculatedWeight: Number(roundedReceivedWeight),
         purityPercentages: {
           pureGold: Number(purityPercentages.pureGold),
           alloy: Number(purityPercentages.alloy)
