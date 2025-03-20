@@ -298,7 +298,7 @@ const CastingForm = () => {
   const calculateWeight = (purity: string, weight: number) => {
     switch(purity) {
       case '22K':
-        return weight * 18;
+        return weight * 18.5;
       case '18K':
         return weight * 16;
       case '14K':
@@ -316,39 +316,56 @@ const CastingForm = () => {
     setCalculatedWeight(result);
   }, [purity, waxTreeWeight]);
 
-  // Update casting number generation
+  // Update casting number generation with reset capability
   useEffect(() => {
     const today = new Date();
-    const dateStr = today.toLocaleDateString('en-GB').split('/').join('/');
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    const dateStr = `${day}/${month}/${year}`;
     const storageKey = `castings_${dateStr}`;
     
-    // Get the current count for today
+    // Check localStorage for today's counter
     const todayCastings = localStorage.getItem(storageKey);
-    let currentCount = todayCastings ? parseInt(todayCastings) : 0;
     
-    // Format the next number with leading zeros
+    // If no castings today or invalid value, start at 1
+    let currentCount = todayCastings && !isNaN(parseInt(todayCastings)) ? 
+      parseInt(todayCastings) : 0;
+    
+    // Format the next number with leading zeros (starting at 01)
     const nextCount = (currentCount + 1).toString().padStart(2, '0');
     
-    // Save the updated count back to localStorage
-    localStorage.setItem(storageKey, (currentCount + 1).toString());
-    
     setCastingNumber(`${dateStr}/${nextCount}`);
+    
+    // For debugging - add this line to help troubleshoot
+    console.log(`Today's date: ${dateStr}, Current count in localStorage: ${currentCount}, Next casting number: ${nextCount}`);
+    
+    // You can uncomment this line to reset the counter for testing
+    // localStorage.removeItem(storageKey);
   }, []);
 
   const generateCastingNumber = () => {
     const today = new Date();
-    const dateStr = today.toLocaleDateString('en-GB').split('/').join('/');
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    const dateStr = `${day}/${month}/${year}`;
     const storageKey = `castings_${dateStr}`;
     
-    // Get and increment the counter
+    // Get the current count - default to 0 if not found or invalid
     const todayCastings = localStorage.getItem(storageKey);
-    let currentCount = todayCastings ? parseInt(todayCastings) : 0;
+    let currentCount = todayCastings && !isNaN(parseInt(todayCastings)) ? 
+      parseInt(todayCastings) : 0;
+    
+    // Increment for this submission
     currentCount += 1;
     
     // Save the new count
     localStorage.setItem(storageKey, currentCount.toString());
     
-    // Format with leading zeros
+    console.log(`Generating new casting number. Count: ${currentCount}`);
+    
+    // Format with leading zeros (always 2 digits)
     return `${dateStr}/${currentCount.toString().padStart(2, '0')}`;
   };
 
@@ -437,6 +454,10 @@ const CastingForm = () => {
         return;
       }
 
+      // Generate a new casting number for this submission and save the counter
+      const newCastingNumber = generateCastingNumber();
+      setCastingNumber(newCastingNumber);
+
       // Calculate total issued weight
       const totalIssued = inventoryItems.reduce((sum, item) => sum + Number(item.issueWeight), 0);
 
@@ -448,9 +469,9 @@ const CastingForm = () => {
 
       // Prepare casting data matching the backend API structure
       const castingData = {
-        castingNumber: castingNumber,
-        date: issuedDate, // This is already in DD/MM/YYYY format
-        orders: selectedOrders, // Array of order IDs
+        castingNumber: newCastingNumber,
+        date: issuedDate,
+        orders: selectedOrders,
         waxTreeWeight: Number(waxTreeWeight),
         purity: purity,
         calculatedWeight: Number(roundedReceivedWeight),
