@@ -20,7 +20,10 @@ export const fetchDealData = async (): Promise<ICasting[]> => {
             issuedDate: casting.Issued_Date || '-',
             receivedDate: casting.Received_Date || '-',
             status: casting.status || 'Open',
-            castingLoss: casting.Casting_Loss || 0
+            castingLoss: casting.Casting_Loss || 0,
+            ornamentWeight: casting.Ornament_Weight || 0,
+            scrapWeight: casting.Scrap_Weight || 0,
+            dustWeight: casting.Dust_Weight || 0
           };
         });
       } else {

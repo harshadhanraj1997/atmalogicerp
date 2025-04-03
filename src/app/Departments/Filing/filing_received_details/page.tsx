@@ -45,6 +45,10 @@ const FilingDetailsPage = () => {
   const [formErrors, setFormErrors] = useState<Partial<UpdateFormData>>({});
   const [pouchReceivedWeights, setPouchReceivedWeights] = useState<{ [key: string]: number }>({});
   const [totalReceivedWeight, setTotalReceivedWeight] = useState<number>(0);
+  const [receivedTime, setReceivedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -82,40 +86,28 @@ const FilingDetailsPage = () => {
     }
   }, [receivedWeight, data]);
 
-  const updateFiling = async (filingNumber: string, updateData: { 
-    receivedDate: string; 
-    receivedWeight: number; 
-    grindingLoss: number;
-    pouches: Array<{
-      pouchId: string;
-      receivedWeight: number;
-    }>;
-  }) => {
+  const updateFiling = async (filingNumber: string, updateData: any) => {
     console.log('[FilingReceived] Updating filing:', { filingNumber, updateData });
     
     try {
       // Parse the filing number to get components
       const [prefix, date, month, year, number] = filingNumber.split('/');
+      const apiEndpoint = `${apiBaseUrl}/api/filing/update/${prefix}/${date}/${month}/${year}/${number}`;
       
-      const response = await fetch(
-        `${apiBaseUrl}/api/filing/update/${prefix}/${date}/${month}/${year}/${number}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(updateData)
-        }
-      );
+      console.log('[FilingReceived] Making API call to:', apiEndpoint);
+      console.log('[FilingReceived] With data:', JSON.stringify(updateData, null, 2));
 
-      console.log('[FilingReceived] Update response status:', response.status);
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to update filing details');
-      }
-
+      console.log('[FilingReceived] API response status:', response.status);
       const result = await response.json();
-      console.log('[FilingReceived] Update response:', result);
+      console.log('[FilingReceived] API response data:', result);
 
       return result;
     } catch (error) {
@@ -188,51 +180,66 @@ const FilingDetailsPage = () => {
     try {
       setIsSubmitting(true);
       
-      if (!data) return;
+      if (!data) {
+        console.log('[FilingReceived] No data available');
+        return;
+      }
 
-      // Log each pouch's data before submission
-      console.log('[FilingReceived] Current pouch weights:', pouchReceivedWeights);
-      console.log('[FilingReceived] Original pouches:', data.pouches);
-
-      const pouchUpdates = Object.entries(pouchReceivedWeights).map(([pouchId, weight]) => {
-        const pouch = data.pouches.find(p => p.Id === pouchId);
-        console.log('[FilingReceived] Processing pouch:', {
-          pouchId,
-          originalWeight: pouch?.Issued_Pouch_weight__c,
-          newWeight: weight,
-          loss: pouch ? pouch.Issued_Pouch_weight__c - weight : 0
-        });
-        
-        return {
-          pouchId,
-          receivedWeight: weight
-        };
+      // Log initial values
+      console.log('[FilingReceived] Initial values:', {
+        receivedDate,
+        receivedTime,
+        totalReceivedWeight,
+        issuedWeight: data.filing.Issued_weight__c,
+        pouchReceivedWeights,
+        filingNumber: data.filing.Name
       });
 
+      // Combine date and time for received datetime
+      const combinedReceivedDateTime = `${receivedDate}T${receivedTime}:00.000Z`;
+      console.log('[FilingReceived] Combined datetime:', combinedReceivedDateTime);
+
+      // Calculate grinding loss (issued weight - received weight)
+      const grindingLoss = parseFloat((data.filing.Issued_weight__c - totalReceivedWeight).toFixed(4));
+      console.log('[FilingReceived] Calculated grinding loss:', grindingLoss);
+
       const formData = {
-        receivedDate,
-        receivedWeight: totalReceivedWeight,
-        grindingLoss,
-        pouches: pouchUpdates
+        receivedDate: combinedReceivedDateTime,
+        receivedWeight: parseFloat(totalReceivedWeight.toFixed(4)),
+        grindingLoss: grindingLoss, // Changed from filingLoss to grindingLoss
+        pouches: Object.entries(pouchReceivedWeights).map(([pouchId, weight]) => ({
+          pouchId,
+          receivedWeight: weight
+        }))
       };
 
-      console.log('[FilingReceived] Submitting complete payload:', JSON.stringify(formData, null, 2));
+      // Log the complete payload
+      console.log('[FilingReceived] Complete payload being sent:', JSON.stringify(formData, null, 2));
+      console.log('[FilingReceived] Filing number being updated:', data.filing.Name);
 
-      const filingNumber = data.filing.Name;
-      console.log('[FilingReceived] Filing number being updated:', filingNumber);
+      // Log the API endpoint being called
+      const [prefix, date, month, year, number] = data.filing.Name.split('/');
+      console.log('[FilingReceived] API endpoint components:', {
+        prefix, date, month, year, number,
+        grindingLoss // Updated log field name
+      });
 
-      const result = await updateFiling(filingNumber, formData);
+      const result = await updateFiling(data.filing.Name, formData);
+      console.log('[FilingReceived] API response:', result);
 
       if (result.success) {
+        console.log('[FilingReceived] Update successful');
         toast.success('Filing details updated successfully');
         await refreshData();
       } else {
+        console.log('[FilingReceived] Update failed:', result.message);
         throw new Error(result.message || 'Failed to update filing details');
       }
     } catch (error) {
-      console.error('[FilingReceived] Error:', error);
+      console.error('[FilingReceived] Error in submission:', error);
       toast.error(error.message || 'Failed to update filing details');
     } finally {
+      console.log('[FilingReceived] Submission completed');
       setIsSubmitting(false);
     }
   };
@@ -358,6 +365,19 @@ const FilingDetailsPage = () => {
                   {formErrors.receivedDate && (
                     <p className="text-red-500 text-xs mt-1">{formErrors.receivedDate}</p>
                   )}
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1.5">
+                    Received Time
+                  </label>
+                  <Input
+                    type="time"
+                    value={receivedTime}
+                    onChange={(e) => setReceivedTime(e.target.value)}
+                    className="w-full h-9"
+                    required
+                    disabled={isSubmitting}
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-gray-600 block mb-1.5">

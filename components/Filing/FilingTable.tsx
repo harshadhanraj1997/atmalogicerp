@@ -49,7 +49,7 @@ interface Department {
 const departments: Department[] = [
   { value: 'grinding', label: 'Grinding', path: '/Departments/Grinding/add_grinding_details' },
   { value: 'setting', label: 'Setting', path: '/Departments/Setting/add_setting_details' },
-  { value: 'polish', label: 'Polish', path: '/Departments/Polish/add_polish_details' },
+  { value: 'polish', label: 'Polish', path: '/Departments/Polishing/add_polishing_details' },
   { value: 'dull', label: 'Dull', path: '/Departments/Dull/add_dull_details' }
 ];
 
@@ -166,9 +166,12 @@ console.log("Deals State:", deals);
           return true;
         }
 
-        // Parse the filing date and normalize to local midnight
-        const filingDate = new Date(deal.issuedDate);
-        const filingDateStr = filingDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+        // Safely format the filing date
+        const filingDateStr = deal.issuedDate ? formatDate(deal.issuedDate) : '';
+        if (!filingDateStr) {
+          console.warn('Invalid or missing date for filing:', deal.id);
+          return true; // Include records with invalid dates
+        }
 
         // Apply start date filter if exists
         if (startDate && filingDateStr < startDate) {
@@ -225,10 +228,25 @@ console.log("Deals State:", deals);
       endDate,
       sampleDates: deals.slice(0, 3).map(d => ({
         id: d.id,
-        date: new Date(d.issuedDate).toISOString().split('T')[0]
+        date: d.issuedDate ? formatDate(d.issuedDate) : null
       }))
     });
   }, [deals, filteredRows, startDate, endDate]);
+
+  // Add a helper function to safely format dates
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date:', dateString);
+        return '';
+      }
+      return date.toISOString().split('T')[0];
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '';
+    }
+  };
 
   const handlePrint = (pdfUrl: string | null) => {
     if (pdfUrl) {

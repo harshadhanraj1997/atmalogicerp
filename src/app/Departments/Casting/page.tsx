@@ -85,6 +85,12 @@ const CastingForm = () => {
     return `${day}/${month}/${year}`;
   });
 
+  // Add state for issued time
+  const [issuedTime, setIssuedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
+
   // Add state for purity percentages
   const [purityPercentages, setPurityPercentages] = useState({
     pureGold: 0,
@@ -316,57 +322,20 @@ const CastingForm = () => {
     setCalculatedWeight(result);
   }, [purity, waxTreeWeight]);
 
-  // Update casting number generation with reset capability
-  useEffect(() => {
-    const today = new Date();
-    const day = String(today.getDate()).padStart(2, '0');
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const year = today.getFullYear();
-    const dateStr = `${day}/${month}/${year}`;
-    const storageKey = `castings_${dateStr}`;
-    
-    // Check localStorage for today's counter
-    const todayCastings = localStorage.getItem(storageKey);
-    
-    // If no castings today or invalid value, start at 1
-    let currentCount = todayCastings && !isNaN(parseInt(todayCastings)) ? 
-      parseInt(todayCastings) : 0;
-    
-    // Format the next number with leading zeros (starting at 01)
-    const nextCount = (currentCount + 1).toString().padStart(2, '0');
-    
-    setCastingNumber(`${dateStr}/${nextCount}`);
-    
-    // For debugging - add this line to help troubleshoot
-    console.log(`Today's date: ${dateStr}, Current count in localStorage: ${currentCount}, Next casting number: ${nextCount}`);
-    
-    // You can uncomment this line to reset the counter for testing
-    // localStorage.removeItem(storageKey);
-  }, []);
+  // Add state for manual casting number
+  const [castingLastNumber, setCastingLastNumber] = useState<string>('');
 
+  // Add function to generate casting number
   const generateCastingNumber = () => {
     const today = new Date();
     const day = String(today.getDate()).padStart(2, '0');
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const year = today.getFullYear();
-    const dateStr = `${day}/${month}/${year}`;
-    const storageKey = `castings_${dateStr}`;
     
-    // Get the current count - default to 0 if not found or invalid
-    const todayCastings = localStorage.getItem(storageKey);
-    let currentCount = todayCastings && !isNaN(parseInt(todayCastings)) ? 
-      parseInt(todayCastings) : 0;
+    // Use the manually entered last number, padded to 2 digits
+    const number = castingLastNumber.padStart(2, '0');
     
-    // Increment for this submission
-    currentCount += 1;
-    
-    // Save the new count
-    localStorage.setItem(storageKey, currentCount.toString());
-    
-    console.log(`Generating new casting number. Count: ${currentCount}`);
-    
-    // Format with leading zeros (always 2 digits)
-    return `${dateStr}/${currentCount.toString().padStart(2, '0')}`;
+    return `${day}/${month}/${year}/${number}`;
   };
 
   // Update the updateInventoryWeights function to prevent negative values
@@ -449,14 +418,17 @@ const CastingForm = () => {
       setLoading(true);
 
       // Basic validation for required fields
-      if (!selectedOrders.length || !purity || !waxTreeWeight || inventoryItems.length === 0) {
-        toast.error('Please fill all required fields');
+      if (!selectedOrders.length || !purity || !waxTreeWeight || inventoryItems.length === 0 || !castingLastNumber) {
+        toast.error('Please fill all required fields including casting number');
         return;
       }
 
-      // Generate a new casting number for this submission and save the counter
+      // Generate the casting number using the current date and manual number
       const newCastingNumber = generateCastingNumber();
       setCastingNumber(newCastingNumber);
+
+      // Combine date and time
+      const combinedDateTime = `${issuedDate}T${issuedTime}`;
 
       // Calculate total issued weight
       const totalIssued = inventoryItems.reduce((sum, item) => sum + Number(item.issueWeight), 0);
@@ -470,7 +442,7 @@ const CastingForm = () => {
       // Prepare casting data matching the backend API structure
       const castingData = {
         castingNumber: newCastingNumber,
-        date: issuedDate,
+        date: combinedDateTime, // Now includes both date and time
         orders: selectedOrders,
         waxTreeWeight: Number(waxTreeWeight),
         purity: purity,
@@ -558,6 +530,8 @@ const CastingForm = () => {
       setIsDropdownOpen(false);
       setCalculatedWeight(0);
       setIssuedDate(`${day}/${month}/${year}`);
+      setIssuedTime(today.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
+      setCastingLastNumber('');
 
     } catch (error) {
       console.error('Error in handleSubmit:', error);
@@ -606,8 +580,47 @@ const CastingForm = () => {
         <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-sm p-6 mr-[300px] md:mr-[300px]">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold">Update Casting</h2>
-            <div className="text-sm font-medium">
-              Casting Number: <span className="text-blue-600">{castingNumber || '-'}</span>
+            <div className="flex items-center gap-4">
+              {/* Date and Time inputs */}
+              <div className="flex items-center gap-4">
+                <div>
+                  <Label className="text-sm">Issue Date:</Label>
+                  <Input
+                    type="date"
+                    value={issuedDate}
+                    onChange={(e) => setIssuedDate(e.target.value)}
+                    className="w-32 h-8 text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm">Issue Time:</Label>
+                  <Input
+                    type="time"
+                    value={issuedTime}
+                    onChange={(e) => setIssuedTime(e.target.value)}
+                    className="w-32 h-8 text-sm"
+                  />
+                </div>
+              </div>
+              
+              {/* Existing casting number input */}
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">Casting Number:</Label>
+                <Input
+                  type="number"
+                  value={castingLastNumber}
+                  onChange={(e) => setCastingLastNumber(e.target.value)}
+                  className="w-20 h-8 text-sm"
+                  placeholder="##"
+                  min="1"
+                  max="99"
+                />
+              </div>
+              <div className="text-sm font-medium">
+                Preview: <span className="text-blue-600">
+                  {castingLastNumber ? generateCastingNumber() : 'DD/MM/YYYY/##'}
+                </span>
+              </div>
             </div>
           </div>
           
@@ -716,7 +729,8 @@ const CastingForm = () => {
               </div>
             </div>
 
-            {/* Wax Tree Weight */}
+            {/* Wax Tree
+             Weight */}
             <div>
               <Label className="text-sm mb-1.5">Wax Tree Weight (grams)</Label>
               <Input
@@ -922,8 +936,7 @@ const CastingForm = () => {
                   </div>
                 </div>
               )}
-
-              {/* Conditional Rendering based on Purity */}
+            {/* Conditional Rendering based on Purity */}
               {purity === '92.5%' ? (
                 <div className="mt-6 border rounded-lg overflow-hidden">
                   <table className="min-w-full divide-y divide-gray-200">
@@ -941,7 +954,7 @@ const CastingForm = () => {
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Issued Date</th>
                       </tr>
                     </thead>
-                    <tbody>
+                     <tbody>
                       <tr>
                         <td className="px-3 py-2 text-sm font-medium text-blue-600">{castingNumber || '-'}</td>
                         <td className="px-3 py-2 text-sm">{purity || '-'}</td>
@@ -1000,11 +1013,8 @@ const CastingForm = () => {
           </div>
         </div>
       </div>
-  
-  );
+    );
 };
 
 export default CastingForm;
-
-
 

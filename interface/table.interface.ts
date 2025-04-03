@@ -424,6 +424,9 @@ export interface ICasting {
   receivedDate: string;
   status: "Open" | "Completed" | "In Progress";
   castingLoss: number;
+  ornamentWeight: number;
+  scrapWeight: number;
+  dustWeight: number;
 }
 
 // Define an interface for the casting form data
@@ -508,4 +511,33 @@ export interface Billing {
   DeliveryChallanUrl: string;
   TaxInvoiceUrl: string;
   CreatedDate: string;
+}
+
+
+export interface DepartmentLosses {
+  data: {
+    casting: DepartmentRecord[];
+    filing: DepartmentRecord[];
+    grinding: DepartmentRecord[];
+    setting: DepartmentRecord[];
+    polishing: DepartmentRecord[];
+    dull: DepartmentRecord[];
+  };
+  summary: {
+    totalCastingLoss: number;
+    totalFilingLoss: number;
+    totalGrindingLoss: number;
+    totalSettingLoss: number;
+    totalPolishingLoss: number;
+    totalDullLoss: number;
+    totalOverallLoss: number;
+  };
+}
+
+interface DepartmentRecord {
+  id: string;
+  date: string;
+  issuedWeight: number;
+  receivedWeight: number;
+  loss: number;
 }

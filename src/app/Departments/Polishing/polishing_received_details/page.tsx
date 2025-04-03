@@ -54,6 +54,10 @@ export default function PolishingReceivedDetails() {
   const [pouches, setPouches] = useState<Pouch[]>([]);
   const [pouchReceivedWeights, setPouchReceivedWeights] = useState<{ [key: string]: number }>({});
   const [receivedDate, setReceivedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [receivedTime, setReceivedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
   const [totalReceivedWeight, setTotalReceivedWeight] = useState(0);
   const [polishingLoss, setPolishingLoss] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -151,8 +155,12 @@ export default function PolishingReceivedDetails() {
 
       const [prefix, date, month, year, number] = polishingId!.split('/');
 
+      // Combine date and time for received datetime
+      const combinedDateTime = `${receivedDate}T${receivedTime}:00.000Z`;
+      console.log('[PolishingReceived] Combined datetime:', combinedDateTime);
+
       const requestData = {
-        receivedDate,
+        receivedDate: combinedDateTime,
         receivedWeight: totalReceivedWeight,
         polishingLoss,
         pouches: pouches.map(pouch => ({
@@ -179,38 +187,23 @@ export default function PolishingReceivedDetails() {
       );
 
       const result = await response.json();
-      console.log('[Polishing Update] API Response:', {
-        status: response.status,
-        result: result
-      });
 
       if (result.success) {
-        console.log('[Polishing Update] Success:', {
-          message: result.message,
-          data: result.data
-        });
-        
-        // Show success message
         toast.success('Polishing details updated successfully');
-        
         // Reset form
         setReceivedDate(new Date().toISOString().split('T')[0]);
+        setReceivedTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
         setPouchReceivedWeights({});
         setTotalReceivedWeight(0);
         setPolishingLoss(0);
         
-        // Show alert
         alert('Polishing details have been updated successfully!');
-        
-        // Optional: Redirect or refresh
-        window.location.href = '/departments/polishing'; // Adjust the path as needed
+        window.location.href = '/departments/polishing';
       } else {
-        console.error('[Polishing Update] API returned error:', result);
         throw new Error(result.message || 'Failed to update polishing details');
       }
     } catch (error) {
       console.error('[Polishing Update] Error:', error);
-      console.error('[Polishing Update] Full error details:', JSON.stringify(error, null, 2));
       toast.error(error.message || 'Failed to update polishing details');
     } finally {
       setIsSubmitting(false);
@@ -262,15 +255,27 @@ export default function PolishingReceivedDetails() {
 
           <form onSubmit={handleSubmit} className="mt-8">
             <div className="space-y-6">
-              <div>
-                <Label>Received Date</Label>
-                <Input
-                  type="date"
-                  value={receivedDate}
-                  onChange={(e) => setReceivedDate(e.target.value)}
-                  className="mt-1"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Received Date</Label>
+                  <Input
+                    type="date"
+                    value={receivedDate}
+                    onChange={(e) => setReceivedDate(e.target.value)}
+                    className="mt-1"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>Received Time</Label>
+                  <Input
+                    type="time"
+                    value={receivedTime}
+                    onChange={(e) => setReceivedTime(e.target.value)}
+                    className="mt-1"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="space-y-4">

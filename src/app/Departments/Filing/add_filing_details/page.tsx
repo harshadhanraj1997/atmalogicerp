@@ -36,8 +36,8 @@ interface CastingResponse {
 
 interface CastingDetails {
   id: string;
-  issuedWeight: number;
-  issuedDate: string;
+  receivedWeight: number;
+  receivedDate: string;
   orders: Order[];
 }
 
@@ -70,14 +70,14 @@ export default function AddGrindingDetails() {
   const [loading, setLoading] = useState(true);
   const [castingDetails, setCastingDetails] = useState<CastingDetails>({
     id: '',
-    issuedWeight: 0,
-    issuedDate: '',
+    receivedWeight: 0,
+    receivedDate: '',
     orders: []
   });
   const [bagName, setBagName] = useState('');
   const [selectedOrder, setSelectedOrder] = useState('');
-  const [issuedWeight, setIssuedWeight] = useState(0);
-  const [issuedDate, setIssuedDate] = useState('');
+  const [receivedWeight, setReceivedWeight] = useState(0);
+  const [receivedDate, setReceivedDate] = useState('');
   const [pouchWeights, setPouchWeights] = useState<{ [key: string]: number }>({});
   const [bags, setBags] = useState<Array<{bagName: string; order: string; weight: number}>>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -85,6 +85,15 @@ export default function AddGrindingDetails() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedCategoryQuantities, setSelectedCategoryQuantities] = useState<CategoryQuantity[]>([]);
   const [pouchCategories, setPouchCategories] = useState<{[key: string]: CategoryQuantity[]}>({});
+  const [issuedDate, setIssuedDate] = useState<string>(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [issuedTime, setIssuedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
+  const [filingIssuedWeight, setFilingIssuedWeight] = useState<number>(0);
 
   // Add a formatted ID that includes GRIND
   const formattedId = castingId ? `Filing/${castingId}` : '';
@@ -114,23 +123,25 @@ export default function AddGrindingDetails() {
         
         const responseData = await response.json();
         console.log('Full API Response:', responseData);
-        console.log('Orders from response:', responseData.data.orders);
         
-        // Set default current date
-        const currentDate = new Date().toISOString().split('T')[0];
+        // Format the date from ISO string to YYYY-MM-DD
+        const receivedDateTime = responseData.data.casting.Received_Date__c;
+        const formattedDate = receivedDateTime ? receivedDateTime.split('T')[0] : '';
         
+        // Get received weight and date from the API response using correct field names
         const castingDetailsData = {
           id: castingId,
-          issuedWeight: responseData.summary.totalIssuedWeight || 0,
-          issuedDate: responseData.data.casting.Issued_Date__c || currentDate,
-          orders: responseData.data.orders || [] // Access orders from data object
+          receivedWeight: responseData.data.casting.Weight_Received__c || 0,
+          receivedDate: formattedDate,
+          orders: responseData.data.orders || []
         };
         
         console.log('Setting casting details:', castingDetailsData);
         setCastingDetails(castingDetailsData);
         
-        setIssuedWeight(responseData.summary.totalIssuedWeight || 0);
-        setIssuedDate(responseData.data.casting.Issued_Date__c || currentDate);
+        // Set the received weight and date in state using correct field names
+        setReceivedWeight(responseData.data.casting.Weight_Received__c || 0);
+        setReceivedDate(formattedDate);
 
       } catch (error) {
         console.error('Error fetching casting details:', error);
@@ -153,20 +164,24 @@ export default function AddGrindingDetails() {
     return `${formattedId}/POUCH${nextPouchNumber}`;
   };
 
-  // Function to update pouch weight
+  // Update the handlePouchWeightChange function to properly calculate total weight
   const handlePouchWeightChange = (bagName: string, weight: number) => {
+    console.log('Updating pouch weight:', { bagName, weight });
+    
     setPouchWeights(prev => {
       const newWeights = { ...prev, [bagName]: weight };
+      console.log('New pouch weights:', newWeights);
       
-      // Calculate total weight
-      const totalWeight = Object.values(newWeights).reduce((sum, w) => sum + (w || 0), 0);
-      setIssuedWeight(totalWeight);
+      // Calculate total filing issued weight from all pouches
+      const totalFilingWeight = Object.values(newWeights).reduce((sum, w) => sum + (parseFloat(w.toString()) || 0), 0);
+      console.log('Calculated total filing weight:', totalFilingWeight);
       
+      setFilingIssuedWeight(totalFilingWeight);
       return newWeights;
     });
   };
 
-  // Update handleAddBag to include weight
+  // Update handleAddBag to initialize the weight
   const handleAddBag = () => {
     if (!selectedOrder) {
       toast.error('Please select an order');
@@ -175,6 +190,13 @@ export default function AddGrindingDetails() {
 
     const newPouchName = generatePouchName();
     setBags([...bags, { bagName: newPouchName, order: selectedOrder, weight: 0 }]);
+    
+    // Initialize the weight in pouchWeights
+    setPouchWeights(prev => ({
+      ...prev,
+      [newPouchName]: 0
+    }));
+    
     setSelectedOrder(''); // Reset order selection
   };
 
@@ -338,16 +360,14 @@ export default function AddGrindingDetails() {
     toast.success('Pouch created successfully');
   };
 
+  // Update the handleSubmit function to use the correct field name
   const handleSubmit = async (e: React.FormEvent) => {
     try {
       e.preventDefault();
       console.log('[AddFiling] Starting form submission');
-
-      // Create a reference to the submit button
-      let submitButton: HTMLButtonElement | null = null;
-      if (e.currentTarget instanceof HTMLFormElement) {
-        submitButton = e.currentTarget.querySelector<HTMLButtonElement>('button[type="submit"]');
-      }
+      console.log('Current filing issued weight:', filingIssuedWeight);
+      console.log('Current pouch weights:', pouchWeights);
+      console.log('Current bags:', bags);
 
       if (bags.length === 0) {
         console.log('[AddFiling] No bags added');
@@ -355,113 +375,68 @@ export default function AddGrindingDetails() {
         return;
       }
 
-      // Debug log for data validation
-      console.log('[AddFiling] Current state:', {
-        bags,
-        pouchWeights,
-        pouchCategories,
-        issuedWeight,
-        issuedDate
+      // Recalculate total weight to ensure accuracy
+      const totalIssuedWeight = Object.values(pouchWeights).reduce((sum, w) => sum + (parseFloat(w.toString()) || 0), 0);
+      console.log('Recalculated total issued weight:', totalIssuedWeight);
+
+      // Combine date and time for issued datetime
+      const combinedIssuedDateTime = `${issuedDate}T${issuedTime}:00.000Z`;
+
+      const filingData = {
+        filingId: formattedId,
+        receivedWeight: receivedWeight,
+        issuedWeight: totalIssuedWeight, // Changed from filingIssuedWeight to issuedWeight
+        receivedDate: receivedDate,
+        issuedDate: combinedIssuedDateTime,
+        pouches: bags.map(bag => ({
+          pouchId: bag.bagName,
+          orderId: castingDetails.orders.find(o => o.Id === bag.order)?.Order_Id__c || '',
+          weight: parseFloat(pouchWeights[bag.bagName]?.toString() || '0'),
+          categories: pouchCategories[bag.bagName] || []
+        }))
+      };
+
+      console.log('[AddFiling] Submitting filing data:', JSON.stringify(filingData, null, 2));
+      console.log('[AddFiling] API URL:', `${apiBaseUrl}/api/filing/create`);
+
+      const response = await fetch(`${apiBaseUrl}/api/filing/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(filingData),
       });
 
-      try {
-        // Disable submit button if it exists
-        if (submitButton) {
-          submitButton.disabled = true;
-          submitButton.textContent = 'Processing...';
-        }
+      console.log('[AddFiling] API Response status:', response.status);
+      console.log('[AddFiling] API Response status text:', response.statusText);
 
-        const filingData = {
-          filingId: formattedId,
-          issuedWeight: issuedWeight,
-          issuedDate: issuedDate,
-          pouches: bags.map(bag => {
-            const orderDetails = castingDetails.orders.find(o => o.Id === bag.order);
-            const bagCategories = pouchCategories[bag.bagName] || [];
-            
-            console.log(`[AddFiling] Processing pouch ${bag.bagName}:`, {
-              orderDetails,
-              categories: bagCategories,
-              weight: pouchWeights[bag.bagName]
-            });
+      const result = await response.json();
+      console.log('[AddFiling] API Response data:', result);
 
-            return {
-              pouchId: bag.bagName,
-              orderId: orderDetails?.Order_Id__c || '',
-              weight: pouchWeights[bag.bagName] || 0,
-              categories: bagCategories.map(cat => ({
-                category: cat.category,
-                quantity: cat.quantity
-              }))
-            };
-          })
-        };
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to submit filing details');
+      }
 
-        console.log('[AddFiling] Submitting filing data:', JSON.stringify(filingData, null, 2));
-        console.log('[AddFiling] API URL:', `${apiBaseUrl}/api/filing/create`);
-
-        const response = await fetch(`${apiBaseUrl}/api/filing/create`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(filingData),
-        });
-
-        console.log('[AddFiling] API Response status:', response.status);
-        console.log('[AddFiling] API Response status text:', response.statusText);
-
-        const result = await response.json();
-        console.log('[AddFiling] API Response data:', result);
-
-        if (!response.ok) {
-          throw new Error(result.message || 'Failed to submit filing details');
-        }
-
-        if (result.success) {
-          console.log('[AddFiling] Submission successful:', result);
-          toast.success('Filing details submitted successfully');
-          
-          // Reset form
-          setBags([]);
-          setPouchWeights({});
-          setSelectedOrder('');
-          setSelectedCategory('');
-          setSelectedCategoryQuantities([]);
-          setPouchCategories({});
-          setIssuedWeight(castingDetails.issuedWeight);
-          setIssuedDate(castingDetails.issuedDate);
-        } else {
-          throw new Error(result.message || 'Failed to submit filing details');
-        }
+      if (result.success) {
+        console.log('[AddFiling] Submission successful:', result);
+        toast.success('Filing details submitted successfully');
         
-      } catch (submitError) {
-        console.error('[AddFiling] Error during submission:', {
-          error: submitError,
-          message: submitError.message,
-          stack: submitError.stack
-        });
-        throw submitError;
+        // Reset form
+        setBags([]);
+        setPouchWeights({});
+        setSelectedOrder('');
+        setSelectedCategory('');
+        setSelectedCategoryQuantities([]);
+        setPouchCategories({});
+        setReceivedWeight(castingDetails.receivedWeight);
+        setReceivedDate(castingDetails.receivedDate);
+      } else {
+        throw new Error(result.message || 'Failed to submit filing details');
       }
       
     } catch (error) {
-      console.error('[AddFiling] Error in handleSubmit:', {
-        error: error,
-        message: error.message,
-        stack: error.stack
-      });
+      console.error('[AddFiling] Error in handleSubmit:', error);
       toast.error(error.message || 'Failed to submit filing details');
-    } finally {
-      try {
-        // Re-enable submit button
-        const submitButton = document.querySelector<HTMLButtonElement>('button[type="submit"]');
-        if (submitButton) {
-          submitButton.disabled = false;
-          submitButton.textContent = 'Submit Filing Details';
-        }
-      } catch (finallyError) {
-        console.error('[AddFiling] Error in finally block:', finallyError);
-      }
     }
   };
 
@@ -476,29 +451,58 @@ export default function AddGrindingDetails() {
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold">Add Filing Details</h2>
             <div className="text-sm font-medium">
-              Grinding ID: <span className="text-blue-600">{formattedId}</span>
+              Filing ID: <span className="text-blue-600">{formattedId}</span>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Issued Weight and Date */}
+            {/* Received Weight and Date */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Issued Weight (g)</Label>
+                <Label>Received Weight from Casting(g)</Label>
                 <Input
                   type="number"
-                  value={issuedWeight}
-                  onChange={(e) => setIssuedWeight(Number(e.target.value))}
+                  value={receivedWeight}
                   className="h-10"
+                  readOnly
                 />
               </div>
               <div>
-                <Label>Issued Date</Label>
+                <Label>Total Weight Issued for Filing(g)</Label>
+                <Input
+                  type="number"
+                  value={filingIssuedWeight}
+                  className="h-10"
+                  readOnly
+                />
+              </div>
+              <div>
+                <Label>Received Date from Casting</Label>
+                <Input
+                  type="date"
+                  value={receivedDate}
+                  className="h-10"
+                  readOnly
+                />
+              </div>
+              <div>
+                <Label>Filing Issue Date</Label>
                 <Input
                   type="date"
                   value={issuedDate}
                   onChange={(e) => setIssuedDate(e.target.value)}
                   className="h-10"
+                  required
+                />
+              </div>
+              <div>
+                <Label>Filing Issue Time</Label>
+                <Input
+                  type="time"
+                  value={issuedTime}
+                  onChange={(e) => setIssuedTime(e.target.value)}
+                  className="h-10"
+                  required
                 />
               </div>
             </div>
@@ -697,7 +701,7 @@ export default function AddGrindingDetails() {
                                 delete newPouchCategories[bag.bagName];
                                 setPouchCategories(newPouchCategories);
                                 const totalWeight = Object.values(newWeights).reduce((sum, w) => sum + (w || 0), 0);
-                                setIssuedWeight(totalWeight);
+                                setReceivedWeight(totalWeight);
                               }}
                             >
                               Remove

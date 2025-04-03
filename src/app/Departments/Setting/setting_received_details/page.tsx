@@ -65,6 +65,10 @@ const SettingDetailsPage = () => {
   const [pouchStoneWeights, setPouchStoneWeights] = useState<{ [key: string]: number }>({});
   const [totalStoneWeight, setTotalStoneWeight] = useState<number>(0);
   const [stoneWeightAdded, setStoneWeightAdded] = useState<number>(0);
+  const [receivedTime, setReceivedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
 
   // Add pouch weight change handler
   const handlePouchWeightChange = (pouchId: string, weight: number) => {
@@ -222,11 +226,15 @@ const SettingDetailsPage = () => {
       
       if (!data) return;
 
+      // Combine date and time for received datetime
+      const combinedReceivedDateTime = `${receivedDate}T${receivedTime}:00.000Z`;
+      console.log('[SettingReceived] Combined datetime:', combinedReceivedDateTime);
+
       // Calculate total received without stones for each pouch
       const pouchesData = data.pouches.map(pouch => {
         const receivedWeight = pouchReceivedWeights[pouch.Id] || 0;
         const stoneWeight = pouchStoneWeights[pouch.Id] || 0;
-        const pouchSettingLoss = pouch.Isssued_Weight_Setting__c - receivedWeight; // Loss calculation without stone weight
+        const pouchSettingLoss = pouch.Isssued_Weight_Setting__c - receivedWeight;
 
         return {
           pouchId: pouch.Id,
@@ -246,9 +254,9 @@ const SettingDetailsPage = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            receivedDate,
+            receivedDate: combinedReceivedDateTime, // Use combined date and time
             receivedWeight: totalReceivedWeight,
-            settingLoss, // This is now calculated correctly (Issued - Received without stones)
+            settingLoss,
             totalStoneWeight,
             pouches: pouchesData
           })
@@ -264,7 +272,7 @@ const SettingDetailsPage = () => {
         throw new Error(result.message || 'Failed to update setting details');
       }
     } catch (error) {
-      console.error('[Setting Update] Error:', error);
+      console.error('[SettingReceived] Error:', error);
       toast.error(error.message || 'Failed to update setting details');
     } finally {
       setIsSubmitting(false);
@@ -335,15 +343,27 @@ const SettingDetailsPage = () => {
 
           <form onSubmit={handleSubmit} className="mt-8">
             <div className="space-y-6">
-              <div>
-                <Label>Received Date</Label>
-                <Input
-                  type="date"
-                  value={receivedDate}
-                  onChange={(e) => setReceivedDate(e.target.value)}
-                  className="mt-1"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Received Date</Label>
+                  <Input
+                    type="date"
+                    value={receivedDate}
+                    onChange={(e) => setReceivedDate(e.target.value)}
+                    className="mt-1"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>Received Time</Label>
+                  <Input
+                    type="time"
+                    value={receivedTime}
+                    onChange={(e) => setReceivedTime(e.target.value)}
+                    className="mt-1"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="space-y-4">

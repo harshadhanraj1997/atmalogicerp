@@ -49,7 +49,7 @@ interface Department {
 const departments: Department[] = [
   { value: 'grinding', label: 'Grinding', path: '/Departments/Grinding/add_grinding_details' },
   { value: 'setting', label: 'Setting', path: '/Departments/Setting/add_setting_details' },
-  { value: 'polish', label: 'Polish', path: '/Departments/Polish/add_polish_details' },
+  { value: 'polish', label: 'Polish', path: '/Departments/Polishing/add_polishing_details' },
   { value: 'dull', label: 'Dull', path: '/Departments/Dull/add_dull_details' }
 ];
 

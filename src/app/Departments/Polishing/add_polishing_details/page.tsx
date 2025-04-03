@@ -9,63 +9,111 @@ import { toast } from "react-hot-toast";
 interface Pouch {
   Id: string;
   Name: string;
-  Issued_weight_setting__c: number;
-  Received_Weight_Setting__c: number;
+  Order_Id__c: string;
+  Isssued_Weight_Grinding__c: number;
+  Received_Weight_Grinding__c: number;
+  Received_Weight_Setting__c?: number;
+  partyName?: string;
+  orderNumber?: string;
 }
 
 export default function AddPolishingDetails() {
+  const [isFromGrinding, setIsFromGrinding] = useState(false);
   const searchParams = useSearchParams();
   const filingId = searchParams.get('filingId');
+  const grindingId = searchParams.get('grindingId');
   const [loading, setLoading] = useState(true);
   const [formattedId, setFormattedId] = useState<string>('');
   const [pouches, setPouches] = useState<Pouch[]>([]);
   const [pouchWeights, setPouchWeights] = useState<{ [key: string]: number }>({});
   const [issuedDate, setIssuedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [issuedTime, setIssuedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
   const [totalWeight, setTotalWeight] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [totalReceivedFromSetting, setTotalReceivedFromSetting] = useState(0);
 
   useEffect(() => {
     const initializePolishing = async () => {
-      if (!filingId) {
-        toast.error('No filing ID provided');
+      if (!filingId && !grindingId) {
+        toast.error('No ID provided');
         return;
       }
 
       try {
-        const [prefix, date, month, year, number] = filingId.split('/');
-        console.log('[AddPolishing] Filing ID parts:', { prefix, date, month, year, number });
+        // Get the source ID from either parameter
+        const sourceId = filingId || grindingId;
+        console.log('[AddPolishing] Processing source ID:', sourceId);
 
+        const idParts = sourceId!.split('/');
+        const [prefix, date, month, year, number] = idParts;
+
+        // Determine source type by checking the prefix and update state
+        const isGrinding = prefix === 'GRIND';
+        setIsFromGrinding(isGrinding);
+        console.log('[AddPolishing] ID Analysis:', {
+          prefix,
+          isGrinding,
+          fullId: sourceId
+        });
+
+        // Generate polishing ID
         const generatedPolishingId = `POLISH/${date}/${month}/${year}/${number}`;
         setFormattedId(generatedPolishingId);
 
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/setting/${prefix}/${date}/${month}/${year}/${number}/pouches`
-        );
+        // Construct the endpoint based on the API structure
+        const endpoint = isGrinding
+          ? `${process.env.NEXT_PUBLIC_API_URL}/api/grinding/GRIND/${date}/${month}/${year}/${number}/pouches`
+          : `${process.env.NEXT_PUBLIC_API_URL}/api/setting/${prefix}/${date}/${month}/${year}/${number}/pouches`
+
+
+        console.log('[AddPolishing] Endpoint details:', {
+          isGrinding,
+          endpoint,
+          sourceType: isGrinding ? 'Grinding' : 'Setting',
+          params: { prefix, date, month, year, number }
+        });
+
+        const response = await fetch(endpoint);
+        if (!response.ok) {
+          throw new Error(`API call failed with status: ${response.status}`);
+        }
 
         const result = await response.json();
+        console.log('[AddPolishing] API Response:', result);
 
         if (!result.success) {
           throw new Error(result.message || 'Failed to fetch pouches');
         }
 
+        console.log('[AddPolishing] Fetched pouches:', result.data.pouches);
+
         setPouches(result.data.pouches);
         
-        // Calculate total received from setting
+        // Calculate total received weight using the correct field
+        const weightField = isGrinding ? 'Received_Weight_Grinding__c' : 'Received_Weight_Setting__c';
+        console.log('[AddPolishing] Using weight field:', weightField);
+
         const totalReceived = result.data.pouches.reduce((sum: number, pouch: Pouch) => 
-          sum + (pouch.Received_Weight_Setting__c || 0), 0
+          sum + (pouch[weightField] || 0), 0
         );
         setTotalReceivedFromSetting(totalReceived);
 
+        // Initialize pouch weights
         const weights: { [key: string]: number } = {};
         result.data.pouches.forEach((pouch: Pouch) => {
-          weights[pouch.Id] = 0; // Initialize polishing weights to 0
+          weights[pouch.Id] = 0;
         });
         setPouchWeights(weights);
-        setTotalWeight(0); // Initialize total polishing weight to 0
 
       } catch (error) {
-        console.error('[AddPolishing] Error:', error);
+        console.error('[AddPolishing] Error details:', {
+          message: error.message,
+          stack: error.stack,
+          sourceId: filingId || grindingId
+        });
         toast.error(error.message || 'Failed to initialize polishing');
       } finally {
         setLoading(false);
@@ -73,7 +121,7 @@ export default function AddPolishingDetails() {
     };
 
     initializePolishing();
-  }, [filingId]);
+  }, [filingId, grindingId]);
 
   const handleWeightChange = (pouchId: string, weight: number) => {
     setPouchWeights(prev => {
@@ -90,6 +138,10 @@ export default function AddPolishingDetails() {
     try {
       setIsSubmitting(true);
 
+      // Combine date and time for issued datetime
+      const combinedDateTime = `${issuedDate}T${issuedTime}:00.000Z`;
+      console.log('[AddPolishing] Combined datetime:', combinedDateTime);
+
       // Prepare pouch data
       const pouchData = pouches.map(pouch => ({
         pouchId: pouch.Id,
@@ -105,7 +157,7 @@ export default function AddPolishingDetails() {
       // Prepare polishing data
       const polishingData = {
         polishingId: formattedId,
-        issuedDate: issuedDate,
+        issuedDate: combinedDateTime, // Use combined date and time
         pouches: pouchData,
         totalWeight: totalWeight,
         status: 'Pending'
@@ -131,6 +183,7 @@ export default function AddPolishingDetails() {
         setTotalWeight(0);
         setTotalReceivedFromSetting(0);
         setIssuedDate(new Date().toISOString().split('T')[0]);
+        setIssuedTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
         setFormattedId('');
         setLoading(false);
       } else {
@@ -176,6 +229,16 @@ export default function AddPolishingDetails() {
                   className="h-10"
                 />
               </div>
+              <div>
+                <Label htmlFor="issuedTime">Issued Time</Label>
+                <Input
+                  id="issuedTime"
+                  type="time"
+                  value={issuedTime}
+                  onChange={(e) => setIssuedTime(e.target.value)}
+                  className="h-10"
+                />
+              </div>
             </div>
           </div>
 
@@ -190,8 +253,14 @@ export default function AddPolishingDetails() {
                       <div className="h-10 flex items-center">{pouch.Name}</div>
                     </div>
                     <div>
-                      <Label>Received Weight from Setting</Label>
-                      <div className="h-10 flex items-center">{pouch.Received_Weight_Setting__c?.toFixed(4) || '0.0000'}g</div>
+                      <Label>
+                        {isFromGrinding ? 'Received Weight from Grinding' : 'Received Weight from Setting'}
+                      </Label>
+                      <div className="h-10 flex items-center">
+                        {isFromGrinding 
+                          ? (pouch.Received_Weight_Grinding__c?.toFixed(4) || '0.0000')
+                          : (pouch.Received_Weight_Setting__c?.toFixed(4) || '0.0000')}g
+                      </div>
                     </div>
                     <div>
                       <Label>Weight for Polishing</Label>

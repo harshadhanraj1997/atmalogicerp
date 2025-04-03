@@ -1341,6 +1341,5 @@ const NewTagging = () => {
     </div>
   );
 };
+
 export default NewTagging;
-
-

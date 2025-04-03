@@ -50,6 +50,10 @@ const GrindingDetailsPage = () => {
   const searchParams = useSearchParams();
   const grindingId = searchParams.get('grindingId');
   const [receivedDate, setReceivedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [receivedTime, setReceivedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
   const [receivedWeight, setReceivedWeight] = useState<number>(0);
   const [grindingLoss, setGrindingLoss] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -174,28 +178,33 @@ const GrindingDetailsPage = () => {
       
       if (!data) return;
 
-      // Prepare pouch data
-      const pouchesData = data.pouches.map(pouch => ({
-        pouchId: pouch.Id,
-        receivedWeight: pouchReceivedWeights[pouch.Id] || 0,
-        grindingLoss: pouch.Issued_Weight__c - (pouchReceivedWeights[pouch.Id] || 0)
-      }));
+      // Combine date and time for received datetime
+      const combinedReceivedDateTime = `${receivedDate}T${receivedTime}:00.000Z`;
+
+      console.log('[GrindingReceived] Submitting with values:', {
+        receivedDate,
+        receivedTime,
+        combinedDateTime: combinedReceivedDateTime,
+        receivedWeight,
+        grindingLoss,
+        pouches: Object.entries(pouchReceivedWeights).map(([id, weight]) => ({
+          pouchId: id,
+          weight
+        }))
+      });
+
+      const formData = {
+        receivedDate: combinedReceivedDateTime,
+        receivedWeight: parseFloat(receivedWeight.toString() || '0'),
+        grindingLoss: parseFloat(grindingLoss.toString() || '0'),
+        pouches: Object.entries(pouchReceivedWeights).map(([pouchId, weight]) => ({
+          pouchId,
+          receivedWeight: weight
+        }))
+      };
 
       // Extract grinding number parts
       const [prefix, date, month, year, number] = data.grinding.Name.split('/');
-
-      // Prepare form data
-      const formData = {
-        receivedDate,
-        receivedWeight,
-        grindingLoss,
-        pouches: pouchesData
-      };
-
-      // Validate form data
-      if (!validateForm(formData)) {
-        return;
-      }
 
       const response = await fetch(
         `${apiBaseUrl}/api/grinding/update/${prefix}/${date}/${month}/${year}/${number}`,
@@ -212,13 +221,12 @@ const GrindingDetailsPage = () => {
 
       if (result.success) {
         toast.success('Grinding details updated successfully');
-        // Refresh data after update
         window.location.reload();
       } else {
         throw new Error(result.message || 'Failed to update grinding details');
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('[GrindingReceived] Error:', error);
       toast.error(error.message || 'Failed to update grinding details');
     } finally {
       setIsSubmitting(false);
@@ -358,6 +366,19 @@ const GrindingDetailsPage = () => {
                   {formErrors.receivedDate && (
                     <p className="text-red-500 text-xs mt-1">{formErrors.receivedDate}</p>
                   )}
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1.5">
+                    Received Time
+                  </label>
+                  <Input
+                    type="time"
+                    value={receivedTime}
+                    onChange={(e) => setReceivedTime(e.target.value)}
+                    className="w-full h-9"
+                    required
+                    disabled={isSubmitting}
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-gray-600 block mb-1.5">

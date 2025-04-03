@@ -50,25 +50,29 @@ import "react-datepicker/dist/react-datepicker.css";
     switch (range) {
       case "day":
         // Today
-        startDate = new Date(now.setHours(0, 0, 0, 0));
-        filterByDateRange(data, startDate, new Date());
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        filterByDateRange(data, startDate, now);
         break;
       case "week":
         // Current week (last 7 days)
-        startDate = new Date();
+        startDate = new Date(now);
         startDate.setDate(startDate.getDate() - 7);
-        filterByDateRange(data, startDate, new Date());
+        startDate.setHours(0, 0, 0, 0);
+        filterByDateRange(data, startDate, now);
         break;
       case "month":
         // Current month
-        startDate = new Date();
-        startDate.setDate(1);
-        filterByDateRange(data, startDate, new Date());
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        startDate.setHours(0, 0, 0, 0);
+        filterByDateRange(data, startDate, now);
         break;
       case "custom":
         // Custom date range
         if (customStartDate && customEndDate) {
-          filterByDateRange(data, customStartDate, customEndDate);
+          const endDate = new Date(customEndDate);
+          endDate.setHours(23, 59, 59, 999);
+          filterByDateRange(data, customStartDate, endDate);
         }
         break;
       default:
@@ -79,8 +83,22 @@ import "react-datepicker/dist/react-datepicker.css";
   // Helper function to filter by date range
   const filterByDateRange = (data: ISetting[], start: Date, end: Date) => {
     const filtered = data.filter((item) => {
-      const issuedDate = new Date(item.issuedDate);
-      return issuedDate >= start && issuedDate <= end;
+      try {
+        // Parse the ISO date string to Date object
+        const issuedDate = new Date(item.issuedDate);
+        
+        // Set the time to start of day for start date and end of day for end date
+        const startOfDay = new Date(start);
+        startOfDay.setHours(0, 0, 0, 0);
+        
+        const endOfDay = new Date(end);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        return issuedDate >= startOfDay && issuedDate <= endOfDay;
+      } catch (error) {
+        console.error('Error parsing date:', error, item.issuedDate);
+        return false;
+      }
     });
     setFilteredData(filtered);
   };

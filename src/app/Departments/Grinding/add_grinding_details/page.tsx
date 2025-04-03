@@ -20,6 +20,10 @@ export default function AddGrindingDetails() {
   const [pouches, setPouches] = useState<Pouch[]>([]);
   const [pouchWeights, setPouchWeights] = useState<{ [key: string]: number }>({});
   const [issuedDate, setIssuedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [issuedTime, setIssuedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
   const [totalWeight, setTotalWeight] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -84,16 +88,19 @@ export default function AddGrindingDetails() {
     try {
       setIsSubmitting(true);
 
+      // Combine date and time for issued datetime
+      const combinedDateTime = `${issuedDate}T${issuedTime}:00.000Z`;
+
       // Prepare pouch data
       const pouchData = pouches.map(pouch => ({
         pouchId: pouch.Id,
         grindingWeight: pouchWeights[pouch.Id] || 0
       }));
 
-      // Prepare simplified grinding data
+      // Prepare grinding data
       const grindingData = {
         grindingId: formattedId,
-        issuedDate: issuedDate,
+        issuedDate: combinedDateTime, // Use combined date and time
         pouches: pouchData,
         totalWeight: totalWeight,
         status: 'Pending'
@@ -141,7 +148,7 @@ export default function AddGrindingDetails() {
           </div>
 
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="text-sm font-medium">
                 Grinding ID: <span className="text-blue-600 font-bold">
                   {formattedId || 'Generating...'}
@@ -154,6 +161,16 @@ export default function AddGrindingDetails() {
                   type="date"
                   value={issuedDate}
                   onChange={(e) => setIssuedDate(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div>
+                <Label htmlFor="issuedTime">Issued Time</Label>
+                <Input
+                  id="issuedTime"
+                  type="time"
+                  value={issuedTime}
+                  onChange={(e) => setIssuedTime(e.target.value)}
                   className="h-10"
                 />
               </div>

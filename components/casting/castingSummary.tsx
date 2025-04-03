@@ -34,6 +34,11 @@ const CastingSummary: React.FC = () => {
 
   // Filter data when date range changes
   useEffect(() => {
+    console.log('[CastingSummary] Date range changed:', {
+      dateRange,
+      customStartDate: customStartDate?.toISOString(),
+      customEndDate: customEndDate?.toISOString()
+    });
     filterDataByDateRange(castingData, dateRange);
   }, [dateRange, customStartDate, customEndDate, castingData]);
 
@@ -50,25 +55,29 @@ const CastingSummary: React.FC = () => {
     switch (range) {
       case "day":
         // Today
-        startDate = new Date(now.setHours(0, 0, 0, 0));
-        filterByDateRange(data, startDate, new Date());
+        startDate = new Date(now);
+        startDate.setUTCHours(0, 0, 0, 0);
+        filterByDateRange(data, startDate, now);
         break;
       case "week":
         // Current week (last 7 days)
-        startDate = new Date();
+        startDate = new Date(now);
         startDate.setDate(startDate.getDate() - 7);
-        filterByDateRange(data, startDate, new Date());
+        startDate.setUTCHours(0, 0, 0, 0);
+        filterByDateRange(data, startDate, now);
         break;
       case "month":
         // Current month
-        startDate = new Date();
-        startDate.setDate(1);
-        filterByDateRange(data, startDate, new Date());
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        startDate.setUTCHours(0, 0, 0, 0);
+        filterByDateRange(data, startDate, now);
         break;
       case "custom":
         // Custom date range
         if (customStartDate && customEndDate) {
-          filterByDateRange(data, customStartDate, customEndDate);
+          const endDate = new Date(customEndDate);
+          endDate.setUTCHours(23, 59, 59, 999);
+          filterByDateRange(data, customStartDate, endDate);
         }
         break;
       default:
@@ -79,8 +88,31 @@ const CastingSummary: React.FC = () => {
   // Helper function to filter by date range
   const filterByDateRange = (data: ICasting[], start: Date, end: Date) => {
     const filtered = data.filter((item) => {
-      const issuedDate = new Date(item.issuedDate);
-      return issuedDate >= start && issuedDate <= end;
+      try {
+        // Parse the ISO date string with timezone
+        const issuedDate = new Date(item.issuedDate);
+        
+        // Set the time to start of day for start date and end of day for end date
+        const startOfDay = new Date(start);
+        startOfDay.setUTCHours(0, 0, 0, 0);
+        
+        const endOfDay = new Date(end);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+
+        console.log('Date comparison:', {
+          issuedDate: issuedDate.toISOString(),
+          startOfDay: startOfDay.toISOString(),
+          endOfDay: endOfDay.toISOString()
+        });
+
+        return issuedDate >= startOfDay && issuedDate <= endOfDay;
+      } catch (error) {
+        console.error('Error parsing date:', error, {
+          dateString: item.issuedDate,
+          expectedFormat: '2025-04-02T02:56:00.000+0000'
+        });
+        return false;
+      }
     });
     setFilteredData(filtered);
   };
@@ -218,23 +250,41 @@ const CastingSummary: React.FC = () => {
           <div className="flex items-center gap-2 mt-2 md:mt-0">
             <DatePicker
               selected={customStartDate}
-              onChange={(date) => setCustomStartDate(date)}
+              onChange={(date) => {
+                if (date) {
+                  const utcDate = new Date(date);
+                  utcDate.setUTCHours(0, 0, 0, 0);
+                  setCustomStartDate(utcDate);
+                } else {
+                  setCustomStartDate(null);
+                }
+              }}
               selectsStart
               startDate={customStartDate}
               endDate={customEndDate}
               placeholderText="Start Date"
               className="px-2 py-1 text-sm border rounded"
+              dateFormat="yyyy-MM-dd"
             />
             <span>to</span>
             <DatePicker
               selected={customEndDate}
-              onChange={(date) => setCustomEndDate(date)}
+              onChange={(date) => {
+                if (date) {
+                  const utcDate = new Date(date);
+                  utcDate.setUTCHours(23, 59, 59, 999);
+                  setCustomEndDate(utcDate);
+                } else {
+                  setCustomEndDate(null);
+                }
+              }}
               selectsEnd
               startDate={customStartDate}
               endDate={customEndDate}
               minDate={customStartDate}
               placeholderText="End Date"
               className="px-2 py-1 text-sm border rounded"
+              dateFormat="yyyy-MM-dd"
             />
             <button
               onClick={handleApplyCustomRange}

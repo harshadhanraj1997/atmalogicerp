@@ -37,7 +37,12 @@ interface InventoryItem {
 const updateFormSchema = z.object({
   receivedDate: z.string().min(1, "Received date is required"),
   receivedWeight: z.number().positive("Weight must be greater than 0"),
-  castingLoss: z.number()
+  ornamentWeight: z.number().positive("Ornament weight must be greater than 0"),
+  scrapReceivedWeight: z.number().min(0, "Weight cannot be negative"),
+  dustReceivedWeight: z.number().min(0, "Weight cannot be negative"),
+  castingLoss: z.number(),
+  castingScrap: z.number(),
+  castingDust: z.number()
 });
 
 type UpdateFormData = z.infer<typeof updateFormSchema>;
@@ -52,8 +57,15 @@ const CastingDetailsPage = () => {
   const searchParams = useSearchParams();
   const castingId = searchParams.get('castingId');
   const [receivedDate, setReceivedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [receivedTime, setReceivedTime] = useState<string>(
+    new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+  );
   const [receivedWeight, setReceivedWeight] = useState<number>(0);
+  const [scrapReceivedWeight, setScrapReceivedWeight] = useState<number>(0);
+  const [dustReceivedWeight, setDustReceivedWeight] = useState<number>(0);
   const [castingLoss, setCastingLoss] = useState<number>(0);
+  const [castingScrap, setCastingScrap] = useState<number>(0);
+  const [castingDust, setCastingDust] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Partial<UpdateFormData>>({});
 
@@ -86,26 +98,30 @@ const CastingDetailsPage = () => {
   }, [castingId]);
 
   useEffect(() => {
-    if (data && receivedWeight > 0) {
+    if (data) {
       const issuedWeight = data.casting.Issud_weight__c;
-      const loss = issuedWeight - receivedWeight;
+      const totalReceivedWeight = receivedWeight + scrapReceivedWeight + dustReceivedWeight;
+      const loss = issuedWeight - totalReceivedWeight;
       setCastingLoss(loss);
     }
-  }, [receivedWeight, data]);
+  }, [receivedWeight, scrapReceivedWeight, dustReceivedWeight, data]);
 
-  const updateCasting = async (castingNumber: string, updateData: { receivedDate: string; receivedWeight: number; castingLoss: number; }) => {
-    const [date, month, year, number] = castingNumber.split('/');
+  const updateCasting = async (castingNum: string, updateData: UpdateFormData) => {
+    console.log('Updating casting:', castingNum);
+    
     const response = await fetch(
-      `${apiBaseUrl}/api/casting/update/${date}/${month}/${year}/${number}`,
+      `${apiBaseUrl}/api/casting/update/${castingNum.split('/')[0]}/${castingNum.split('/')[1]}/${castingNum.split('/')[2]}/${castingNum.split('/')[3]}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          receivedDate: updateData.receivedDate,
+          ...updateData,
           receivedWeight: updateData.receivedWeight,
-          castingLoss: updateData.castingLoss
+          ornamentWeight: updateData.ornamentWeight,
+          scrapReceivedWeight: updateData.scrapReceivedWeight,
+          dustReceivedWeight: updateData.dustReceivedWeight
         })
       }
     );
@@ -135,6 +151,9 @@ const CastingDetailsPage = () => {
   // Reset form
   const resetForm = () => {
     setReceivedDate(new Date().toISOString().split('T')[0]);
+    setReceivedTime(
+      new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+    );
     setReceivedWeight(0);
     setCastingLoss(0);
     setFormErrors({});
@@ -161,13 +180,32 @@ const CastingDetailsPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!data) return;
+    if (!data || !castingId) {
+      toast.error('Please enter the casting number');
+      return;
+    }
 
-    // Create form data object
+    const castingNum = castingId;
+    
+    // Combine date and time
+    const combinedDateTime = `${receivedDate}T${receivedTime}`;
+
+    // Calculate total received weight
+    const totalReceivedWeight = (
+      parseFloat(receivedWeight.toString() || '0') + 
+      parseFloat(scrapReceivedWeight.toString() || '0') + 
+      parseFloat(dustReceivedWeight.toString() || '0')
+    );
+
     const formData: UpdateFormData = {
-      receivedDate,
-      receivedWeight,
-      castingLoss
+      receivedDate: combinedDateTime,
+      receivedWeight: totalReceivedWeight,
+      ornamentWeight: parseFloat(receivedWeight.toString() || '0'),
+      scrapReceivedWeight,
+      dustReceivedWeight,
+      castingLoss,
+      castingScrap,
+      castingDust
     };
 
     // Validate form
@@ -179,20 +217,18 @@ const CastingDetailsPage = () => {
     setIsSubmitting(true);
 
     try {
-      const castingNumber = data.casting.Name;
-      
       // Show loading toast
       toast.loading('Updating casting details...', {
         id: 'updateCasting',
       });
 
-      const result = await updateCasting(castingNumber, formData);
+      const result = await updateCasting(castingNum, formData);
       
       if (result.success) {
         // Show success alert
         toast.success('Success!', {
           id: 'updateCasting',
-          description: `Casting ${castingNumber} has been updated successfully.`,
+          description: `Casting ${castingNum} has been updated successfully.`,
           duration: 5000,
           action: {
             label: 'Dismiss',
@@ -363,7 +399,20 @@ const CastingDetailsPage = () => {
                 </div>
                 <div>
                   <label className="text-sm text-gray-600 block mb-1.5">
-                    Received Weight (g)
+                    Received Time
+                  </label>
+                  <Input
+                    type="time"
+                    value={receivedTime}
+                    onChange={(e) => setReceivedTime(e.target.value)}
+                    className="w-full h-9"
+                    required
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1.5">
+                    Received Weight of ornaments(g)
                   </label>
                   <Input
                     type="number"
@@ -379,6 +428,43 @@ const CastingDetailsPage = () => {
                     <p className="text-red-500 text-xs mt-1">{formErrors.receivedWeight}</p>
                   )}
                 </div>
+                
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1.5">
+                    Received Weight of scrap (g)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={scrapReceivedWeight || ''}
+                    onChange={(e) => setScrapReceivedWeight(parseFloat(e.target.value) || 0)}
+                    className={`w-full h-9 ${formErrors.scrapReceivedWeight ? 'border-red-500' : ''}`}
+                    required
+                    placeholder="Enter received weight"
+                    disabled={isSubmitting}
+                  />
+                  {formErrors.scrapReceivedWeight && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.scrapReceivedWeight}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1.5">
+                    Received Weight of dust (g)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={dustReceivedWeight || ''}
+                    onChange={(e) => setDustReceivedWeight(parseFloat(e.target.value) || 0)}
+                    className={`w-full h-9 ${formErrors.dustReceivedWeight ? 'border-red-500' : ''}`}
+                    required
+                    placeholder="Enter received weight"
+                    disabled={isSubmitting}
+                  />
+                  {formErrors.dustReceivedWeight && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.dustReceivedWeight}</p>
+                  )}
+                </div>
                 <div>
                   <label className="text-sm text-gray-600 block mb-1.5">
                     Casting Loss (g)
@@ -392,6 +478,7 @@ const CastingDetailsPage = () => {
                   />
                 </div>
               </div>
+              
               <div className="mt-4 text-right">
                 <Button 
                   type="submit" 
