@@ -4,8 +4,9 @@ import { fetchGrindingData } from "@/data/crm/filing-data";
 import { IDull } from "@/interface/table.interface";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { fetchDullData } from "@/data/crm/dull-data";
 
-        const DullSummary: React.FC = () => {
+const DullSummary: React.FC = () => {
   const [dullData, setDullData] = useState<IDull[]>([]);
   const [filteredData, setFilteredData] = useState<IDull[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -14,27 +15,86 @@ import "react-datepicker/dist/react-datepicker.css";
   const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
   const [showCustomDatePicker, setShowCustomDatePicker] = useState<boolean>(false);
 
-  // Fetch casting data
+  // Add helper function for Indian timezone date formatting
+  const formatIndianDateTime = (date: Date, isEndDate: boolean = false) => {
+    // Add 5 hours and 30 minutes to convert to Indian time
+    const indianDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+    
+    // Set appropriate time
+    if (isEndDate) {
+      indianDate.setHours(23, 59, 59, 999);
+    } else {
+      indianDate.setHours(0, 0, 0, 0);
+    }
+    
+    // Format as YYYY-MM-DD HH:mm:ss
+    return indianDate.toISOString().slice(0, 19).replace('T', ' ');
+  };
+
+  // Update the useEffect for data fetching
   useEffect(() => {
     const getData = async () => {
       try {
         setLoading(true);
-        const data = await fetchGrindingData();
+        console.log("=== FETCHING DULL SUMMARY DATA ===");
+        
+        const now = new Date();
+        let startDate: Date = new Date(now);
+        let endDate: Date = new Date(now);
+
+        switch (dateRange) {
+          case "day":
+            startDate = new Date(now);
+            break;
+          case "week":
+            startDate = new Date(now);
+            startDate.setDate(startDate.getDate() - 7);
+            break;
+          case "month":
+            startDate = new Date(now);
+            startDate.setDate(1);
+            break;
+          case "custom":
+            if (customStartDate && customEndDate) {
+              startDate = new Date(customStartDate);
+              endDate = new Date(customEndDate);
+            }
+            break;
+        }
+
+        // Format dates with Indian timezone
+        const formattedStartDate = formatIndianDateTime(startDate);
+        const formattedEndDate = formatIndianDateTime(endDate, true);
+
+        console.log("Date Range:", {
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
+          range: dateRange
+        });
+
+        const data = await fetchDullData(formattedStartDate, formattedEndDate);
+        
+        console.log("Received Data:", {
+          totalRecords: data.length,
+          sampleRecord: data[0],
+          dateRange: dateRange
+        });
+
         setDullData(data);
         filterDataByDateRange(data, dateRange);
       } catch (error) {
-          console.error("Error fetching dull data:", error);
+        console.error("Error fetching dull data:", error);
       } finally {
         setLoading(false);
       }
     };
 
     getData();
-  }, []);
+  }, [dateRange, customStartDate, customEndDate]);
 
   // Filter data when date range changes
   useEffect(() => {
-        filterDataByDateRange(dullData, dateRange);
+    filterDataByDateRange(dullData, dateRange);
   }, [dateRange, customStartDate, customEndDate, dullData]);
 
   // Function to filter data by date range
@@ -76,12 +136,31 @@ import "react-datepicker/dist/react-datepicker.css";
     }
   };
 
-  // Helper function to filter by date range
+  // Update the filterByDateRange function
   const filterByDateRange = (data: IDull[], start: Date, end: Date) => {
+    console.log("=== FILTERING DULL DATA ===");
+    console.log("Filter Range:", {
+      start: formatIndianDateTime(start),
+      end: formatIndianDateTime(end, true)
+    });
+
     const filtered = data.filter((item) => {
       const issuedDate = new Date(item.issuedDate);
-      return issuedDate >= start && issuedDate <= end;
+      // Convert to Indian timezone for comparison
+      const indianIssuedDate = new Date(issuedDate.getTime() + (5.5 * 60 * 60 * 1000));
+      
+      // Convert filter dates to Indian timezone
+      const indianStart = new Date(start.getTime() + (5.5 * 60 * 60 * 1000));
+      const indianEnd = new Date(end.getTime() + (5.5 * 60 * 60 * 1000));
+      
+      return indianIssuedDate >= indianStart && indianIssuedDate <= indianEnd;
     });
+
+    console.log("Filtering Results:", {
+      totalRecords: data.length,
+      filteredRecords: filtered.length
+    });
+
     setFilteredData(filtered);
   };
 
@@ -158,7 +237,7 @@ import "react-datepicker/dist/react-datepicker.css";
 
   const handleApplyCustomRange = () => {
     if (customStartDate && customEndDate) {
-      filterDataByDateRange(filingData, "custom");
+        filterDataByDateRange(dullData, "custom");
       setShowCustomDatePicker(false);
     }
   };
@@ -224,6 +303,11 @@ import "react-datepicker/dist/react-datepicker.css";
               endDate={customEndDate}
               placeholderText="Start Date"
               className="px-2 py-1 text-sm border rounded"
+              dateFormat="dd/MM/yyyy HH:mm"
+              showTimeSelect
+              timeFormat="HH:mm"
+              timeIntervals={15}
+              timeCaption="Time"
             />
             <span>to</span>
             <DatePicker
@@ -235,6 +319,11 @@ import "react-datepicker/dist/react-datepicker.css";
               minDate={customStartDate}
               placeholderText="End Date"
               className="px-2 py-1 text-sm border rounded"
+              dateFormat="dd/MM/yyyy HH:mm"
+              showTimeSelect
+              timeFormat="HH:mm"
+              timeIntervals={15}
+              timeCaption="Time"
             />
             <button
               onClick={handleApplyCustomRange}
@@ -250,7 +339,7 @@ import "react-datepicker/dist/react-datepicker.css";
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading ? (
           <div className="col-span-full text-center py-8 text-gray-500">
-            Loading casting data...
+            Loading Dull data...
           </div>
         ) : (
           summaryData.map((item, index) => (

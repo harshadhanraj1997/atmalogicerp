@@ -120,7 +120,26 @@ const getStatusClass = (status: string) => {
   }
 };
 
-    const DullTable = () => {
+const formatIndianDateTime = (date: string | null): string => {
+  if (!date) return '';
+  
+  // Convert to Indian timezone (UTC+5:30)
+  const utcDate = new Date(date);
+  const indianDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
+  
+  // Format as "DD/MM/YYYY HH:mm:ss"
+  return indianDate.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
+};
+
+const DullTable = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [editData, setEditData] = useState<IDeal | null>(null);
@@ -144,7 +163,20 @@ const getStatusClass = (status: string) => {
       try {
         setLoading(true);
         const data = await fetchDullData();
-        console.log("Fetched Deals:", data);
+        
+        // Add detailed logging
+        console.log("=== DULL TABLE DATA FROM SERVER ===");
+        console.log("Raw Response:", data);
+        console.log("Sample Record:", data[0]);
+        console.log("Date Fields:", {
+          issuedDate: data[0]?.issuedDate,
+          receivedDate: data[0]?.receivedDate,
+          formattedIssuedDate: formatIndianDateTime(data[0]?.issuedDate),
+          formattedReceivedDate: formatIndianDateTime(data[0]?.receivedDate)
+        });
+        console.log("Total Records:", data.length);
+        console.log("================================");
+
         setDeals(data);
       } catch (error) {
         console.error("Error loading deals:", error);
@@ -155,7 +187,6 @@ const getStatusClass = (status: string) => {
     };
 
     loadDeals();
-
   }, []);
   
 console.log("Deals State:", deals);
@@ -175,33 +206,44 @@ console.log("Deals State:", deals);
   useEffect(() => {
     let filtered = [...deals];
 
+    console.log("=== FILTERING DULL TABLE DATA ===");
+    console.log("Initial Records:", deals.length);
+    console.log("Filter Criteria:", {
+      searchQuery,
+      startDate,
+      endDate
+    });
+
     // Apply search filter
     if (searchQuery) {
       filtered = filtered.filter(deal => 
         deal.Name.toLowerCase().includes(searchQuery.toLowerCase())
       );
+      console.log("After Search Filter:", filtered.length);
     }
 
-    // Apply date filter
+    // Apply date filter with Indian timezone
     if (startDate) {
+      const startDateTime = new Date(startDate);
+      startDateTime.setHours(0, 0, 0, 0);
       filtered = filtered.filter(deal => 
-        new Date(deal.Issued_Date__c) >= new Date(startDate)
+        new Date(deal.Issued_Date__c).getTime() + (5.5 * 60 * 60 * 1000) >= startDateTime.getTime()
       );
+      console.log("After Start Date Filter:", filtered.length);
     }
 
     if (endDate) {
+      const endDateTime = new Date(endDate);
+      endDateTime.setHours(23, 59, 59, 999);
       filtered = filtered.filter(deal => 
-        new Date(deal.Issued_Date__c) <= new Date(endDate)
+        new Date(deal.Issued_Date__c).getTime() + (5.5 * 60 * 60 * 1000) <= endDateTime.getTime()
       );
+      console.log("After End Date Filter:", filtered.length);
     }
 
-    console.log('[DullTable] Filtered records:', {
-      total: deals.length,
-      filtered: filtered.length,
-      searchQuery,
-      startDate,
-      endDate
-    });
+    console.log("Final Filtered Records:", filtered.length);
+    console.log("Sample Filtered Record:", filtered[0]);
+    console.log("================================");
 
     setFilteredDeals(filtered);
   }, [deals, searchQuery, startDate, endDate]);
@@ -365,8 +407,8 @@ console.log("Deals State:", deals);
                               <TableCell>{deal.id}</TableCell>
                               <TableCell>{deal.issuedWeight}</TableCell>
                               <TableCell>{deal.receivedWeight}</TableCell>
-                              <TableCell>{deal.issuedDate}</TableCell>
-                              <TableCell>{deal.receivedDate}</TableCell>
+                              <TableCell>{formatIndianDateTime(deal.issuedDate)}</TableCell>
+                              <TableCell>{formatIndianDateTime(deal.receivedDate)}</TableCell>
                               <TableCell>
                                 <span 
                                   className={`bd-badge ${getStatusClass(deal.status)}`}
