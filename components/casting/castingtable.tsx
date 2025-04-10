@@ -32,6 +32,7 @@ import DeleteModal from "@/components/common/DeleteModal";
 import { PDFDocument } from 'pdf-lib';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 const downloadPDF = async (pdfUrl: string) => {
@@ -488,25 +489,48 @@ console.log("Deals State:", deals);
                                     </button>
                                   </Link>
 
-                                  <Link href={`/Departments/Casting/casting_received_details?castingId=${deal.id}`} passHref>
+                                  {/* Edit button - disabled when status is Finished */}
+                                  {deal.status?.toLowerCase() !== 'finished' ? (
+                                    <Link href={`/Departments/Casting/casting_received_details?castingId=${deal.id}`} passHref>
+                                      <button
+                                        type="button"
+                                        className="table__icon edit"
+                                        style={{
+                                          display: 'inline-block',
+                                          backgroundColor: 'green',
+                                          color: 'white',
+                                          borderRadius: '4px',
+                                          padding: '5px',
+                                          textDecoration: 'none',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <i className="fa-sharp fa-light fa-pen"></i>
+                                      </button>
+                                    </Link>
+                                  ) : (
                                     <button
                                       type="button"
                                       className="table__icon edit"
                                       style={{
                                         display: 'inline-block',
-                                        backgroundColor: 'green',
+                                        backgroundColor: 'gray',
                                         color: 'white',
                                         borderRadius: '4px',
                                         padding: '5px',
                                         textDecoration: 'none',
                                         border: 'none',
-                                        cursor: 'pointer',
+                                        cursor: 'not-allowed',
+                                        opacity: 0.6,
                                       }}
-                                      onClick={(e) => e.stopPropagation()}
+                                      disabled
+                                      title="Cannot edit finished items"
                                     >
                                       <i className="fa-sharp fa-light fa-pen"></i>
                                     </button>
-                                  </Link>
+                                  )}
 
                                   <button
                                     type="button"
@@ -538,26 +562,44 @@ console.log("Deals State:", deals);
                                     <i className="fa-solid fa-check"></i>
                                   </button>
 
-                                  <div className="relative">
-                                    <select
-                                      className="form-select text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                                      onChange={(e) => {
-                                        e.preventDefault();
-                                        const selectedPath = departments.find(dept => dept.value === e.target.value)?.path;
-                                        if (selectedPath) {
-                                          window.location.href = `${selectedPath}?castingId=${deal.id}`;
-                                        }
+                                  {/* Transfer select - always enabled */}
+                                  <Select
+                                    onValueChange={(value) => {
+                                      const dept = departments.find(d => d.value === value);
+                                      if (dept) {
+                                        window.location.href = `${dept.path}?castingId=${deal.id}`;
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger 
+                                      className="w-[130px] h-8"
+                                      style={{
+                                        backgroundColor: '#6366F1',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
                                       }}
-                                      value=""
                                     >
-                                      <option value="" disabled>Transfer to</option>
+                                      <SelectValue placeholder="Transfer to" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-white border border-gray-200">
                                       {departments.map((dept) => (
-                                        <option key={dept.value} value={dept.value}>
-                                          Transfer to {dept.label}
-                                        </option>
+                                        <SelectItem 
+                                          key={dept.value} 
+                                          value={dept.value}
+                                          className="cursor-pointer hover:bg-gray-100"
+                                          style={{
+                                            backgroundColor: 'white',
+                                            color: 'black',
+                                            padding: '8px 12px'
+                                          }}
+                                        >
+                                          {dept.label}
+                                        </SelectItem>
                                       ))}
-                                    </select>
-                                  </div>
+                                    </SelectContent>
+                                  </Select>
                                 </div>
                               </TableCell>
                             </TableRow>

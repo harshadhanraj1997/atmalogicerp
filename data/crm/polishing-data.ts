@@ -21,7 +21,7 @@ export const fetchPolishingData = async (): Promise<IPolishing[]> => {
             issuedDate: polishing.Issued_Date__c || '-',    // Updated to match server field
             receivedWeight: polishing.Received_Weight__c || 0, // Updated to match server field
             receivedDate: polishing.Received_Date__c || '-',  // Updated to match server field
-            status: polishing.Status__c || 'Open',           // Updated to match server field
+            status: polishing.status__c,           // Updated to match server field
             polishingLoss: polishing.Polishing_loss__c || 0 // Calculate loss
           };
         });

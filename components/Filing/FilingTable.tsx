@@ -435,25 +435,47 @@ console.log("Deals State:", deals);
                                     </button>
                                   </Link>
 
-                                  <Link href={`/Departments/Filing/filing_received_details?filingId=${deal.id}`} passHref>
+                                  {deal.status?.toLowerCase() !== 'finished' ? (
+                                    <Link href={`/Departments/Filing/filing_received_details?filingId=${deal.id}`} passHref>
+                                      <button
+                                        type="button"
+                                        className="table__icon edit"
+                                        style={{
+                                          display: 'inline-block',
+                                          backgroundColor: 'green',
+                                          color: 'white',
+                                          borderRadius: '4px',
+                                          padding: '5px',
+                                          textDecoration: 'none',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <i className="fa-sharp fa-light fa-pen"></i>
+                                      </button>
+                                    </Link>
+                                  ) : (
                                     <button
                                       type="button"
                                       className="table__icon edit"
                                       style={{
-                                        display: 'inline-block',      
-                                        backgroundColor: 'green',
+                                        display: 'inline-block',
+                                        backgroundColor: 'gray',
                                         color: 'white',
                                         borderRadius: '4px',
                                         padding: '5px',
                                         textDecoration: 'none',
                                         border: 'none',
-                                        cursor: 'pointer',
+                                        cursor: 'not-allowed',
+                                        opacity: 0.6,
                                       }}
-                                      onClick={(e) => e.stopPropagation()}
+                                      disabled
+                                      title="Cannot edit finished items"
                                     >
                                       <i className="fa-sharp fa-light fa-pen"></i>
                                     </button>
-                                  </Link>
+                                  )}
 
                                   <button
                                     type="button"
@@ -500,6 +522,7 @@ console.log("Deals State:", deals);
                                         color: 'white',
                                         border: 'none',
                                         borderRadius: '4px',
+                                        cursor: 'pointer',
                                       }}
                                     >
                                       <SelectValue placeholder="Transfer to" />

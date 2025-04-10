@@ -21,7 +21,7 @@ export const fetchGrindingData = async (): Promise<IFiling[]> => {
             issuedDate: grinding.Issued_Date__c || '-',    // Updated to match server field
             receivedWeight: grinding.Received_Weight__c || 0, // Updated to match server field
             receivedDate: grinding.Received_Date__c || '-',  // Updated to match server field
-            status: grinding.Status__c || 'Open',           // Updated to match server field
+            status: grinding.status__c,           // Updated to match server field
             grindingLoss: grinding.Grinding_loss__c || 0 // Calculate loss
           };
         });

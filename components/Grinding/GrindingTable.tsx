@@ -352,25 +352,47 @@ console.log("Deals State:", deals);
                                     </button>
                                   </Link>
 
-                                  <Link href={`/Departments/Grinding/grinding_received_details?grindingId=${deal.id}`} passHref>
+                                  {deal.status?.toLowerCase() !== 'finished' ? (
+                                    <Link href={`/Departments/Grinding/grinding_received_details?grindingId=${deal.id}`} passHref>
+                                      <button
+                                        type="button"
+                                        className="table__icon edit"
+                                        style={{
+                                          display: 'inline-block',
+                                          backgroundColor: 'green',
+                                          color: 'white',
+                                          borderRadius: '4px',
+                                          padding: '5px',
+                                          textDecoration: 'none',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <i className="fa-sharp fa-light fa-pen"></i>
+                                      </button>
+                                    </Link>
+                                  ) : (
                                     <button
                                       type="button"
                                       className="table__icon edit"
                                       style={{
-                                        display: 'inline-block',      
-                                        backgroundColor: 'green',
+                                        display: 'inline-block',
+                                        backgroundColor: 'gray',
                                         color: 'white',
                                         borderRadius: '4px',
                                         padding: '5px',
                                         textDecoration: 'none',
                                         border: 'none',
-                                        cursor: 'pointer',
+                                        cursor: 'not-allowed',
+                                        opacity: 0.6,
                                       }}
-                                      onClick={(e) => e.stopPropagation()}
+                                      disabled
+                                      title="Cannot edit finished items"
                                     >
                                       <i className="fa-sharp fa-light fa-pen"></i>
                                     </button>
-                                  </Link>
+                                  )}
 
                                   <button
                                     type="button"
@@ -406,7 +428,7 @@ console.log("Deals State:", deals);
                                     onValueChange={(value) => {
                                       const dept = departments.find(d => d.value === value);
                                       if (dept) {
-                                        window.location.href = `${dept.path}?filingId=${deal.id}`;
+                                        window.location.href = `${dept.path}?grindingId=${deal.id}`;
                                       }
                                     }}
                                   >
@@ -417,18 +439,21 @@ console.log("Deals State:", deals);
                                         color: 'white',
                                         border: 'none',
                                         borderRadius: '4px',
+                                        cursor: 'pointer',
                                       }}
                                     >
                                       <SelectValue placeholder="Transfer to" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="bg-white border border-gray-200">
                                       {departments.map((dept) => (
                                         <SelectItem 
                                           key={dept.value} 
                                           value={dept.value}
                                           className="cursor-pointer hover:bg-gray-100"
                                           style={{
-                                            backgroundColor: 'white'
+                                            backgroundColor: 'white',
+                                            color: 'black',
+                                            padding: '8px 12px'
                                           }}
                                         >
                                           {dept.label}
@@ -609,4 +634,4 @@ console.log("Deals State:", deals);
     </>
   );
 }
-export default GrindingTable;
+export default GrindingTable; 
