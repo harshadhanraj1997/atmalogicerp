@@ -5,8 +5,9 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import GrindingTable from "./GrindingTable";
 import GrindingSummary from "./GrindingSummary";
+import { Button } from "@/components/ui/button";
 
-      const GrindingMainArea = () => {
+const GrindingMainArea = () => {
   const router = useRouter();
 
   return (
@@ -20,10 +21,17 @@ import GrindingSummary from "./GrindingSummary";
                 <li className="breadcrumb-item">
                   <Link href="/">Home</Link>
                 </li>
-                <li className="breadcrumb-item active">Casting</li>
+                <li className="breadcrumb-item active">Grinding</li>
               </ol>
             </nav>
-          
+            <div className="breadcrumb__btn">
+              <Link 
+                href="/Departments/Grinding/"
+                className="btn btn-primary"
+              >
+                Grinding Back Order
+              </Link>
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-12 gap-x-6 maxXs:gap-x-0">

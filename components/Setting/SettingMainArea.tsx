@@ -5,8 +5,9 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import SettingTable from "./SettingTable";
 import SettingSummary from "./SettingSummary";
+import { Button } from "@/components/ui/button";
 
-      const SettingMainArea = () => {
+const SettingMainArea = () => {
   const router = useRouter();
 
   return (
@@ -23,7 +24,14 @@ import SettingSummary from "./SettingSummary";
                 <li className="breadcrumb-item active">Setting</li>
               </ol>
             </nav>
-            
+            <div className="breadcrumb__btn">
+              <Link 
+                href="/Departments/Setting/"
+                className="btn btn-primary"
+              >
+                Setting Back Order
+              </Link>
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-12 gap-x-6 maxXs:gap-x-0">

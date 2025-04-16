@@ -58,7 +58,10 @@ export default function PolishingReceivedDetails() {
     const now = new Date();
     return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
   });
-  const [totalReceivedWeight, setTotalReceivedWeight] = useState(0);
+  const [ornamentWeight, setOrnamentWeight] = useState<number>(0);
+  const [scrapReceivedWeight, setScrapReceivedWeight] = useState<number>(0);
+  const [dustReceivedWeight, setDustReceivedWeight] = useState<number>(0);
+  const [totalReceivedWeight, setTotalReceivedWeight] = useState<number>(0);
   const [polishingLoss, setPolishingLoss] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Partial<UpdateFormData>>({});
@@ -133,15 +136,36 @@ export default function PolishingReceivedDetails() {
     fetchPolishingDetails();
   }, [polishingId]);
 
+  useEffect(() => {
+    // Calculate total pouch weight
+    const totalPouchWeight = Object.values(pouchReceivedWeights).reduce((sum, w) => sum + (w || 0), 0);
+    setOrnamentWeight(totalPouchWeight);
+    
+    // Calculate total received weight
+    const totalWeight = totalPouchWeight + scrapReceivedWeight + dustReceivedWeight;
+    setTotalReceivedWeight(totalWeight);
+    
+    if (polishing) {
+      const issuedWeight = polishing.Issued_Weight__c;
+      const loss = issuedWeight - totalWeight;
+      setPolishingLoss(loss);
+    }
+  }, [pouchReceivedWeights, scrapReceivedWeight, dustReceivedWeight, polishing]);
+
   const handleWeightChange = (pouchId: string, weight: number) => {
     setPouchReceivedWeights(prev => {
       const newWeights = { ...prev, [pouchId]: weight };
-      const newTotal = Object.values(newWeights).reduce((sum, w) => sum + (w || 0), 0);
-      setTotalReceivedWeight(newTotal);
+      const totalPouchWeight = Object.values(newWeights).reduce((sum, w) => sum + (w || 0), 0);
       
-      if (polishing?.Issued_Weight__c) {
-        setPolishingLoss(polishing.Issued_Weight__c - newTotal);
-      }
+      // Set ornament weight as total pouch weight
+      setOrnamentWeight(totalPouchWeight);
+      
+      // Calculate total received weight
+      const newTotalReceived = totalPouchWeight + scrapReceivedWeight + dustReceivedWeight;
+      setTotalReceivedWeight(newTotalReceived);
+      
+      // Calculate polishing loss
+      setPolishingLoss(polishing?.Issued_Weight__c ? polishing.Issued_Weight__c - newTotalReceived : 0);
       
       return newWeights;
     });
@@ -159,22 +183,6 @@ export default function PolishingReceivedDetails() {
       const combinedDateTime = `${receivedDate}T${receivedTime}:00.000Z`;
       console.log('[PolishingReceived] Combined datetime:', combinedDateTime);
 
-      const requestData = {
-        receivedDate: combinedDateTime,
-        receivedWeight: totalReceivedWeight,
-        polishingLoss,
-        pouches: pouches.map(pouch => ({
-          pouchId: pouch.Id,
-          receivedWeight: pouchReceivedWeights[pouch.Id] || 0,
-          polishingLoss: pouch.Issued_Weight_Polishing__c - (pouchReceivedWeights[pouch.Id] || 0)
-        }))
-      };
-
-      console.log('[Polishing Update] Sending request:', {
-        url: `${process.env.NEXT_PUBLIC_API_URL}/api/polishing/update/${prefix}/${date}/${month}/${year}/${number}`,
-        data: requestData
-      });
-
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/polishing/update/${prefix}/${date}/${month}/${year}/${number}`,
         {
@@ -182,7 +190,18 @@ export default function PolishingReceivedDetails() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(requestData)
+          body: JSON.stringify({
+            receivedDate: combinedDateTime,
+            receivedWeight: parseFloat(totalReceivedWeight.toFixed(4)),
+            ornamentWeight: parseFloat(ornamentWeight.toFixed(4)),
+            scrapReceivedWeight: parseFloat(scrapReceivedWeight.toFixed(4)),
+            dustReceivedWeight: parseFloat(dustReceivedWeight.toFixed(4)),
+            polishingLoss: parseFloat(polishingLoss.toFixed(4)),
+            pouches: Object.entries(pouchReceivedWeights).map(([pouchId, weight]) => ({
+              pouchId,
+              receivedWeight: parseFloat(weight.toFixed(4))
+            }))
+          })
         }
       );
 
@@ -307,14 +326,69 @@ export default function PolishingReceivedDetails() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label>Total Received Weight</Label>
-                  <div className="mt-1 font-semibold">{totalReceivedWeight.toFixed(4)}g</div>
+                  <Label>Ornament Weight (g)</Label>
+                  <Input
+                    type="number"
+                    value={ornamentWeight.toFixed(4)}
+                    className="w-full h-9 bg-gray-50"
+                    disabled={true}
+                  />
                 </div>
+
                 <div>
-                  <Label>Polishing Loss</Label>
-                  <div className="mt-1 font-semibold">{polishingLoss.toFixed(4)}g</div>
+                  <Label>Scrap Weight (g)</Label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={scrapReceivedWeight || ''}
+                    onChange={(e) => setScrapReceivedWeight(parseFloat(e.target.value) || 0)}
+                    className={`w-full h-9 ${formErrors.scrapReceivedWeight ? 'border-red-500' : ''}`}
+                    required
+                    placeholder="Enter scrap weight"
+                    disabled={isSubmitting}
+                  />
+                  {formErrors.scrapReceivedWeight && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.scrapReceivedWeight}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label>Dust Weight (g)</Label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={dustReceivedWeight || ''}
+                    onChange={(e) => setDustReceivedWeight(parseFloat(e.target.value) || 0)}
+                    className={`w-full h-9 ${formErrors.dustReceivedWeight ? 'border-red-500' : ''}`}
+                    required
+                    placeholder="Enter dust weight"
+                    disabled={isSubmitting}
+                  />
+                  {formErrors.dustReceivedWeight && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.dustReceivedWeight}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label>Total Received Weight (g)</Label>
+                  <Input
+                    type="number"
+                    value={totalReceivedWeight.toFixed(4)}
+                    className="w-full h-9 bg-gray-50"
+                    disabled={true}
+                  />
+                </div>
+
+                <div>
+                  <Label>Polishing Loss (g)</Label>
+                  <Input
+                    type="number"
+                    value={polishingLoss.toFixed(4)}
+                    className="w-full h-9 bg-gray-50"
+                    disabled={true}
+                  />
                 </div>
               </div>
 

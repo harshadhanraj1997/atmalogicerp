@@ -46,7 +46,7 @@ const updateFormSchema = z.object({
 
 type UpdateFormData = z.infer<typeof updateFormSchema>;
 
-    const DullDetailsPage = () => {
+const DullDetailsPage = () => {
   const [data, setData] = useState<SettingData | null>(null);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
@@ -57,31 +57,50 @@ type UpdateFormData = z.infer<typeof updateFormSchema>;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Partial<UpdateFormData>>({});
   const [pouchReceivedWeights, setPouchReceivedWeights] = useState<{ [key: string]: number }>({});
+  const [ornamentWeight, setOrnamentWeight] = useState<number>(0);
+  const [scrapReceivedWeight, setScrapReceivedWeight] = useState<number>(0);
+  const [dustReceivedWeight, setDustReceivedWeight] = useState<number>(0);
+  const [dullLoss, setDullLoss] = useState<number>(0);
   const [totalReceivedWeight, setTotalReceivedWeight] = useState<number>(0);
 
-  // Add pouch weight change handler
+  // Update pouch weight handler
   const handlePouchWeightChange = (pouchId: string, weight: number) => {
-    setPouchReceivedWeights(prev => ({
-      ...prev,
-      [pouchId]: weight
-    }));
+    setPouchReceivedWeights(prev => {
+      const newWeights = { ...prev, [pouchId]: weight };
+      const totalPouchWeight = Object.values(newWeights).reduce((sum, w) => sum + (w || 0), 0);
+      
+      // Set ornament weight as total pouch weight
+      setOrnamentWeight(totalPouchWeight);
+      
+      // Calculate total received weight
+      const newTotalReceived = totalPouchWeight + scrapReceivedWeight + dustReceivedWeight;
+      setTotalReceivedWeight(newTotalReceived);
+      setReceivedWeight(newTotalReceived);
+      
+      // Calculate dull loss
+      setDullLoss(data?.dull.Issued_Weight__c ? data.dull.Issued_Weight__c - newTotalReceived : 0);
+      
+      return newWeights;
+    });
   };
 
-  // Calculate total received weight when pouch weights change
+  // Add useEffect for total calculations
   useEffect(() => {
-    const total = Object.values(pouchReceivedWeights).reduce((sum, weight) => sum + weight, 0);
-    setTotalReceivedWeight(total);
-    setReceivedWeight(total);
-  }, [pouchReceivedWeights]);
-
-  // Calculate setting loss when received weight changes
-  useEffect(() => {
-    if (data && receivedWeight > 0) {
+    // Calculate total pouch weight
+    const totalPouchWeight = Object.values(pouchReceivedWeights).reduce((sum, w) => sum + (w || 0), 0);
+    setOrnamentWeight(totalPouchWeight);
+    
+    // Calculate total received weight
+    const totalWeight = totalPouchWeight + scrapReceivedWeight + dustReceivedWeight;
+    setTotalReceivedWeight(totalWeight);
+    setReceivedWeight(totalWeight);
+    
+    if (data) {
       const issuedWeight = data.dull.Issued_Weight__c;
-      const loss = Number((issuedWeight - receivedWeight).toFixed(4));
-      setSettingLoss(loss);
+      const loss = issuedWeight - totalWeight;
+      setDullLoss(loss);
     }
-  }, [receivedWeight, data]);
+  }, [pouchReceivedWeights, scrapReceivedWeight, dustReceivedWeight, data]);
 
   // Update fetch details to include pouches
   useEffect(() => {
@@ -160,33 +179,13 @@ type UpdateFormData = z.infer<typeof updateFormSchema>;
     
     try {
       setIsSubmitting(true);
-
-      if (!data || !data.dull || !dullId) {
-        console.error('[Dull Details] Missing data for submission:', { data, dullId });
-        throw new Error('Missing required data for submission');
-      }
-
-      // Use the dullId from URL params instead of data.dull.Name
-      const [prefix, date, month, year, number] = dullId.split('/');
       
-      console.log('[Dull Details] Submitting update:', {
-        dullId,
-        receivedDate,
-        totalReceivedWeight,
-        dullLoss: settingLoss,
-        pouchCount: data.pouches.length
-      });
+      if (!data) return;
 
-      const pouchData = data.pouches.map(pouch => ({
-        pouchId: pouch.Id,
-        receivedWeight: pouchReceivedWeights[pouch.Id] || 0,
-        dullLoss: pouch.Issued_Weight_Dull__c - (pouchReceivedWeights[pouch.Id] || 0)
-      }));
-
-      console.log('[Dull Details] Pouch data:', pouchData);
+      const [prefix, date, month, year, number] = dullId!.split('/');
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/dull/update/${prefix}/${date}/${month}/${year}/${number}`,
+        `${apiBaseUrl}/api/dull/update/${prefix}/${date}/${month}/${year}/${number}`,
         {
           method: 'POST',
           headers: {
@@ -194,15 +193,20 @@ type UpdateFormData = z.infer<typeof updateFormSchema>;
           },
           body: JSON.stringify({
             receivedDate,
-            receivedWeight: totalReceivedWeight,
-            dullLoss: settingLoss,
-            pouches: pouchData
+            receivedWeight: parseFloat(totalReceivedWeight.toFixed(4)),
+            ornamentWeight: parseFloat(ornamentWeight.toFixed(4)),
+            scrapReceivedWeight: parseFloat(scrapReceivedWeight.toFixed(4)),
+            dustReceivedWeight: parseFloat(dustReceivedWeight.toFixed(4)),
+            dullLoss: parseFloat(dullLoss.toFixed(4)),
+            pouches: Object.entries(pouchReceivedWeights).map(([pouchId, weight]) => ({
+              pouchId,
+              receivedWeight: parseFloat(weight.toFixed(4))
+            }))
           })
         }
       );
 
       const result = await response.json();
-      console.log('[Dull Details] Update response:', result);
 
       if (result.success) {
         toast.success('Dull details updated successfully');
@@ -211,7 +215,7 @@ type UpdateFormData = z.infer<typeof updateFormSchema>;
         throw new Error(result.message || 'Failed to update dull details');
       }
     } catch (error) {
-      console.error('[Dull Details] Update error:', error);
+      console.error('[DullReceived] Error:', error);
       toast.error(error.message || 'Failed to update dull details');
     } finally {
       setIsSubmitting(false);
@@ -234,7 +238,8 @@ type UpdateFormData = z.infer<typeof updateFormSchema>;
         <div className="p-6">
           <h2 className="text-xl font-semibold mb-4">Dull Details</h2>
           
-          <div className="grid grid-cols-2 gap-4">
+          {/* Dull Info Grid */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
               <Label>Dull Number</Label>
               <div className="mt-1">{dull?.Name || 'N/A'}</div>
@@ -268,6 +273,7 @@ type UpdateFormData = z.infer<typeof updateFormSchema>;
                 />
               </div>
 
+              {/* Pouch Details Section */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Pouch Details</h3>
                 {pouches?.map((pouch) => (
@@ -297,21 +303,74 @@ type UpdateFormData = z.infer<typeof updateFormSchema>;
                 ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Total Received Weight</Label>
-                  <div className="mt-1 font-semibold">{totalReceivedWeight.toFixed(4)}g</div>
-                </div>
-                <div>
-                  <Label>Dull Loss</Label>
-                  <div className="mt-1 font-semibold">{settingLoss.toFixed(4)}g</div>
+              {/* Weight Details Section */}
+              <div className="mt-8">
+                <h3 className="text-lg font-semibold mb-4">Weight Details</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Ornament Weight (g)</Label>
+                    <Input
+                      type="number"
+                      value={ornamentWeight.toFixed(4)}
+                      className="w-full h-9 bg-gray-50"
+                      disabled={true}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Scrap Weight (g)</Label>
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={scrapReceivedWeight || ''}
+                      onChange={(e) => setScrapReceivedWeight(parseFloat(e.target.value) || 0)}
+                      className="mt-1"
+                      required
+                      placeholder="Enter scrap weight"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Dust Weight (g)</Label>
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={dustReceivedWeight || ''}
+                      onChange={(e) => setDustReceivedWeight(parseFloat(e.target.value) || 0)}
+                      className="mt-1"
+                      required
+                      placeholder="Enter dust weight"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Total Received Weight (g)</Label>
+                    <Input
+                      type="number"
+                      value={totalReceivedWeight.toFixed(4)}
+                      className="w-full h-9 bg-gray-50"
+                      disabled={true}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Dull Loss (g)</Label>
+                    <Input
+                      type="number"
+                      value={dullLoss.toFixed(4)}
+                      className="w-full h-9 bg-gray-50"
+                      disabled={true}
+                    />
+                  </div>
                 </div>
               </div>
 
               <Button
                 type="submit"
                 disabled={isSubmitting || totalReceivedWeight === 0}
-                className="w-full"
+                className="w-full mt-6"
               >
                 {isSubmitting ? 'Updating...' : 'Update Dull Details'}
               </Button>

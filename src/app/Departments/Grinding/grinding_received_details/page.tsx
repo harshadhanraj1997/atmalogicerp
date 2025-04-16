@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -31,12 +31,10 @@ interface Pouch {
 const updateFormSchema = z.object({
   receivedDate: z.string().min(1, "Received date is required"),
   receivedWeight: z.number().positive("Weight must be greater than 0"),
-  grindingLoss: z.number(),
-  pouches: z.array(z.object({
-    pouchId: z.string(),
-    receivedWeight: z.number(),
-    grindingLoss: z.number()
-  }))
+  ornamentWeight: z.number().positive("Ornament weight must be greater than 0"),
+  scrapReceivedWeight: z.number().min(0, "Weight cannot be negative"),
+  dustReceivedWeight: z.number().min(0, "Weight cannot be negative"),
+  grindingLoss: z.number()
 });
 
 type UpdateFormData = z.infer<typeof updateFormSchema>;
@@ -55,28 +53,43 @@ const GrindingDetailsPage = () => {
     return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
   });
   const [receivedWeight, setReceivedWeight] = useState<number>(0);
+  const [ornamentWeight, setOrnamentWeight] = useState<number>(0);
+  const [scrapReceivedWeight, setScrapReceivedWeight] = useState<number>(0);
+  const [dustReceivedWeight, setDustReceivedWeight] = useState<number>(0);
   const [grindingLoss, setGrindingLoss] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Partial<UpdateFormData>>({});
   const [pouchReceivedWeights, setPouchReceivedWeights] = useState<{ [key: string]: number }>({});
   const [totalReceivedWeight, setTotalReceivedWeight] = useState<number>(0);
+  const router = useRouter();
 
-  // Add pouch weight change handler
+  // Update pouch weight handler
   const handlePouchWeightChange = (pouchId: string, weight: number) => {
-    setPouchReceivedWeights(prev => ({
-      ...prev,
-      [pouchId]: weight
-    }));
+    setPouchReceivedWeights(prev => {
+      const newWeights = { ...prev, [pouchId]: weight };
+      const newTotal = Object.values(newWeights).reduce((sum, w) => sum + (w || 0), 0);
+      setOrnamentWeight(newTotal); // Update ornament weight instead of total weight
+      const newTotalReceived = newTotal + scrapReceivedWeight + dustReceivedWeight;
+      setTotalReceivedWeight(newTotalReceived);
+      setReceivedWeight(newTotalReceived);
+      setGrindingLoss(data?.grinding.Issued_Weight__c ? data.grinding.Issued_Weight__c - newTotalReceived : 0);
+      return newWeights;
+    });
   };
 
-  // Calculate total received weight when pouch weights change
+  // Update total weight calculation
   useEffect(() => {
-    const total = Object.values(pouchReceivedWeights).reduce((sum, weight) => sum + weight, 0);
-    setTotalReceivedWeight(total);
-    setReceivedWeight(total); // Update the main received weight
-  }, [pouchReceivedWeights]);
+    const totalWeight = ornamentWeight + scrapReceivedWeight + dustReceivedWeight;
+    setTotalReceivedWeight(totalWeight);
+    setReceivedWeight(totalWeight);
+    if (data) {
+      const issuedWeight = data.grinding.Issued_Weight__c;
+      const loss = issuedWeight - totalWeight;
+      setGrindingLoss(loss);
+    }
+  }, [ornamentWeight, scrapReceivedWeight, dustReceivedWeight, data]);
 
-  // Update fetch details to include pouches
+  // Update fetch details to handle different ID formats
   useEffect(() => {
     const fetchDetails = async () => {
       if (!grindingId) {
@@ -86,7 +99,15 @@ const GrindingDetailsPage = () => {
       }
 
       try {
-        const [prefix, date, month, year, number] = grindingId.split('/');
+        const parts = grindingId.split('/');
+        let prefix, date, month, year, number;
+        
+        if (parts[0].length > 1) {
+          [prefix, date, month, year, number] = parts;
+        } else {
+          [prefix, date, month, year, number] = parts;
+        }
+
         const response = await fetch(
           `${apiBaseUrl}/api/grinding/${prefix}/${date}/${month}/${year}/${number}`
         );
@@ -95,6 +116,13 @@ const GrindingDetailsPage = () => {
         if (result.success && result.data) {
           const { grinding, pouches } = result.data;
           
+          // Initialize pouch weights with existing data
+          const initialPouchWeights: { [key: string]: number } = {};
+          pouches.forEach((pouch: Pouch) => {
+            initialPouchWeights[pouch.Id] = pouch.Received_Weight__c || 0;
+          });
+          setPouchReceivedWeights(initialPouchWeights);
+
           setData({
             grinding: {
               Id: grinding.Id || '',
@@ -103,8 +131,9 @@ const GrindingDetailsPage = () => {
               Issued_Weight__c: Number(grinding.Issued_Weight__c) || 0,
               Received_Date__c: grinding.Received_Date__c || '',
               Received_Weight__c: Number(grinding.Received_Weight__c) || 0,
-              Status__c: grinding.Status__c || 'Open',
-              Grinding_loss__c: Number(grinding.Grinding_loss__c) || 0
+              Status__c: grinding.Status__c || 'Pending',
+              Grinding_loss__c: Number(grinding.Grinding_loss__c) || 0,
+              Source_Department__c: grinding.Source_Department__c || '' // Add source department
             },
             pouches: pouches.map((pouch: Pouch) => ({
               Id: pouch.Id || '',
@@ -112,27 +141,26 @@ const GrindingDetailsPage = () => {
               Order_Id__c: pouch.Order_Id__c || '',
               Grinding__c: pouch.Grinding__c || '',
               Issued_Weight__c: Number(pouch.Isssued_Weight_Grinding__c) || 0,
-              Received_Weight__c: 0
+              Received_Weight__c: Number(pouch.Received_Weight__c) || 0,
+              Source_Department__c: pouch.Source_Department__c || '' // Add source department
             }))
           });
 
+          // Set initial values if they exist
           if (grinding.Received_Weight__c) {
             setReceivedWeight(Number(grinding.Received_Weight__c));
           }
-
           if (grinding.Received_Date__c) {
             setReceivedDate(grinding.Received_Date__c);
           }
-
           if (grinding.Grinding_loss__c) {
             setGrindingLoss(Number(grinding.Grinding_loss__c));
           }
-
         } else {
           toast.error(result.message || 'Grinding record not found');
         }
       } catch (error) {
-        console.error('Error fetching details:', error);
+        console.error('Error:', error);
         toast.error('Error fetching grinding details');
       } finally {
         setLoading(false);
@@ -141,14 +169,6 @@ const GrindingDetailsPage = () => {
 
     fetchDetails();
   }, [grindingId]);
-
-  useEffect(() => {
-    if (data && receivedWeight > 0) {
-      const issuedWeight = data.grinding.Issued_Weight__c;
-      const loss = Number((issuedWeight - receivedWeight).toFixed(4));
-      setGrindingLoss(loss);
-    }
-  }, [receivedWeight, data]);
 
   // Validate form data
   const validateForm = (data: UpdateFormData) => {
@@ -176,35 +196,48 @@ const GrindingDetailsPage = () => {
     try {
       setIsSubmitting(true);
       
-      if (!data) return;
+      if (!data) {
+        console.log('[GrindingReceived] No data available');
+        return;
+      }
 
-      // Combine date and time for received datetime
-      const combinedReceivedDateTime = `${receivedDate}T${receivedTime}:00.000Z`;
+      // Calculate total received weight from pouches
+      const totalReceivedWeight = Object.values(pouchReceivedWeights)
+        .reduce((sum, weight) => sum + (weight || 0), 0);
 
-      console.log('[GrindingReceived] Submitting with values:', {
-        receivedDate,
-        receivedTime,
-        combinedDateTime: combinedReceivedDateTime,
-        receivedWeight,
-        grindingLoss,
-        pouches: Object.entries(pouchReceivedWeights).map(([id, weight]) => ({
-          pouchId: id,
-          weight
-        }))
-      });
+      // Add scrap and dust weights
+      const totalWeight = totalReceivedWeight + 
+        (scrapReceivedWeight || 0) + 
+        (dustReceivedWeight || 0);
+
+      // Get current date and time in ISO format
+      const currentDateTime = new Date().toISOString();
+
+      const parts = data.grinding.Name.split('/');
+      const [prefix, date, month, year, number] = parts;
+
+      // Prepare pouch data with weights
+      const pouchData = data.pouches.map(pouch => ({
+        pouchId: pouch.Id,
+        issuedWeight: pouch.Issued_Weight__c,
+        receivedWeight: pouchReceivedWeights[pouch.Id] || 0,
+        receivedDate: currentDateTime
+      }));
 
       const formData = {
-        receivedDate: combinedReceivedDateTime,
-        receivedWeight: parseFloat(receivedWeight.toString() || '0'),
-        grindingLoss: parseFloat(grindingLoss.toString() || '0'),
-        pouches: Object.entries(pouchReceivedWeights).map(([pouchId, weight]) => ({
-          pouchId,
-          receivedWeight: weight
-        }))
+        grindingId: data.grinding.Id,
+        sourceDepartment: data.grinding.Source_Department__c,
+        issuedWeight: data.grinding.Issued_Weight__c,
+        receivedWeight: totalWeight,
+        receivedDate: currentDateTime,
+        scrapWeight: scrapReceivedWeight || 0,
+        dustWeight: dustReceivedWeight || 0,
+        status: 'Completed',
+        grindingLoss: data.grinding.Issued_Weight__c - totalWeight,
+        pouches: pouchData
       };
 
-      // Extract grinding number parts
-      const [prefix, date, month, year, number] = data.grinding.Name.split('/');
+      console.log('Submitting data:', formData);
 
       const response = await fetch(
         `${apiBaseUrl}/api/grinding/update/${prefix}/${date}/${month}/${year}/${number}`,
@@ -221,7 +254,7 @@ const GrindingDetailsPage = () => {
 
       if (result.success) {
         toast.success('Grinding details updated successfully');
-        window.location.reload();
+        router.push('/Departments/Grinding');
       } else {
         throw new Error(result.message || 'Failed to update grinding details');
       }
@@ -257,6 +290,10 @@ const GrindingDetailsPage = () => {
           <div className="p-6">
             <h2 className="text-xl font-semibold mb-4">Grinding Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div>
+                <label className="text-sm text-gray-600">Source Department</label>
+                <p className="font-medium">{data?.grinding.Source_Department__c}</p>
+              </div>
               <div>
                 <label className="text-sm text-gray-600">Grinding Number</label>
                 <p className="font-medium">{data.grinding.Name}</p>
@@ -315,7 +352,7 @@ const GrindingDetailsPage = () => {
                           onChange={(e) => handlePouchWeightChange(pouch.Id, parseFloat(e.target.value) || 0)}
                           className="w-32 h-8"
                           placeholder="Enter weight"
-                          disabled={isSubmitting}
+                          disabled={data.grinding.Status__c === 'Completed'}
                         />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-red-600">
@@ -359,13 +396,9 @@ const GrindingDetailsPage = () => {
                     type="date"
                     value={receivedDate}
                     onChange={(e) => setReceivedDate(e.target.value)}
-                    className={`w-full h-9 ${formErrors.receivedDate ? 'border-red-500' : ''}`}
-                    required
-                    disabled={isSubmitting}
+                    className="w-full h-9"
+                    disabled={data?.grinding.Status__c === 'Completed'}
                   />
-                  {formErrors.receivedDate && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.receivedDate}</p>
-                  )}
                 </div>
                 <div>
                   <label className="text-sm text-gray-600 block mb-1.5">
@@ -386,16 +419,47 @@ const GrindingDetailsPage = () => {
                   </label>
                   <Input
                     type="number"
-                    step="0.0001"
-                    value={receivedWeight || ''}
-                    onChange={(e) => setReceivedWeight(parseFloat(e.target.value) || 0)}
-                    className={`w-full h-9 ${formErrors.receivedWeight ? 'border-red-500' : ''}`}
-                    required
-                    disabled={isSubmitting}
+                    value={receivedWeight.toFixed(4)}
+                    className="w-full h-9 bg-gray-50"
+                    disabled={true}
                   />
-                  {formErrors.receivedWeight && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.receivedWeight}</p>
-                  )}
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1.5">
+                    Ornament Weight (g)
+                  </label>
+                  <Input
+                    type="number"
+                    value={ornamentWeight.toFixed(4)}
+                    className="w-full h-9 bg-gray-50"
+                    disabled={true}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1.5">
+                    Scrap Weight (g)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={scrapReceivedWeight || ''}
+                    onChange={(e) => setScrapReceivedWeight(parseFloat(e.target.value) || 0)}
+                    className="w-full h-9"
+                    disabled={data?.grinding.Status__c === 'Completed'}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1.5">
+                    Dust Weight (g)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={dustReceivedWeight || ''}
+                    onChange={(e) => setDustReceivedWeight(parseFloat(e.target.value) || 0)}
+                    className="w-full h-9"
+                    disabled={data?.grinding.Status__c === 'Completed'}
+                  />
                 </div>
                 <div>
                   <label className="text-sm text-gray-600 block mb-1.5">
@@ -420,6 +484,48 @@ const GrindingDetailsPage = () => {
               </div>
             </form>
           </div>
+        </div>
+
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-4">Summary</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-lg">
+            <div>
+              <label className="text-sm text-gray-600">Total Issued Weight</label>
+              <p className="font-medium">{data?.grinding.Issued_Weight__c.toFixed(4)}g</p>
+            </div>
+            <div>
+              <label className="text-sm text-gray-600">Total Received Weight</label>
+              <p className="font-medium">
+                {(Object.values(pouchReceivedWeights).reduce((sum, weight) => sum + (weight || 0), 0) + 
+                  (scrapReceivedWeight || 0) + 
+                  (dustReceivedWeight || 0)).toFixed(4)}g
+              </p>
+            </div>
+            <div>
+              <label className="text-sm text-gray-600">Total Loss</label>
+              <p className="font-medium text-red-600">
+                {(data?.grinding.Issued_Weight__c - 
+                  (Object.values(pouchReceivedWeights).reduce((sum, weight) => sum + (weight || 0), 0) + 
+                  (scrapReceivedWeight || 0) + 
+                  (dustReceivedWeight || 0))).toFixed(4)}g
+              </p>
+            </div>
+            <div>
+              <label className="text-sm text-gray-600">Received Date</label>
+              <p className="font-medium">{new Date().toLocaleDateString()}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end">
+          <Button
+            type="submit"
+            onClick={handleSubmit}
+            disabled={isSubmitting || data?.grinding.Status__c === 'Completed'}
+            className="px-6"
+          >
+            {isSubmitting ? 'Updating...' : 'Update Grinding Details'}
+          </Button>
         </div>
       </div>
     </div>

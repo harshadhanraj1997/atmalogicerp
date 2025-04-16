@@ -23,8 +23,8 @@ interface Setting {
 interface Pouch {
   Id: string;
   Name: string;
-  Isssued_Weight_Setting__c: number;
-  Received_Weight_Setting__c: number;
+  Issued_weight_setting__c: number;
+  Received_Weight_Setting__c?: number;
 }
 
 interface SettingData {
@@ -65,68 +65,99 @@ const SettingDetailsPage = () => {
   const [pouchStoneWeights, setPouchStoneWeights] = useState<{ [key: string]: number }>({});
   const [totalStoneWeight, setTotalStoneWeight] = useState<number>(0);
   const [stoneWeightAdded, setStoneWeightAdded] = useState<number>(0);
+  const [ornamentWeight, setOrnamentWeight] = useState<number>(0);
+  const [scrapReceivedWeight, setScrapReceivedWeight] = useState<number>(0);
+  const [dustReceivedWeight, setDustReceivedWeight] = useState<number>(0);
   const [receivedTime, setReceivedTime] = useState<string>(() => {
     const now = new Date();
     return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
   });
 
-  // Add pouch weight change handler
+  // Update the form validation schema
+  const updateFormSchema = z.object({
+    receivedDate: z.string().min(1, "Received date is required"),
+    receivedWeight: z.number().positive("Weight must be greater than 0"),
+    ornamentWeight: z.number().positive("Ornament weight must be greater than 0"),
+    scrapReceivedWeight: z.number().min(0, "Weight cannot be negative"),
+    dustReceivedWeight: z.number().min(0, "Weight cannot be negative"),
+    settingLoss: z.number()
+  });
+
+  // Update pouch weight handler
   const handlePouchWeightChange = (pouchId: string, weight: number) => {
-    setPouchReceivedWeights(prev => ({
-      ...prev,
-      [pouchId]: weight
-    }));
+    setPouchReceivedWeights(prev => {
+      const newWeights = { ...prev, [pouchId]: weight };
+      // Calculate total pouch weights
+      const totalPouchWeight = Object.values(newWeights).reduce((sum, w) => sum + (w || 0), 0);
+      // Calculate total stone weights
+      const totalStoneWeight = Object.values(pouchStoneWeights).reduce((sum, w) => sum + (w || 0), 0);
+      
+      // Set ornament weight as pouch weights + stone weights
+      setOrnamentWeight(totalPouchWeight + totalStoneWeight);
+      
+      // Calculate total received weight including scrap and dust
+      const newTotalReceived = totalPouchWeight + totalStoneWeight + scrapReceivedWeight + dustReceivedWeight;
+      setTotalReceivedWeight(newTotalReceived);
+      setReceivedWeight(newTotalReceived);
+      
+      // Calculate setting loss
+      setSettingLoss(data?.setting.Issued_Weight__c ? data.setting.Issued_Weight__c - newTotalReceived : 0);
+      
+      return newWeights;
+    });
   };
 
-  // Calculate total received weight when pouch weights change
-  useEffect(() => {
-    const total = Object.values(pouchReceivedWeights).reduce((sum, weight) => sum + weight, 0);
-    setTotalReceivedWeight(total);
-    setReceivedWeight(total);
-  }, [pouchReceivedWeights]);
-
-  // Calculate setting loss when received weight changes
-  useEffect(() => {
-    if (data && receivedWeight > 0) {
-      const issuedWeight = data.setting.Issued_Weight__c;
-      const loss = Number((issuedWeight - receivedWeight).toFixed(4));
-      setSettingLoss(loss);
-    }
-  }, [receivedWeight, data]);
-
-  // Update useEffect to separate received weight and setting loss calculations
-  useEffect(() => {
-    // Calculate total received weight (including stones)
-    const totalReceived = Object.keys(pouchReceivedWeights).reduce((sum, pouchId) => {
-      const receivedWeight = pouchReceivedWeights[pouchId] || 0;
-      const stoneWeight = pouchStoneWeights[pouchId] || 0;
-      return sum + receivedWeight + stoneWeight;
-    }, 0);
-    
-    setTotalReceivedWeight(totalReceived);
-    
-    // Calculate setting loss (Issued - Received without stones)
-    if (data) {
-      const issuedWeight = data.setting.Issued_Weight__c;
-      const totalReceivedWithoutStones = Object.values(pouchReceivedWeights).reduce((sum, weight) => sum + (weight || 0), 0);
-      const loss = Number((issuedWeight - totalReceivedWithoutStones).toFixed(4));
-      setSettingLoss(loss);
-    }
-  }, [pouchReceivedWeights, pouchStoneWeights, data]);
-
-  // Update useEffect to calculate total stone weight from pouches
-  useEffect(() => {
-    const total = Object.values(pouchStoneWeights).reduce((sum, weight) => sum + (weight || 0), 0);
-    setTotalStoneWeight(total);
-  }, [pouchStoneWeights]);
-
-  // Update handlePouchStoneWeightChange
+  // Update stone weight handler
   const handlePouchStoneWeightChange = (pouchId: string, weight: number) => {
-    setPouchStoneWeights(prev => ({
-      ...prev,
-      [pouchId]: weight
-    }));
+    setPouchStoneWeights(prev => {
+      const newStoneWeights = { ...prev, [pouchId]: weight };
+      // Calculate total stone weights
+      const newTotalStoneWeight = Object.values(newStoneWeights).reduce((sum, w) => sum + (w || 0), 0);
+      setTotalStoneWeight(newTotalStoneWeight); // Set total stone weight
+      
+      // Calculate total pouch weights
+      const totalPouchWeight = Object.values(pouchReceivedWeights).reduce((sum, w) => sum + (w || 0), 0);
+      
+      // Set ornament weight as pouch weights + stone weights
+      setOrnamentWeight(totalPouchWeight + newTotalStoneWeight);
+      
+      // Calculate total received weight including scrap and dust
+      const newTotalReceived = totalPouchWeight + newTotalStoneWeight + scrapReceivedWeight + dustReceivedWeight;
+      setTotalReceivedWeight(newTotalReceived);
+      setReceivedWeight(newTotalReceived);
+      
+      // Calculate setting loss
+      setSettingLoss(data?.setting.Issued_Weight__c ? data.setting.Issued_Weight__c - newTotalReceived : 0);
+      
+      return newStoneWeights;
+    });
   };
+
+  // Update useEffect for total calculations
+  useEffect(() => {
+    // Calculate total pouch weights (excluding stone weights)
+    const totalPouchWeight = Object.values(pouchReceivedWeights).reduce((sum, w) => sum + (w || 0), 0);
+    
+    // Calculate total stone weights (kept for display only)
+    const newTotalStoneWeight = Object.values(pouchStoneWeights).reduce((sum, w) => sum + (w || 0), 0);
+    setTotalStoneWeight(newTotalStoneWeight);
+    
+    // Set ornament weight as pouch weights + stone weights
+    const newOrnamentWeight = totalPouchWeight + newTotalStoneWeight;
+    setOrnamentWeight(newOrnamentWeight);
+    
+    // Calculate total received weight including scrap and dust
+    const totalWeight = totalPouchWeight + scrapReceivedWeight + dustReceivedWeight;
+    setTotalReceivedWeight(totalWeight);
+    setReceivedWeight(totalWeight);
+    
+    if (data) {
+      // Calculate setting loss using only pouch weights (excluding stone weights)
+      const issuedWeight = data.setting.Issued_Weight__c;
+      const loss = issuedWeight - totalWeight;
+      setSettingLoss(loss);
+    }
+  }, [pouchReceivedWeights, pouchStoneWeights, scrapReceivedWeight, dustReceivedWeight, data]);
 
   // Remove manual stone weight distribution logic
   const handleManualStoneWeightChange = (weight: number) => {
@@ -145,7 +176,6 @@ const SettingDetailsPage = () => {
       }
 
       try {
-        // Split the settingId into components
         const [prefix, date, month, year, number] = settingId.split('/');
         
         if (!prefix || !date || !month || !year || !number) {
@@ -161,27 +191,50 @@ const SettingDetailsPage = () => {
         }
         
         const result = await response.json();
-        console.log('API Response:', result);
+        console.log('API Response for Setting Details:', result);
 
         if (!result.success) {
           throw new Error(result.message || 'Failed to fetch setting details');
         }
 
-        // Set the data directly from the API response
+        // Set the data
         setData(result.data);
 
         // Initialize received weights from existing data
         const initialWeights: { [key: string]: number } = {};
-        if (result.data.pouches) {
+        const initialStoneWeights: { [key: string]: number } = {};
+        
+        if (result.data.pouches && result.data.pouches.length > 0) {
+          console.log('Initializing pouch weights:', result.data.pouches);
+          
           result.data.pouches.forEach((pouch: Pouch) => {
-            initialWeights[pouch.Id] = pouch.Received_Weight_Setting__c || 0;
+            console.log('Processing pouch:', pouch);
+            // Use the correct field name
+            const issuedWeight = pouch.Issued_weight_setting__c || 0;
+            console.log(`Pouch ${pouch.Name} issued weight:`, issuedWeight);
+            
+            initialWeights[pouch.Id] = issuedWeight;
+            initialStoneWeights[pouch.Id] = 0;
           });
 
+          console.log('Initial weights set:', initialWeights);
           setPouchReceivedWeights(initialWeights);
+          setPouchStoneWeights(initialStoneWeights);
 
+          // Calculate total weight
           const total = Object.values(initialWeights).reduce((sum, weight) => sum + (weight || 0), 0);
+          console.log('Total calculated weight:', total);
           setTotalReceivedWeight(total);
           setReceivedWeight(total);
+          
+          // Calculate initial setting loss
+          if (result.data.setting.Issued_Weight__c) {
+            const loss = result.data.setting.Issued_Weight__c - total;
+            setSettingLoss(loss);
+            console.log('Initial setting loss:', loss);
+          }
+        } else {
+          console.log('No pouches found in the response');
         }
 
       } catch (error) {
@@ -193,7 +246,7 @@ const SettingDetailsPage = () => {
     };
 
     fetchSettingDetails();
-  }, [settingId]); // Only depend on settingId
+  }, [settingId]);
 
   console.log('Current data:', data);
   console.log('Loading state:', loading);
@@ -226,23 +279,7 @@ const SettingDetailsPage = () => {
       
       if (!data) return;
 
-      // Combine date and time for received datetime
       const combinedReceivedDateTime = `${receivedDate}T${receivedTime}:00.000Z`;
-      console.log('[SettingReceived] Combined datetime:', combinedReceivedDateTime);
-
-      // Calculate total received without stones for each pouch
-      const pouchesData = data.pouches.map(pouch => {
-        const receivedWeight = pouchReceivedWeights[pouch.Id] || 0;
-        const stoneWeight = pouchStoneWeights[pouch.Id] || 0;
-        const pouchSettingLoss = pouch.Isssued_Weight_Setting__c - receivedWeight;
-
-        return {
-          pouchId: pouch.Id,
-          receivedWeight,
-          stoneWeight,
-          settingLoss: Number(pouchSettingLoss.toFixed(4))
-        };
-      });
 
       const [prefix, date, month, year, number] = data.setting.Name.split('/');
 
@@ -254,11 +291,18 @@ const SettingDetailsPage = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            receivedDate: combinedReceivedDateTime, // Use combined date and time
-            receivedWeight: totalReceivedWeight,
-            settingLoss,
-            totalStoneWeight,
-            pouches: pouchesData
+            receivedDate: combinedReceivedDateTime,
+            receivedWeight: parseFloat(totalReceivedWeight.toFixed(4)),
+            ornamentWeight: parseFloat(ornamentWeight.toFixed(4)),
+            scrapReceivedWeight: parseFloat(scrapReceivedWeight.toFixed(4)),
+            dustReceivedWeight: parseFloat(dustReceivedWeight.toFixed(4)),
+            settingLoss: parseFloat(settingLoss.toFixed(4)),
+            totalStoneWeight: parseFloat(totalStoneWeight.toFixed(4)),
+            pouches: Object.entries(pouchReceivedWeights).map(([pouchId, weight]) => ({
+              pouchId,
+              receivedWeight: parseFloat(weight.toFixed(4)),
+              stoneWeight: parseFloat((pouchStoneWeights[pouchId] || 0).toFixed(4))
+            }))
           })
         }
       );
@@ -377,7 +421,7 @@ const SettingDetailsPage = () => {
                       </div>
                       <div>
                         <Label>Issued Weight</Label>
-                        <div className="mt-1">{pouch.Isssued_Weight_Setting__c}g</div>
+                        <div className="mt-1">{pouch.Issued_weight_setting__c}g</div>
                       </div>
                       <div>
                         <Label>Received Weight</Label>
@@ -406,19 +450,79 @@ const SettingDetailsPage = () => {
                 ))}
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label>Total Received Weight</Label>
-                  <div className="mt-1 font-semibold">{totalReceivedWeight.toFixed(4)}g</div>
-                  <div className="text-xs text-gray-500">(Received + Stone Weight)</div>
+                  <Label>Ornament Weight (g)</Label>
+                  <Input
+                    type="number"
+                    value={ornamentWeight.toFixed(4)}
+                    className="w-full h-9 bg-gray-50"
+                    disabled={true}
+                  />
                 </div>
+
                 <div>
-                  <Label>Total Stone Weight</Label>
-                  <div className="mt-1 font-semibold">{totalStoneWeight.toFixed(4)}g</div>
+                  <Label>Scrap Weight (g)</Label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={scrapReceivedWeight || ''}
+                    onChange={(e) => setScrapReceivedWeight(parseFloat(e.target.value) || 0)}
+                    className={`w-full h-9 ${formErrors.scrapReceivedWeight ? 'border-red-500' : ''}`}
+                    required
+                    placeholder="Enter scrap weight"
+                    disabled={isSubmitting}
+                  />
+                  {formErrors.scrapReceivedWeight && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.scrapReceivedWeight}</p>
+                  )}
                 </div>
+
                 <div>
-                  <Label>Setting Loss</Label>
-                  <div className="mt-1 font-semibold">{settingLoss.toFixed(4)}g</div>
+                  <Label>Dust Weight (g)</Label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={dustReceivedWeight || ''}
+                    onChange={(e) => setDustReceivedWeight(parseFloat(e.target.value) || 0)}
+                    className={`w-full h-9 ${formErrors.dustReceivedWeight ? 'border-red-500' : ''}`}
+                    required
+                    placeholder="Enter dust weight"
+                    disabled={isSubmitting}
+                  />
+                  {formErrors.dustReceivedWeight && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.dustReceivedWeight}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label>Total Received Weight (g)</Label>
+                  <Input
+                    type="number"
+                    value={totalReceivedWeight.toFixed(4)}
+                    className="w-full h-9 bg-gray-50"
+                    disabled={true}
+                  />
+                </div>
+
+                <div>
+                  <Label>Setting Loss (g)</Label>
+                  <Input
+                    type="number"
+                    value={settingLoss.toFixed(4)}
+                    className="w-full h-9 bg-gray-50"
+                    disabled={true}
+                  />
+                </div>
+
+                <div>
+                  <Label>Total Stone Weight (g)</Label>
+                  <Input
+                    type="number"
+                    value={totalStoneWeight.toFixed(4)}
+                    className="w-full h-9 bg-gray-50"
+                    disabled={true}
+                  />
                 </div>
               </div>
 

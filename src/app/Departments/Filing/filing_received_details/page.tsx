@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { z } from 'zod';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 const apiBaseUrl = "https://needha-erp-server.onrender.com";
 
@@ -45,10 +47,23 @@ const FilingDetailsPage = () => {
   const [formErrors, setFormErrors] = useState<Partial<UpdateFormData>>({});
   const [pouchReceivedWeights, setPouchReceivedWeights] = useState<{ [key: string]: number }>({});
   const [totalReceivedWeight, setTotalReceivedWeight] = useState<number>(0);
+  const [ornamentWeight, setOrnamentWeight] = useState<number>(0);
+  const [scrapReceivedWeight, setScrapReceivedWeight] = useState<number>(0);
+  const [dustReceivedWeight, setDustReceivedWeight] = useState<number>(0);
   const [receivedTime, setReceivedTime] = useState<string>(() => {
     const now = new Date();
     return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
   });
+  const [issuedDate, setIssuedDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+  const [issuedTime, setIssuedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("");
+  const [departmentRecords, setDepartmentRecords] = useState<any[]>([]);
+  const [selectedRecord, setSelectedRecord] = useState<string>("");
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -79,12 +94,14 @@ const FilingDetailsPage = () => {
   }, [filingId]);
 
   useEffect(() => {
-    if (data && receivedWeight > 0) {
+    const totalWeight = ornamentWeight + scrapReceivedWeight + dustReceivedWeight;
+    setTotalReceivedWeight(totalWeight);
+    if (data) {
       const issuedWeight = data.filing.Issued_weight__c;
-      const loss = Number((issuedWeight - receivedWeight).toFixed(4));
+      const loss = issuedWeight - totalWeight;
       setGrindingLoss(loss);
     }
-  }, [receivedWeight, data]);
+  }, [ornamentWeight, scrapReceivedWeight, dustReceivedWeight, data]);
 
   const updateFiling = async (filingNumber: string, updateData: any) => {
     console.log('[FilingReceived] Updating filing:', { filingNumber, updateData });
@@ -102,7 +119,14 @@ const FilingDetailsPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updateData)
+        body: JSON.stringify({
+          ...updateData,
+          receivedWeight: parseFloat(updateData.receivedWeight.toFixed(4)),
+          ornamentWeight: parseFloat(updateData.ornamentWeight.toFixed(4)),
+          scrapReceivedWeight: parseFloat(updateData.scrapReceivedWeight.toFixed(4)),
+          dustReceivedWeight: parseFloat(updateData.dustReceivedWeight.toFixed(4)),
+          grindingLoss: parseFloat(updateData.grindingLoss.toFixed(4))
+        })
       });
 
       console.log('[FilingReceived] API response status:', response.status);
@@ -167,9 +191,10 @@ const FilingDetailsPage = () => {
     setPouchReceivedWeights(prev => {
       const newWeights = { ...prev, [pouchId]: weight };
       const newTotal = Object.values(newWeights).reduce((sum, w) => sum + (w || 0), 0);
-      setTotalReceivedWeight(newTotal);
-      setReceivedWeight(newTotal); // Update the main received weight
-      setGrindingLoss(data?.filing.Issued_weight__c ? data.filing.Issued_weight__c - newTotal : 0);
+      setOrnamentWeight(newTotal); // Update ornament weight instead of total weight
+      const newTotalReceived = newTotal + scrapReceivedWeight + dustReceivedWeight;
+      setTotalReceivedWeight(newTotalReceived);
+      setGrindingLoss(data?.filing.Issued_weight__c ? data.filing.Issued_weight__c - newTotalReceived : 0);
       return newWeights;
     });
   };
@@ -185,44 +210,23 @@ const FilingDetailsPage = () => {
         return;
       }
 
-      // Log initial values
-      console.log('[FilingReceived] Initial values:', {
-        receivedDate,
-        receivedTime,
-        totalReceivedWeight,
-        issuedWeight: data.filing.Issued_weight__c,
-        pouchReceivedWeights,
-        filingNumber: data.filing.Name
-      });
-
       // Combine date and time for received datetime
       const combinedReceivedDateTime = `${receivedDate}T${receivedTime}:00.000Z`;
-      console.log('[FilingReceived] Combined datetime:', combinedReceivedDateTime);
-
-      // Calculate grinding loss (issued weight - received weight)
-      const grindingLoss = parseFloat((data.filing.Issued_weight__c - totalReceivedWeight).toFixed(4));
-      console.log('[FilingReceived] Calculated grinding loss:', grindingLoss);
 
       const formData = {
         receivedDate: combinedReceivedDateTime,
-        receivedWeight: parseFloat(totalReceivedWeight.toFixed(4)),
-        grindingLoss: grindingLoss, // Changed from filingLoss to grindingLoss
+        receivedWeight: totalReceivedWeight,
+        ornamentWeight: ornamentWeight,
+        scrapReceivedWeight: scrapReceivedWeight,
+        dustReceivedWeight: dustReceivedWeight,
+        grindingLoss: grindingLoss,
         pouches: Object.entries(pouchReceivedWeights).map(([pouchId, weight]) => ({
           pouchId,
-          receivedWeight: weight
-        }))
+          receivedWeight: parseFloat(weight.toFixed(4))
+        })),
+        issuedDate: issuedDate,
+        issuedTime: issuedTime
       };
-
-      // Log the complete payload
-      console.log('[FilingReceived] Complete payload being sent:', JSON.stringify(formData, null, 2));
-      console.log('[FilingReceived] Filing number being updated:', data.filing.Name);
-
-      // Log the API endpoint being called
-      const [prefix, date, month, year, number] = data.filing.Name.split('/');
-      console.log('[FilingReceived] API endpoint components:', {
-        prefix, date, month, year, number,
-        grindingLoss // Updated log field name
-      });
 
       const result = await updateFiling(data.filing.Name, formData);
       console.log('[FilingReceived] API response:', result);
@@ -242,6 +246,10 @@ const FilingDetailsPage = () => {
       console.log('[FilingReceived] Submission completed');
       setIsSubmitting(false);
     }
+  };
+
+  const handleRecordSelection = (value: string) => {
+    setSelectedRecord(value);
   };
 
   if (loading) {
@@ -392,6 +400,53 @@ const FilingDetailsPage = () => {
                 </div>
                 <div>
                   <label className="text-sm text-gray-600 block mb-1.5">
+                    Ornament Weight (g)
+                  </label>
+                  <Input
+                    type="number"
+                    value={ornamentWeight.toFixed(4)}
+                    className="w-full h-9 bg-gray-50"
+                    disabled={true}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1.5">
+                    Scrap Weight (g)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={scrapReceivedWeight || ''}
+                    onChange={(e) => setScrapReceivedWeight(parseFloat(e.target.value) || 0)}
+                    className={`w-full h-9 ${formErrors.scrapReceivedWeight ? 'border-red-500' : ''}`}
+                    required
+                    placeholder="Enter scrap weight"
+                    disabled={isSubmitting}
+                  />
+                  {formErrors.scrapReceivedWeight && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.scrapReceivedWeight}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1.5">
+                    Dust Weight (g)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={dustReceivedWeight || ''}
+                    onChange={(e) => setDustReceivedWeight(parseFloat(e.target.value) || 0)}
+                    className={`w-full h-9 ${formErrors.dustReceivedWeight ? 'border-red-500' : ''}`}
+                    required
+                    placeholder="Enter dust weight"
+                    disabled={isSubmitting}
+                  />
+                  {formErrors.dustReceivedWeight && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.dustReceivedWeight}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1.5">
                     Filing Loss (g)
                   </label>
                   <Input
@@ -420,3 +475,5 @@ const FilingDetailsPage = () => {
 };
 
 export default FilingDetailsPage;
+
+

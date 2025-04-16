@@ -5,8 +5,10 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import PolishingTable from "./PolishingTable";
 import PolishingSummary from "./PolishingSummary";
+import { Button } from "@/components/ui/button";
+import { Plus, FileDown, FileUp } from "lucide-react";
 
-        const PolishingMainArea = () => {
+const PolishingMainArea = () => {
   const router = useRouter();
 
   return (
@@ -23,7 +25,19 @@ import PolishingSummary from "./PolishingSummary";
                 <li className="breadcrumb-item active">Polishing</li>
               </ol>
             </nav>
-                
+            
+            {/* Action Buttons */}
+            <div className="flex items-center gap-4 mt-4">
+              
+            
+
+              <Button
+                onClick={() => router.push('/Departments/Polishing/')}
+                className="bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Polishing Backorder
+              </Button>
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-12 gap-x-6 maxXs:gap-x-0">

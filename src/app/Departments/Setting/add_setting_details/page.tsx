@@ -18,6 +18,7 @@ interface Pouch {
 export default function AddSettingDetails() {
   const searchParams = useSearchParams();
   const filingId = searchParams.get('filingId');
+  const grindingId = searchParams.get('grindingId');
   const [loading, setLoading] = useState(true);
   const [formattedId, setFormattedId] = useState<string>('');
   const [pouches, setPouches] = useState<Pouch[]>([]);
@@ -33,22 +34,29 @@ export default function AddSettingDetails() {
 
   useEffect(() => {
     const initializeSetting = async () => {
-      if (!filingId) {
-        toast.error('No filing ID provided');
+      if (!filingId && !grindingId) {
+        toast.error('No ID provided');
         return;
       }
 
       try {
-        const [prefix, date, month, year, number] = filingId.split('/');
-        console.log('[AddSetting] Filing ID parts:', { prefix, date, month, year, number });
+        let prefix, date, month, year, number;
+        let apiEndpoint;
+
+        if (filingId) {
+          [prefix, date, month, year, number] = filingId.split('/');
+          apiEndpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/grinding/GRIND/${date}/${month}/${year}/${number}/pouches`;
+        } else if (grindingId) {
+          [prefix, date, month, year, number] = grindingId.split('/');
+          apiEndpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/grinding/${grindingId}/pouches`;
+        }
+
+        console.log('[AddSetting] ID parts:', { prefix, date, month, year, number });
 
         const generatedSettingId = `SETTING/${date}/${month}/${year}/${number}`;
         setFormattedId(generatedSettingId);
 
-        const pouchResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/grinding/GRIND/${date}/${month}/${year}/${number}/pouches`
-        );
-
+        const pouchResponse = await fetch(apiEndpoint);
         const pouchResult = await pouchResponse.json();
 
         if (!pouchResult.success) {
@@ -57,8 +65,8 @@ export default function AddSettingDetails() {
 
         const formattedPouches = pouchResult.data.pouches.map((pouch: Pouch) => ({
           ...pouch,
-          Name: `FILING/${date}/${month}/${year}/${number}/POUCH${pouch.Name.split('POUCH')[1]}`,
-          Issued_Pouch_weight__c: pouch.Isssued_Weight_Grinding__c || 0,
+          Name: `${prefix}/${date}/${month}/${year}/${number}/POUCH${pouch.Name.split('POUCH')[1]}`,
+          Issued_Pouch_weight__c: 0,
           Received_Weight_Grinding__c: pouch.Received_Weight_Grinding__c || 0
         }));
 
@@ -66,12 +74,11 @@ export default function AddSettingDetails() {
         
         const weights: { [key: string]: number } = {};
         formattedPouches.forEach((pouch: Pouch) => {
-          weights[pouch.Id] = pouch.Issued_Pouch_weight__c || 0;
+          weights[pouch.Id] = 0;
         });
         setPouchWeights(weights);
         
-        const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
-        setTotalWeight(total);
+        setTotalWeight(0);
 
       } catch (error) {
         console.error('[AddSetting] Error:', error);
@@ -82,7 +89,7 @@ export default function AddSettingDetails() {
     };
 
     initializeSetting();
-  }, [filingId]);
+  }, [filingId, grindingId]);
 
   const handleWeightChange = (pouchId: string, weight: number) => {
     setPouchWeights(prev => {
@@ -168,7 +175,7 @@ export default function AddSettingDetails() {
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold">Add Setting Details</h2>
             <div className="text-sm font-medium">
-              Filing ID: <span className="text-gray-600">{filingId}</span>
+              ID: <span className="text-gray-600">{filingId || grindingId}</span>
             </div>
           </div>
 
@@ -252,3 +259,4 @@ export default function AddSettingDetails() {
     </div>
   );
 }
+

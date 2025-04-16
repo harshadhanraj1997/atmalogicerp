@@ -19,9 +19,11 @@ interface Pouch {
 
 export default function AddPolishingDetails() {
   const [isFromGrinding, setIsFromGrinding] = useState(false);
+  const [isSetting, setIsSetting] = useState(false);
   const searchParams = useSearchParams();
   const filingId = searchParams.get('filingId');
   const grindingId = searchParams.get('grindingId');
+  const settingId = searchParams.get('settingId');
   const [loading, setLoading] = useState(true);
   const [formattedId, setFormattedId] = useState<string>('');
   const [pouches, setPouches] = useState<Pouch[]>([]);
@@ -37,25 +39,28 @@ export default function AddPolishingDetails() {
 
   useEffect(() => {
     const initializePolishing = async () => {
-      if (!filingId && !grindingId) {
+      if (!filingId && !grindingId && !settingId) {
         toast.error('No ID provided');
         return;
       }
 
       try {
-        // Get the source ID from either parameter
-        const sourceId = filingId || grindingId;
+        // Get the source ID from parameters
+        const sourceId = filingId || grindingId || settingId;
         console.log('[AddPolishing] Processing source ID:', sourceId);
 
         const idParts = sourceId!.split('/');
         const [prefix, date, month, year, number] = idParts;
 
-        // Determine source type by checking the prefix and update state
+        // Determine source type by checking the prefix
         const isGrinding = prefix === 'GRIND';
+        const fromSetting = prefix === 'SETTING';
         setIsFromGrinding(isGrinding);
+        setIsSetting(fromSetting);
         console.log('[AddPolishing] ID Analysis:', {
           prefix,
           isGrinding,
+          isSetting: fromSetting,
           fullId: sourceId
         });
 
@@ -64,15 +69,20 @@ export default function AddPolishingDetails() {
         setFormattedId(generatedPolishingId);
 
         // Construct the endpoint based on the API structure
-        const endpoint = isGrinding
-          ? `${process.env.NEXT_PUBLIC_API_URL}/api/grinding/GRIND/${date}/${month}/${year}/${number}/pouches`
-          : `${process.env.NEXT_PUBLIC_API_URL}/api/setting/${prefix}/${date}/${month}/${year}/${number}/pouches`
-
+        let endpoint;
+        if (isGrinding) {
+          endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/grinding/GRIND/${date}/${month}/${year}/${number}/pouches`;
+        } else if (fromSetting) {
+          endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/setting/SETTING/${date}/${month}/${year}/${number}/pouches`;
+        } else {
+          endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/setting/${prefix}/${date}/${month}/${year}/${number}/pouches`;
+        }
 
         console.log('[AddPolishing] Endpoint details:', {
           isGrinding,
+          isSetting: fromSetting,
           endpoint,
-          sourceType: isGrinding ? 'Grinding' : 'Setting',
+          sourceType: isGrinding ? 'Grinding' : fromSetting ? 'Setting' : 'Filing',
           params: { prefix, date, month, year, number }
         });
 
@@ -92,8 +102,10 @@ export default function AddPolishingDetails() {
 
         setPouches(result.data.pouches);
         
-        // Calculate total received weight using the correct field
-        const weightField = isGrinding ? 'Received_Weight_Grinding__c' : 'Received_Weight_Setting__c';
+        // Calculate total received weight using the correct field based on source
+        const weightField = isGrinding ? 'Received_Weight_Grinding__c' : 
+                          fromSetting ? 'Received_Weight_Setting__c' : 
+                          'Received_Weight_Setting__c';
         console.log('[AddPolishing] Using weight field:', weightField);
 
         const totalReceived = result.data.pouches.reduce((sum: number, pouch: Pouch) => 
@@ -112,7 +124,7 @@ export default function AddPolishingDetails() {
         console.error('[AddPolishing] Error details:', {
           message: error.message,
           stack: error.stack,
-          sourceId: filingId || grindingId
+          sourceId: filingId || grindingId || settingId
         });
         toast.error(error.message || 'Failed to initialize polishing');
       } finally {
@@ -121,7 +133,7 @@ export default function AddPolishingDetails() {
     };
 
     initializePolishing();
-  }, [filingId, grindingId]);
+  }, [filingId, grindingId, settingId]);
 
   const handleWeightChange = (pouchId: string, weight: number) => {
     setPouchWeights(prev => {
@@ -254,12 +266,18 @@ export default function AddPolishingDetails() {
                     </div>
                     <div>
                       <Label>
-                        {isFromGrinding ? 'Received Weight from Grinding' : 'Received Weight from Setting'}
+                        {isFromGrinding 
+                          ? 'Received Weight from Grinding' 
+                          : isSetting 
+                            ? 'Received Weight from Setting' 
+                            : 'Received Weight from Filing'}
                       </Label>
                       <div className="h-10 flex items-center">
                         {isFromGrinding 
                           ? (pouch.Received_Weight_Grinding__c?.toFixed(4) || '0.0000')
-                          : (pouch.Received_Weight_Setting__c?.toFixed(4) || '0.0000')}g
+                          : isSetting 
+                            ? (pouch.Received_Weight_Setting__c?.toFixed(4) || '0.0000')
+                            : (pouch.Received_Weight_Setting__c?.toFixed(4) || '0.0000')}g
                       </div>
                     </div>
                     <div>
