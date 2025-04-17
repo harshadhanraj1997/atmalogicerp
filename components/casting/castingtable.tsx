@@ -188,19 +188,19 @@ console.log("Deals State:", deals);
     // Apply date range filter
     if (startDate) {
       filtered = filtered.filter(deal => 
-        new Date(deal.issuedDate) >= new Date(startDate)
+        new Date(deal.created_date) >= new Date(startDate)
       );
     }
     if (endDate) {
       filtered = filtered.filter(deal => 
-        new Date(deal.issuedDate) <= new Date(endDate)
+        new Date(deal.created_date) <= new Date(endDate)
       );
     }
 
-    // Sort by created date
+    // Sort by created_date
     filtered.sort((a, b) => {
-      const dateA = new Date(a.issuedDate).getTime();
-      const dateB = new Date(b.issuedDate).getTime();
+      const dateA = new Date(a.created_date).getTime();
+      const dateB = new Date(b.created_date).getTime();
       return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
     });
 
@@ -416,18 +416,19 @@ console.log("Deals State:", deals);
                         <TableCell>Casting Id</TableCell>
                         <TableCell>Issued Weight</TableCell>
                         <TableCell>Received Weight</TableCell>
+                        <TableCell>Issued Date</TableCell>
+                        <TableCell>Received Date</TableCell>
                         <TableCell 
                           onClick={toggleSortOrder}
                           style={{ cursor: 'pointer' }}
                           className="flex items-center gap-1"
                         >
-                          Issued Date
+                          Created Date
                           {sortOrder === 'desc' ? 
                             <i className="fas fa-sort-down" /> : 
                             <i className="fas fa-sort-up" />
                           }
                         </TableCell>
-                        <TableCell>Received Date</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Casting Loss</TableCell>
                         <TableCell>Actions</TableCell>
@@ -471,7 +472,7 @@ console.log("Deals State:", deals);
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell>{deal.issuedDate}</TableCell>
+                              <TableCell>{new Date(deal.created_date).toLocaleDateString()}</TableCell>
                               <TableCell>{deal.receivedDate}</TableCell>
                               <TableCell>
                                 <span 
