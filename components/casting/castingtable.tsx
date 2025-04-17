@@ -154,6 +154,7 @@ export default function CastingTable() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     const loadDeals = async () => {
@@ -177,29 +178,34 @@ export default function CastingTable() {
 console.log("Deals State:", deals);
 
   useEffect(() => {
-    const newFilteredDeals = deals.filter(deal => {
-      try {
-        // Status filter
-        if (statusFilter !== 'all' && 
-            deal.status?.toLowerCase() !== statusFilter.toLowerCase()) {
-          return false;
-        }
+    let filtered = [...deals];
 
-        // Date filter
-        if (startDate || endDate) {
-          const dealDate = new Date(deal.issuedDate).toISOString().split('T')[0];
-          if (startDate && dealDate < startDate) return false;
-          if (endDate && dealDate > endDate) return false;
-        }
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(deal => deal.status === statusFilter);
+    }
 
-        return true;
-      } catch (error) {
-        console.error('Filtering error:', error);
-        return true;
-      }
+    // Apply date range filter
+    if (startDate) {
+      filtered = filtered.filter(deal => 
+        new Date(deal.issuedDate) >= new Date(startDate)
+      );
+    }
+    if (endDate) {
+      filtered = filtered.filter(deal => 
+        new Date(deal.issuedDate) <= new Date(endDate)
+      );
+    }
+
+    // Sort by created date
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.issuedDate).getTime();
+      const dateB = new Date(b.issuedDate).getTime();
+      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
     });
-    setFilteredDeals(newFilteredDeals);
-  }, [deals, startDate, endDate, statusFilter]);
+
+    setFilteredDeals(filtered);
+  }, [deals, startDate, endDate, statusFilter, sortOrder]);
 
   const handleDateChange = (type: 'start' | 'end', value: string) => {
     if (type === 'start') setStartDate(value);
@@ -352,6 +358,11 @@ console.log("Deals State:", deals);
     );
   };
 
+  // Add sort toggle function
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
+
   if (loading) return <div>Loading deals...</div>;
   if (error) return <div>Error: {error}</div>;
 
@@ -405,7 +416,17 @@ console.log("Deals State:", deals);
                         <TableCell>Casting Id</TableCell>
                         <TableCell>Issued Weight</TableCell>
                         <TableCell>Received Weight</TableCell>
-                        <TableCell>Issued Date</TableCell>
+                        <TableCell 
+                          onClick={toggleSortOrder}
+                          style={{ cursor: 'pointer' }}
+                          className="flex items-center gap-1"
+                        >
+                          Issued Date
+                          {sortOrder === 'desc' ? 
+                            <i className="fas fa-sort-down" /> : 
+                            <i className="fas fa-sort-up" />
+                          }
+                        </TableCell>
                         <TableCell>Received Date</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Casting Loss</TableCell>
@@ -771,5 +792,5 @@ console.log("Deals State:", deals);
         </div>
       )}
     </>
-  );
+  ); 
 }
