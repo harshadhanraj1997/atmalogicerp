@@ -27,42 +27,33 @@ export default function useMaterialTableHook<T extends { [key: string]: any }>(
       });
     }
 
-    // Apply sorting
+    // Apply basic sorting
     if (orderBy) {
       result.sort((a, b) => {
-        // Special handling for created_date
-        if (orderBy === 'created_date') {
-          // Debug log to see what we're working with
-          console.log('Row A:', a);
-          console.log('Row B:', b);
+        try {
+          const valueA = a[orderBy] || '';
+          const valueB = b[orderBy] || '';
           
-          const dateA = a?.Created_Date__c || a?.created_date || a?.issued_date || '';
-          const dateB = b?.Created_Date__c || b?.created_date || b?.issued_date || '';
-          
-          console.log('Comparing dates:', dateA, dateB);
-          
-          // Direct string comparison (works for YYYY-MM-DD format)
           if (order === 'desc') {
-            return dateB.localeCompare(dateA);  // Newest first
+            return valueA < valueB ? 1 : -1;
           }
-          return dateA.localeCompare(dateB);    // Oldest first
+          return valueA > valueB ? 1 : -1;
+        } catch (error) {
+          console.error('Sorting error:', error);
+          return 0;
         }
-        
-        // Default sorting for other fields
-        const valueA = a[orderBy];
-        const valueB = b[orderBy];
-        
-        if (valueA < valueB) return order === 'asc' ? -1 : 1;
-        if (valueA > valueB) return order === 'asc' ? 1 : -1;
-        return 0;
       });
     }
 
-    console.log('Sorted result:', result.map(r => r?.Created_Date__c || r?.created_date));
-
     setFilteredRows(result);
-    setPage(1); // Reset to first page when filtering/sorting changes
+    setPage(1);
   }, [rows, searchQuery, order, orderBy]);
+
+  // Calculate pagination
+  const startIndex = (page - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedRows = filteredRows.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
 
   const handleRequestSort = (property: keyof T) => {
     const isAsc = orderBy === property && order === 'asc';
@@ -100,14 +91,12 @@ export default function useMaterialTableHook<T extends { [key: string]: any }>(
   };
 
   const handleChangePage = (newPage: number) => {
-    console.log("Changing to page:", newPage);
     setPage(newPage);
   };
 
   const handleChangeRowsPerPage = (value: string) => {
-    const newRowsPerPage = parseInt(value, 10);
-    setRowsPerPage(newRowsPerPage);
-    setPage(0);
+    setRowsPerPage(parseInt(value, 10));
+    setPage(1);
   };
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,22 +106,6 @@ export default function useMaterialTableHook<T extends { [key: string]: any }>(
   const handleDelete = async (id: number | string) => {
     // Handle delete if needed
   };
-
-  // Calculate pagination values
-  const startIndex = (page - 1) * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const paginatedRows = filteredRows.slice(startIndex, endIndex);
-  const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
-
-  console.log("Pagination details:", {
-    page,
-    rowsPerPage,
-    startIndex,
-    endIndex,
-    totalRows: filteredRows.length,
-    paginatedRowsLength: paginatedRows.length,
-    totalPages
-  });
 
   return {
     order,

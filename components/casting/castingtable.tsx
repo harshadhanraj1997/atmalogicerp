@@ -196,13 +196,6 @@ console.log("Deals State:", deals);
       });
     }
 
-    // Sort by created_date - newest first
-    filtered.sort((a, b) => {
-      const dateA = a.created_date;
-      const dateB = b.created_date;
-      return dateB.localeCompare(dateA);
-    });
-
     setFilteredDeals(filtered);
   }, [deals, startDate, endDate, statusFilter]);
 
@@ -392,20 +385,9 @@ console.log("Deals State:", deals);
                           <Checkbox
                             className="custom-checkbox checkbox-small"
                             color="primary"
-                            indeterminate={
-                              selected.length > 0 &&
-                              selected.length < filteredDeals.length
-                            }
-                            checked={
-                              filteredDeals.length > 0 &&
-                              selected.length === filteredDeals.length
-                            }
-                            onChange={(e) =>
-                              handleSelectAllClick(
-                                e.target.checked,
-                                filteredDeals
-                              )
-                            }
+                            indeterminate={selected.length > 0 && selected.length < filteredDeals.length}
+                            checked={filteredDeals.length > 0 && selected.length === filteredDeals.length}
+                            onChange={(e) => handleSelectAllClick(e.target.checked, filteredDeals)}
                             size="small"
                           />
                         </TableCell>
@@ -414,6 +396,7 @@ console.log("Deals State:", deals);
                         <TableCell>Received Weight</TableCell>
                         <TableCell>Issued Date</TableCell>
                         <TableCell>Received Date</TableCell>
+                        <TableCell>Created Date</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Casting Loss</TableCell>
                         <TableCell>Actions</TableCell>
@@ -459,6 +442,7 @@ console.log("Deals State:", deals);
                               </TableCell>
                               <TableCell>{deal.issuedDate}</TableCell>
                               <TableCell>{deal.receivedDate}</TableCell>
+                              <TableCell>{deal.created_date}</TableCell>
                               <TableCell>
                                 <span 
                                   className={`bd-badge ${getStatusClass(deal.status)}`}
