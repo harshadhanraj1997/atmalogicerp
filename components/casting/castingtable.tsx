@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Box from "@mui/material/Box";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -154,7 +154,6 @@ export default function CastingTable() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     const loadDeals = async () => {
@@ -182,30 +181,36 @@ console.log("Deals State:", deals);
 
     // Apply status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(deal => deal.status === statusFilter);
-    }
-
-    // Apply date range filter
-    if (startDate) {
       filtered = filtered.filter(deal => 
-        new Date(deal.created_date) >= new Date(startDate)
-      );
-    }
-    if (endDate) {
-      filtered = filtered.filter(deal => 
-        new Date(deal.created_date) <= new Date(endDate)
+        deal.status?.toLowerCase() === statusFilter.toLowerCase()
       );
     }
 
-    // Sort by created_date
+    // Apply date filter
+    if (startDate || endDate) {
+      filtered = filtered.filter(deal => {
+        const dealDate = deal.created_date;
+        if (startDate && dealDate < startDate) return false;
+        if (endDate && dealDate > endDate) return false;
+        return true;
+      });
+    }
+
+    // Sort by created_date - newest first
     filtered.sort((a, b) => {
-      const dateA = new Date(a.created_date).getTime();
-      const dateB = new Date(b.created_date).getTime();
-      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+      const dateA = a.created_date;
+      const dateB = b.created_date;
+      return dateB.localeCompare(dateA);
     });
 
     setFilteredDeals(filtered);
-  }, [deals, startDate, endDate, statusFilter, sortOrder]);
+  }, [deals, startDate, endDate, statusFilter]);
+
+  // Calculate paginated data from filtered deals
+  const paginatedDeals = useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    return filteredDeals.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredDeals, page, rowsPerPage]);
 
   const handleDateChange = (type: 'start' | 'end', value: string) => {
     if (type === 'start') setStartDate(value);
@@ -300,10 +305,6 @@ console.log("Deals State:", deals);
     }
   };
 
-  const startIndex = page * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const paginatedRows = deals.slice(startIndex, endIndex);
-
   // Add click-away listener
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -356,11 +357,6 @@ console.log("Deals State:", deals);
         </div>
       </div>
     );
-  };
-
-  // Add sort toggle function
-  const toggleSortOrder = () => {
-    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
   };
 
   if (loading) return <div>Loading deals...</div>;
@@ -418,25 +414,14 @@ console.log("Deals State:", deals);
                         <TableCell>Received Weight</TableCell>
                         <TableCell>Issued Date</TableCell>
                         <TableCell>Received Date</TableCell>
-                        <TableCell 
-                          onClick={toggleSortOrder}
-                          style={{ cursor: 'pointer' }}
-                          className="flex items-center gap-1"
-                        >
-                          Created Date
-                          {sortOrder === 'desc' ? 
-                            <i className="fas fa-sort-down" /> : 
-                            <i className="fas fa-sort-up" />
-                          }
-                        </TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Casting Loss</TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody className="table__body">
-                      {paginatedRows.length > 0 ? (
-                        paginatedRows.map((deal, index) => {
+                      {paginatedDeals.length > 0 ? (
+                        paginatedDeals.map((deal, index) => {
                           const stausClass = useTableStatusHook(deal?.status);
                           const phaseClass = useTablePhaseHook(deal?.phase);
                           return (
@@ -472,7 +457,7 @@ console.log("Deals State:", deals);
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell>{new Date(deal.created_date).toLocaleDateString()}</TableCell>
+                              <TableCell>{deal.issuedDate}</TableCell>
                               <TableCell>{deal.receivedDate}</TableCell>
                               <TableCell>
                                 <span 
@@ -641,15 +626,15 @@ console.log("Deals State:", deals);
             </Box>
             <Box className="table-search-box mt-[30px]" sx={{ p: 2 }}>
               <Box>
-                {`Showing ${(page - 1) * rowsPerPage + 1} to ${Math.min(
-                  page * rowsPerPage,
+                {`Showing ${page * rowsPerPage + 1} to ${Math.min(
+                  (page + 1) * rowsPerPage,
                   filteredDeals.length
                 )} of ${filteredDeals.length} entries`}
               </Box>
               <Pagination
                 count={Math.ceil(filteredDeals.length / rowsPerPage)}
-                page={page}
-                onChange={(e, value) => handleChangePage(value)}
+                page={page + 1}
+                onChange={(e, value) => handleChangePage(value - 1)}
                 variant="outlined"
                 shape="rounded"
                 className="manaz-pagination-button"

@@ -6,8 +6,8 @@ export default function useMaterialTableHook<T extends { [key: string]: any }>(
   rows: T[],
   initialRowsPerPage: number
 ) {
-  const [order, setOrder] = useState<'asc' | 'desc'>('asc');
-  const [orderBy, setOrderBy] = useState<keyof T | ''>('');
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc');
+  const [orderBy, setOrderBy] = useState<keyof T | ''>('created_date');
   const [selected, setSelected] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredRows, setFilteredRows] = useState<T[]>(rows);
@@ -16,20 +16,53 @@ export default function useMaterialTableHook<T extends { [key: string]: any }>(
 
   // Update filtered rows when rows or search query changes
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredRows(rows);
-      return;
+    let result = [...rows];
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      result = result.filter((row) => {
+        return Object.values(row).some((value) =>
+          String(value).toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      });
     }
 
-    const filtered = rows.filter((row) => {
-      return Object.values(row).some((value) =>
-        String(value).toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    });
+    // Apply sorting
+    if (orderBy) {
+      result.sort((a, b) => {
+        // Special handling for created_date
+        if (orderBy === 'created_date') {
+          // Debug log to see what we're working with
+          console.log('Row A:', a);
+          console.log('Row B:', b);
+          
+          const dateA = a?.Created_Date__c || a?.created_date || a?.issued_date || '';
+          const dateB = b?.Created_Date__c || b?.created_date || b?.issued_date || '';
+          
+          console.log('Comparing dates:', dateA, dateB);
+          
+          // Direct string comparison (works for YYYY-MM-DD format)
+          if (order === 'desc') {
+            return dateB.localeCompare(dateA);  // Newest first
+          }
+          return dateA.localeCompare(dateB);    // Oldest first
+        }
+        
+        // Default sorting for other fields
+        const valueA = a[orderBy];
+        const valueB = b[orderBy];
+        
+        if (valueA < valueB) return order === 'asc' ? -1 : 1;
+        if (valueA > valueB) return order === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
 
-    setFilteredRows(filtered);
-    setPage(1); // Reset to first page when filtering changes
-  }, [rows, searchQuery]);
+    console.log('Sorted result:', result.map(r => r?.Created_Date__c || r?.created_date));
+
+    setFilteredRows(result);
+    setPage(1); // Reset to first page when filtering/sorting changes
+  }, [rows, searchQuery, order, orderBy]);
 
   const handleRequestSort = (property: keyof T) => {
     const isAsc = orderBy === property && order === 'asc';

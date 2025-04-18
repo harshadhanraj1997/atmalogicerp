@@ -241,7 +241,7 @@ const InventoryUpdateForm = () => {
                 id="availableWeight"
                 name="availableWeight"
                 type="number"
-                step="0.01"
+                step="0.001"
                 onChange={handleChange}
                 placeholder="Enter available weight"
                 className="w-full"
