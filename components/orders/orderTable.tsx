@@ -322,6 +322,7 @@ export default function DealsTable() {
         </TableCell>
         <TableCell>{row.createdBy}</TableCell>
         <TableCell>{row.dealName}</TableCell>
+        <TableCell>{row.product}</TableCell>
         <TableCell>{row.expectedEndDate}</TableCell>
         <TableCell>
           <span 
@@ -513,6 +514,7 @@ export default function DealsTable() {
                         <TableCell>Created Date</TableCell>
                         <TableCell>Created By</TableCell>
                         <TableCell>Party Name</TableCell>
+                        <TableCell>Product</TableCell>
                         <TableCell>Delivery Date</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Advance Metal</TableCell>

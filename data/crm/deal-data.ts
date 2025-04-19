@@ -18,6 +18,7 @@ export const fetchDealData = async (): Promise<IDeal[]> => {
             AdvanceMetal: order.advanceMetal || 0,
             tags: "Order",
             expectedEndDate: order.deliveryDate,
+            product: order.category,
             createdDate: order.created_date || new Date().toISOString(),
             createdBy: order.created_by || '',
             status: order.status || 'Open',

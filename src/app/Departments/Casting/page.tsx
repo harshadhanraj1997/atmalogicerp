@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import "../../Orders/add-order/add-order.css";
 import CastingTable from "@/components/casting/castingtable";
 import { toast } from "react-hot-toast";
+import { z } from "zod";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 interface InventoryItem {
@@ -411,8 +412,34 @@ const CastingForm = () => {
     return integerPart;
   };
 
+  // Initialize all state variables at the top
+  const [stoneWeight, setStoneWeight] = useState<number>(0);
+  const [totalWeight, setTotalWeight] = useState<number>(0);
+  const [issuedWeight, setIssuedWeight] = useState<number>(0);
+
+  // Update the total weight calculation with null checks
+  useEffect(() => {
+    if (typeof issuedWeight === 'number') {
+      const totalWithStones = (issuedWeight || 0) + (stoneWeight || 0);
+      setTotalWeight(totalWithStones);
+    }
+  }, [issuedWeight, stoneWeight]);
+
   // Update handleSubmit function
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const totalWeightWithStones = (row.Required_Pure_Metal_Casting__c + row.Required_Alloy_for_Casting__c + (stoneWeight || 0));
+
+    const formData = {
+      // ... existing form fields ...
+      stoneWeight: stoneWeight,
+      issuedWeight: totalWeightWithStones, // Send the total weight including stones
+      Required_Pure_Metal_Casting__c: row.Required_Pure_Metal_Casting__c,
+      Required_Alloy_for_Casting__c: row.Required_Alloy_for_Casting__c,
+      // ... other fields ...
+    };
+
     try {
       console.log("Submit button clicked");
       setLoading(true);
@@ -462,7 +489,9 @@ const CastingForm = () => {
           issuedGold: Number(item.issueWeight) * (parseFloat(item.purity.replace(/[^0-9.]/g, '')) / 100),
           issuedAlloy: Number(item.issueWeight) * (1 - parseFloat(item.purity.replace(/[^0-9.]/g, '')) / 100)
         })),
-        totalIssued: totalIssued
+        totalIssued: totalIssued,
+        stoneWeight: stoneWeight,
+        issuedWeight: totalWeightWithStones,
       };
 
       console.log("Making casting API call with data:", castingData);
@@ -532,6 +561,7 @@ const CastingForm = () => {
       setIssuedDate(`${day}/${month}/${year}`);
       setIssuedTime(today.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
       setCastingLastNumber('');
+      setStoneWeight(0);
 
     } catch (error) {
       console.error('Error in handleSubmit:', error);
@@ -1010,10 +1040,52 @@ const CastingForm = () => {
                 </div>
               )}
             </div>
+
+            {/* Stone Weight Input */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm text-gray-600 block mb-1.5">
+                  Weight Issued (g)
+                </label>
+                <Input
+                  type="number"
+                  value={(inventoryItems.reduce((total, item) => total + item.issueWeight, 0) + (stoneWeight || 0)).toFixed(4) || '0.0000'}
+                  className="w-full h-9 bg-gray-50"
+                  disabled={true}
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-600 block mb-1.5">
+                  Stone Weight (g)
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={stoneWeight || ''}
+                  onChange={(e) => setStoneWeight(parseFloat(e.target.value) || 0)}
+                  className="w-full h-9"
+                  placeholder="Enter stone weight"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-600 block mb-1.5">
+                  Total Weight (with stones)
+                </label>
+                <Input
+                  type="number"
+                  value={(inventoryItems.reduce((total, item) => total + item.issueWeight, 0) + (stoneWeight || 0)).toFixed(4) || '0.0000'}
+                  className="w-full h-9 bg-gray-50"
+                  disabled={true}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    );
+  
+  );
 };
 
 export default CastingForm;
