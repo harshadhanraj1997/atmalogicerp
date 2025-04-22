@@ -315,15 +315,23 @@ const OrderFormModal = ({ open, setOpen }: OrderFormModalProps) => {
         return;
       }
 
+      // Calculate total quantity
+      const totalQuantity = orderItems.reduce(
+        (sum, item) => sum + parseInt(item.quantity || "0", 10),
+        0
+      );
+
       console.log('Preparing form data with:', {
         orderInfo,
-        itemsCount: orderItems.length
+        itemsCount: orderItems.length,
+        totalQuantity
       });
 
       const formData = new FormData();
       const orderData = {
         orderInfo,
-        items: orderItems
+        items: orderItems,
+        totalQuantity  // Add the total quantity to the order data
       };
       
       console.log('Order Data being sent:', orderData);

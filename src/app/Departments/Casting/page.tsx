@@ -426,17 +426,19 @@ const CastingForm = () => {
   }, [issuedWeight, stoneWeight]);
 
   // Update handleSubmit function
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const totalWeightWithStones = (row.Required_Pure_Metal_Casting__c + row.Required_Alloy_for_Casting__c + (stoneWeight || 0));
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+
+    const totalWeightWithStones = (calculatedWeight + (stoneWeight || 0));
 
     const formData = {
       // ... existing form fields ...
       stoneWeight: stoneWeight,
       issuedWeight: totalWeightWithStones, // Send the total weight including stones
-      Required_Pure_Metal_Casting__c: row.Required_Pure_Metal_Casting__c,
-      Required_Alloy_for_Casting__c: row.Required_Alloy_for_Casting__c,
+      Required_Pure_Metal_Casting__c: calculatedWeight,
+      Required_Alloy_for_Casting__c: remainingAlloyRequired,
       // ... other fields ...
     };
 
