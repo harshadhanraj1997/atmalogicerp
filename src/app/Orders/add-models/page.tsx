@@ -623,8 +623,8 @@ const generatePDF = async (pdfDoc) => {
     const lineHeight = 20;
 
     // Draw company header
-    page.drawText('NEEDHA Gold PRIVATE LIMITED', {
-      x: (page.getWidth() - boldFont.widthOfTextAtSize('NEEDHA Gold PRIVATE LIMITED', 16)) / 2,
+    page.drawText('NEEDHA GOLD PRIVATE LIMITED', {
+      x: (page.getWidth() - boldFont.widthOfTextAtSize('NEEDHA GOLD PRIVATE LIMITED', 16)) / 2,
       y: y + 20,
       size: 16,
       font: boldFont
@@ -1826,5 +1826,4 @@ const handleRemoveRow = (index: number) => {
 };
 
 export default AddModel;
-
 

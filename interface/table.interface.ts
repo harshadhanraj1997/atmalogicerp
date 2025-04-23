@@ -541,3 +541,25 @@ interface DepartmentRecord {
   receivedWeight: number;
   loss: number;
 }
+
+export interface IPlating {
+  id: string;
+  issuedWeight: number;
+  issuedDate: string;
+  receivedWeight: number;
+  receivedDate: string;
+  status: string;
+  platingLoss: number;
+}
+
+
+export interface ICutting {
+  id: string;
+  issuedWeight: number;
+  issuedDate: string;
+  receivedWeight: number;
+  receivedDate: string;
+  status: string;
+  cuttingLoss: number;
+  
+}

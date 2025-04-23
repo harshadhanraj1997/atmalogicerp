@@ -56,7 +56,7 @@ if (app.isPackaged) {
 }
 
 // Backend API URL
-const BACKEND_URL = 'https://needha-erp-server.onrender.com';
+const BACKEND_URL = 'https://needha-erp-server-xrdp.onrender.com';
 
 let mainWindow;
 

@@ -142,7 +142,7 @@ const StoneDetailsModal = ({
 
 // Main Component
 const AddJewelryModel = () => {
-  const apiBaseUrl = "https://needha-erp-server.onrender.com";
+  const apiBaseUrl = "https://needha-erp-server-xrdp.onrender.com";
   const router = useRouter();
 
   // States

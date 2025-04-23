@@ -4,7 +4,7 @@ import { Dialog, DialogTitle, DialogContent } from "@mui/material";
 import { useSearchParams } from 'next/navigation';
 import { IDeal } from '@/interface/table.interface';
 
-const apiBaseUrl = "https://needha-erp-server.onrender.com";
+const apiBaseUrl = "https://needha-erp-server-xrdp.onrender.com";
 
 interface OrderDetails {
   orderId: string;
