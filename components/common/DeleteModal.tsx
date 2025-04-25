@@ -3,11 +3,11 @@ import React from "react";
 import { Dialog, DialogContent } from "@mui/material";
 import ModalWarningSvg from "@/svg/ModalWarningSvg";
 
-interface statePropsType {
+interface DeleteModalProps {
   open: boolean;
-  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  handleDeleteFunc: (id: number) => void;
-  deleteId: number;
+  setOpen: (open: boolean) => void;
+  handleDeleteFunc: (id: string) => Promise<void>;
+  deleteId: string;
 }
 
 const DeleteModal = ({
@@ -15,7 +15,7 @@ const DeleteModal = ({
   setOpen,
   handleDeleteFunc,
   deleteId,
-}: statePropsType) => {
+}: DeleteModalProps) => {
   const handleToggle = () => setOpen(!open);
 
   const handleDelete = () => {

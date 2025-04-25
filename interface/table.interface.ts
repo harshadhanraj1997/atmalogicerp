@@ -148,6 +148,9 @@ export interface IDeal {
   clientSheetPdf: string | null;
   purity: string;
   remarks: string;
+  product?: string;
+  weightRange?: string;
+  quantity?: number;
 }
 // Define an interface for the deal statistic
 

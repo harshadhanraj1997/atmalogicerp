@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 "use client";
-import React, { useState, useEffect, useReducer, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Box from "@mui/material/Box";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -9,9 +9,7 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import Pagination from "@mui/material/Pagination";
 import TableRow from "@mui/material/TableRow";
-import TableSortLabel from "@mui/material/TableSortLabel";
 import Paper from "@mui/material/Paper";
-import { visuallyHidden } from "@mui/utils";
 import useMaterialTableHook from "@/hooks/useMaterialTableHook";
 import { IDeal } from "@/interface/table.interface";
 import { dealHeadCells } from "@/data/table-head-cell/table-head";
@@ -25,22 +23,26 @@ import { Checkbox, Button } from "@mui/material";
 import DealsDetailsModal from "./orderdeatilsModal";
 import EditDealsModal from "./editorderModal";
 import { fetchDealData } from "@/data/crm/deal-data";
-import TableControls from "@/components/elements/SharedInputs/TableControls";
 import DeleteModal from "@/components/common/DeleteModal";
-import { appendBezierCurve, mergeLines, numberToString, PDFDocument } from 'pdf-lib';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import OrderTableControls from './OrderTableControls';
-import { Podcast, WheatOffIcon, WholeWord } from "lucide-react";
-import { measureMemory } from "vm";
-import { ppid } from "process";
+
+// Type definition for column
+interface Column {
+  id: string;
+  label: string;
+  numeric: boolean;
+  format?: (value: any) => string;
+}
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
 const downloadPDF = async (pdfUrl: string) => {
   try {
     const response = await fetch(pdfUrl, {
       headers: {
-        "Authorization": `Bearer ${process.env.SALESFORCE_ACCESS_TOKEN}`, // Ensure you have a valid token if needed
+        "Authorization": `Bearer ${process.env.SALESFORCE_ACCESS_TOKEN}`,
       },
     });
 
@@ -51,19 +53,17 @@ const downloadPDF = async (pdfUrl: string) => {
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
 
-    // Create a link element
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'downloaded-file.pdf'; // You can set a default file name here
+    link.download = 'downloaded-file.pdf';
     document.body.appendChild(link);
     link.click();
 
-    // Clean up
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   } catch (error) {
     console.error("Error downloading file:", error);
-    alert("Failed to download PDF.");
+    toast.error("Failed to download PDF.");
   }
 };
 
@@ -71,7 +71,7 @@ const previewPDF = async (pdfUrl: string) => {
   try {
     const response = await fetch(pdfUrl, {
       headers: {
-        "Authorization": `Bearer ${process.env.SALESFORCE_ACCESS_TOKEN}`, // Ensure you have a valid token if needed
+        "Authorization": `Bearer ${process.env.SALESFORCE_ACCESS_TOKEN}`,
       },
     });
 
@@ -81,12 +81,10 @@ const previewPDF = async (pdfUrl: string) => {
 
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
-
-    // Open the PDF in a new tab for preview
     window.open(url, "_blank");
   } catch (error) {
     console.error("Error previewing file:", error);
-    alert("Failed to preview PDF.");
+    toast.error("Failed to preview PDF.");
   }
 };
 
@@ -102,7 +100,7 @@ const getStatusClass = (status: string) => {
 };
 
 export default function DealsTable() {
-  // All hooks must be at the top level
+  // State hooks
   const [deals, setDeals] = useState<IDeal[]>([]);
   const [filteredDeals, setFilteredDeals] = useState<IDeal[]>([]);
   const [startDate, setStartDate] = useState('');
@@ -111,6 +109,7 @@ export default function DealsTable() {
   const [partyNameFilter, setPartyNameFilter] = useState('all');
   const [showConfirmation, setShowConfirmation] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Modal states
   const [modalOpen, setModalOpen] = useState(false);
@@ -119,7 +118,7 @@ export default function DealsTable() {
   const [editData, setEditData] = useState<IDeal | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Table hook
+  // Table hook with added error handling
   const {
     paginatedRows,
     page,
@@ -135,7 +134,38 @@ export default function DealsTable() {
     handleChangePage,
     handleChangeRowsPerPage,
     handleSearchChange,
+    setRows,
   } = useMaterialTableHook(filteredDeals, 10);
+
+  // Load initial data
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        console.log('Starting to fetch data...');
+        const data = await fetchDealData();
+        console.log('Fetched data:', data); // Debug log
+        
+        if (!data || !Array.isArray(data)) {
+          console.error('Invalid data format received:', data);
+          toast.error('Invalid data format received from server');
+          return;
+        }
+
+        console.log(`Setting ${data.length} deals to state`);
+        setDeals(data);
+        setFilteredDeals(data);
+        setRows(data); // Make sure the table hook gets the data
+      } catch (error) {
+        console.error('Error loading data:', error);
+        toast.error('Failed to load orders');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [setRows]);
 
   // Memoized party name options
   const partyNameOptions = useMemo(() => {
@@ -156,7 +186,10 @@ export default function DealsTable() {
     fetchDealData().then(data => {
       setDeals(data);
       setFilteredDeals(data);
-    }).catch(console.error);
+    }).catch(error => {
+      console.error("Error fetching deal data:", error);
+      toast.error("Failed to load data");
+    });
   }, []);
 
   // Filter effect
@@ -176,10 +209,22 @@ export default function DealsTable() {
       }
       return true;
     });
+    
     setFilteredDeals(newFilteredDeals);
+    
+    // If current page would be empty with new filtered data, reset to page 1
+    const maxPage = Math.ceil(newFilteredDeals.length / 10);
+    if (page > maxPage && maxPage > 0) {
+      handleChangePage(1);
+    }
   }, [deals, startDate, endDate, statusFilter, partyNameFilter]);
 
-  // Handler functions (not hooks, can be after hooks)
+  // Monitor pagination for debugging
+  useEffect(() => {
+    console.log(`Page: ${page}, Total Pages: ${totalPages}, Items: ${paginatedRows.length}`);
+  }, [page, totalPages, paginatedRows.length]);
+
+  // Handler functions
   const handleDateChange = (type: 'start' | 'end', value: string) => {
     if (type === 'start') setStartDate(value);
     else setEndDate(value);
@@ -202,19 +247,18 @@ export default function DealsTable() {
 
   const handlePrint = (pdfUrl: string | null) => {
     if (pdfUrl) {
-      // Convert URL to a file and open it
       window.open(pdfUrl, "_blank");
     } else {
-      alert("No PDF available to print.");
+      toast.error("No PDF available to print.");
     }
   };
+
   const handlePdfClick = (pdfUrl: string) => {
     if (!pdfUrl) {
-      alert("No PDF available to print.");
+      toast.error("No PDF available to preview.");
       return;
     }
 
-    // Create an HTML page with an embedded PDF
     const html = `
       <html>
         <head>
@@ -226,7 +270,6 @@ export default function DealsTable() {
       </html>
     `;
 
-    // Open the HTML page in a new tab
     const newWindow = window.open();
     if (newWindow) {
       newWindow.document.write(html);
@@ -248,9 +291,6 @@ export default function DealsTable() {
       
       if (result.success) {
         toast.success('Order approved successfully');
-        if (onUpdate) {
-          onUpdate();
-        }
       } else {
         toast.error(result.message || 'Failed to approve order');
       }
@@ -260,7 +300,6 @@ export default function DealsTable() {
     }
   };
 
-  // Handler functions
   const handleEdit = (deal: IDeal) => {
     setEditData(deal);
     setModalOpen(true);
@@ -279,15 +318,19 @@ export default function DealsTable() {
   // Calculate total weight for each row
   const calculateTotalWeight = (weightRange: string, quantity: number) => {
     try {
+      if (!weightRange) return '0.00';
+      
       // If weight range contains a hyphen (e.g., "10-12")
       if (weightRange.includes('-')) {
         const [min, max] = weightRange.split('-').map(w => parseFloat(w.trim()));
+        if (isNaN(min) || isNaN(max)) return '0.00';
         const avgWeight = (min + max) / 2;
         return (avgWeight * quantity).toFixed(2);
       } 
       // If it's a single number
       else {
         const weight = parseFloat(weightRange);
+        if (isNaN(weight)) return '0.00';
         return (weight * quantity).toFixed(2);
       }
     } catch (error) {
@@ -296,8 +339,40 @@ export default function DealsTable() {
     }
   };
 
-  // Update your table rows rendering
+  // Calculate total weight for all rows
+  const calculateTotalWeightForAllRows = () => {
+    return filteredDeals.reduce((total, row) => {
+      const weight = parseFloat(calculateTotalWeight(row.weightRange || '0', Number(row.quantity) || 0));
+      return total + (isNaN(weight) ? 0 : weight);
+    }, 0).toFixed(2);
+  };
+
+  // Render table rows with safety checks
   const renderTableRows = () => {
+    if (isLoading) {
+      return (
+        <TableRow>
+          <TableCell colSpan={12} align="center">
+            Loading orders...
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    if (paginatedRows.length === 0) {
+      if (filteredDeals.length > 0) {
+        // If we have data but no rows on this page, try to go to page 1
+        setTimeout(() => handleChangePage(1), 0);
+      }
+      return (
+        <TableRow>
+          <TableCell colSpan={12} align="center">
+            No data available on this page
+          </TableCell>
+        </TableRow>
+      );
+    }
+
     return paginatedRows.map((row, index) => (
       <TableRow
         key={row.id}
@@ -343,7 +418,7 @@ export default function DealsTable() {
           <span className="tag-badge">{row.tags}</span>
         </TableCell>
         <TableCell>
-          {row.weightRange ? calculateTotalWeight(row.weightRange, Number(row.quantity)) : '0.00'}
+          {calculateTotalWeight(row.weightRange || '0', Number(row.quantity) || 0)}
         </TableCell>
         <TableCell className="table__icon-box">
           <div className="flex items-center justify-start gap-[10px]">
@@ -422,45 +497,8 @@ export default function DealsTable() {
     ));
   };
 
-  // If you have a total weight calculation
-  const calculateTotalWeightForAllRows = () => {
-    return filteredDeals.reduce((total, row) => {
-      const weight = parseFloat(calculateTotalWeight(row.weightRange || '0', Number(row.quantity)));
-      return total + weight;
-    }, 0).toFixed(2);
-  };
-
-  if (!paginatedRows.length) return <div>No orders found</div>;
-
-  const columns: Column[] = [
-    {
-      id: 'createdDate',
-      label: 'Created Date',
-      numeric: false,
-      format: (value: string) => {
-        return new Date(value).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        });
-      }
-    },
-    {
-      id: 'createdBy',
-      label: 'Created By',
-      numeric: false
-    },
-    {
-      id: 'purity',
-      label: 'Purity',
-      numeric: false
-    },
-    {
-      id: 'remarks',
-      label: 'Remarks',
-      numeric: false
-    },
-  ];
+  // Display a message if no data at all
+  if (filteredDeals.length === 0) return <div className="p-4 text-center">No orders found</div>;
 
   return (
     <>
@@ -530,19 +568,27 @@ export default function DealsTable() {
                 </TableContainer>
               </Paper>
             </Box>
-            <Box className="table-search-box mt-[30px]" sx={{ p: 2 }}>
+            <Box className="table-search-box mt-[30px]" sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box>
-                {`Showing ${startIndex + 1} to ${Math.min(endIndex, paginatedRows.length)} of ${paginatedRows.length} entries`}
+                {filteredDeals.length > 0 ? 
+                  `Showing ${Math.min(startIndex + 1, filteredDeals.length)} to ${Math.min(endIndex, filteredDeals.length)} of ${filteredDeals.length} entries` : 
+                  'No entries to show'}
                 {statusFilter !== 'all' && ` (filtered by ${statusFilter})`}
               </Box>
-              <Pagination
-                count={totalPages}
-                page={page}
-                onChange={(e, value) => handleChangePage(value)}
-                variant="outlined"
-                shape="rounded"
-                className="manaz-pagination-button"
-              />
+              {totalPages > 0 ? (
+                <Pagination
+                  count={totalPages}
+                  page={Math.min(page, totalPages)}
+                  onChange={(e, value) => handleChangePage(value)}
+                  variant="outlined"
+                  shape="rounded"
+                  className="manaz-pagination-button"
+                  showFirstButton
+                  showLastButton
+                />
+              ) : (
+                <Box>No pages available</Box>
+              )}
             </Box>
           </div>
         </div>
@@ -634,7 +680,11 @@ export default function DealsTable() {
                           setTimeout(() => {
                             setShowConfirmation(null);
                             setIsApproved(false);
-                            window.location.reload();
+                            // Refresh data instead of reloading page
+                            fetchDealData().then(data => {
+                              setDeals(data);
+                              setFilteredDeals(data);
+                            }).catch(console.error);
                           }, 1500);
                         } else {
                           toast.error(result.message || 'Failed to approve order');
@@ -683,5 +733,3 @@ export default function DealsTable() {
     </>
   );
 }
-
-

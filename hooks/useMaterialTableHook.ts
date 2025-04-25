@@ -27,13 +27,19 @@ export default function useMaterialTableHook<T>(initialRows: T[] = [], initialRo
     }
 
     setFilteredRows(result);
-  }, [rows, searchQuery]);
+    
+    // Reset to page 1 if current page would be empty with new filtered data
+    const maxPage = Math.ceil(result.length / rowsPerPage);
+    if (page > maxPage && maxPage > 0) {
+      setPage(1);
+    }
+  }, [rows, searchQuery, rowsPerPage]);
 
-  // Calculate pagination
-  const startIndex = (page - 1) * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
+  // Calculate pagination with safety checks
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / rowsPerPage));
+  const startIndex = Math.min((page - 1) * rowsPerPage, Math.max(0, filteredRows.length - 1));
+  const endIndex = Math.min(startIndex + rowsPerPage, filteredRows.length);
   const paginatedRows = filteredRows.slice(startIndex, endIndex);
-  const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
 
   const handleRequestSort = (property: keyof T) => {
     const isAsc = orderBy === property && order === 'asc';
@@ -43,7 +49,7 @@ export default function useMaterialTableHook<T>(initialRows: T[] = [], initialRo
 
   const handleSelectAllClick = (checked: boolean, rows: T[]) => {
     if (checked) {
-      const newSelected = rows.map((_, index) => index);
+      const newSelected = rows.map((_, index) => startIndex + index);
       setSelected(newSelected);
       return;
     }
@@ -71,7 +77,9 @@ export default function useMaterialTableHook<T>(initialRows: T[] = [], initialRo
   };
 
   const handleChangePage = (newPage: number) => {
-    setPage(newPage);
+    // Ensure page is within valid range
+    const validPage = Math.max(1, Math.min(newPage, totalPages));
+    setPage(validPage);
   };
 
   const handleChangeRowsPerPage = (value: string) => {
@@ -81,10 +89,13 @@ export default function useMaterialTableHook<T>(initialRows: T[] = [], initialRo
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
+    setPage(1); // Reset to first page when search changes
   };
 
   const handleDelete = async (id: number | string) => {
     // Handle delete if needed
+    console.log(`Deleting item with ID: ${id}`);
+    // After deletion, you might want to refresh data
   };
 
   return {
@@ -106,5 +117,6 @@ export default function useMaterialTableHook<T>(initialRows: T[] = [], initialRo
     handleChangePage,
     handleChangeRowsPerPage,
     handleSearchChange,
+    setRows, // Expose this to allow updating rows from outside
   };
 }

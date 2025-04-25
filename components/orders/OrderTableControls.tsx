@@ -5,6 +5,12 @@ import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+// Updated interface to properly type partyNameOptions
+interface PartyNameOption {
+  value: string;
+  label: string;
+}
+
 interface OrderTableControlsProps {
   searchQuery: string;
   handleSearchChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -16,7 +22,7 @@ interface OrderTableControlsProps {
   handleStatusChange: (value: string) => void;
   partyNameFilter: string;
   handlePartyNameChange: (value: string) => void;
-  partyNameOptions: { value: string; label: string; }[];
+  partyNameOptions: PartyNameOption[]; // Updated type
 }
 
 const OrderTableControls: React.FC<OrderTableControlsProps> = ({
@@ -93,11 +99,11 @@ const OrderTableControls: React.FC<OrderTableControlsProps> = ({
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
               }}
             >
+              {/* Updated to use the correct properties from options */}
               {partyNameOptions.map((option) => (
                 <SelectItem 
                   key={option.value} 
-                  value={option.value}
-                  className="hover:bg-gray-100 cursor-pointer px-4 py-2"
+                  value={option.value} 
                 >
                   {option.label}
                 </SelectItem>
@@ -131,4 +137,5 @@ const OrderTableControls: React.FC<OrderTableControlsProps> = ({
     </div>
   );
 };
-export default OrderTableControls; 
+
+export default OrderTableControls;

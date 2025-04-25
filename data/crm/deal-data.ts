@@ -4,7 +4,9 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 // Function to fetch orders from the server
 export const fetchDealData = async (): Promise<IDeal[]> => {
   try {
+    console.log('Fetching data from:', `${apiUrl}/api/orders`);
     const response = await fetch(`${apiUrl}/api/orders`);
+    console.log('Response status:', response.status);
     const result = await response.json();
     console.log("API Response:", result); // Log the entire response
 
