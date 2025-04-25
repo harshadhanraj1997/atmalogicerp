@@ -17,12 +17,15 @@ interface Pouch {
 
 export default function AddDullDetails() {
   const searchParams = useSearchParams();
- const polishingId = searchParams.get('polishingId');
+  const polishingId = searchParams.get('polishingId');
   const [loading, setLoading] = useState(true);
   const [formattedId, setFormattedId] = useState<string>('');
   const [pouches, setPouches] = useState<Pouch[]>([]);
   const [pouchWeights, setPouchWeights] = useState<{ [key: string]: number }>({});
   const [issuedDate, setIssuedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [issuedTime, setIssuedTime] = useState(
+    new Date().toTimeString().split(' ')[0].substring(0, 5)
+  );
   const [totalWeight, setTotalWeight] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
@@ -120,9 +123,14 @@ export default function AddDullDetails() {
         dullWeight: pouchWeights[pouch.Id] || 0
       }));
 
+      // Combine date and time for issued datetime
+      const issuedDateTime = `${issuedDate}T${issuedTime}:00`;
+
       console.log('[Add Dull] Preparing submission with:', {
         dullId: formattedId,
         issuedDate,
+        issuedTime,
+        issuedDateTime,
         pouchCount: pouchData.length,
         totalWeight,
         pouches: pouchData,
@@ -133,6 +141,8 @@ export default function AddDullDetails() {
       const dullData = {
         dullId: formattedId,
         issuedDate: issuedDate,
+        issuedTime: issuedTime,
+        issuedDateTime: issuedDateTime,
         pouches: pouchData,
         totalWeight: totalWeight,
         status: 'Pending'
@@ -168,6 +178,7 @@ export default function AddDullDetails() {
         setPouchWeights({});
         setTotalWeight(0);
         setIssuedDate(new Date().toISOString().split('T')[0]);
+        setIssuedTime(new Date().toTimeString().split(' ')[0].substring(0, 5));
         setFormattedId('');
         setLoading(false);
         
@@ -200,9 +211,9 @@ export default function AddDullDetails() {
           </div>
 
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="text-sm font-medium">
-            Dull ID: <span className="text-blue-600 font-bold">
+                Dull ID: <span className="text-blue-600 font-bold">
                   {formattedId || 'Generating...'}
                 </span>
               </div>
@@ -213,6 +224,16 @@ export default function AddDullDetails() {
                   type="date"
                   value={issuedDate}
                   onChange={(e) => setIssuedDate(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div>
+                <Label htmlFor="issuedTime">Issued Time</Label>
+                <Input
+                  id="issuedTime"
+                  type="time"
+                  value={issuedTime}
+                  onChange={(e) => setIssuedTime(e.target.value)}
                   className="h-10"
                 />
               </div>
@@ -249,10 +270,10 @@ export default function AddDullDetails() {
                 </div>
               ))}
             </div>
-
+                
             <div className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
               <div>
-                <span className="font-medium">Total Weight: </span>
+                <span className="font-medium">Total Weight:</span>
                 <span>{totalWeight.toFixed(4)}g</span>
               </div>
               <Button 

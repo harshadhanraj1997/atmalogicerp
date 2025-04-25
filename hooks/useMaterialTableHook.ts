@@ -2,52 +2,32 @@ import { useState, useEffect } from 'react';
 export type RowObject = { [key: string]: string | number | boolean };
 type Order = "asc" | "desc";
 
-export default function useMaterialTableHook<T extends { [key: string]: any }>(
-  rows: T[],
-  initialRowsPerPage: number
-) {
+export default function useMaterialTableHook<T>(initialRows: T[] = [], initialRowsPerPage: number = 10) {
+  const [rows, setRows] = useState<T[]>(initialRows);
+  const [filteredRows, setFilteredRows] = useState<T[]>(initialRows);
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [orderBy, setOrderBy] = useState<keyof T | ''>('created_date');
   const [selected, setSelected] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredRows, setFilteredRows] = useState<T[]>(rows);
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(initialRowsPerPage);
 
   // Update filtered rows when rows or search query changes
   useEffect(() => {
-    let result = [...rows];
+    // Ensure rows is an array before spreading
+    let result = Array.isArray(rows) ? [...rows] : [];
 
     // Apply search filter
     if (searchQuery.trim()) {
       result = result.filter((row) => {
-        return Object.values(row).some((value) =>
+        return Object.values(row as any).some((value) =>
           String(value).toLowerCase().includes(searchQuery.toLowerCase())
         );
       });
     }
 
-    // Apply basic sorting
-    if (orderBy) {
-      result.sort((a, b) => {
-        try {
-          const valueA = a[orderBy] || '';
-          const valueB = b[orderBy] || '';
-          
-          if (order === 'desc') {
-            return valueA < valueB ? 1 : -1;
-          }
-          return valueA > valueB ? 1 : -1;
-        } catch (error) {
-          console.error('Sorting error:', error);
-          return 0;
-        }
-      });
-    }
-
     setFilteredRows(result);
-    setPage(1);
-  }, [rows, searchQuery, order, orderBy]);
+  }, [rows, searchQuery]);
 
   // Calculate pagination
   const startIndex = (page - 1) * rowsPerPage;

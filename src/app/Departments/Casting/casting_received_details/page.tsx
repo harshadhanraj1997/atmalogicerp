@@ -36,13 +36,11 @@ interface InventoryItem {
 // Form validation schema
 const updateFormSchema = z.object({
   receivedDate: z.string().min(1, "Received date is required"),
-  receivedWeight: z.number().positive("Weight must be greater than 0"),
-  ornamentWeight: z.number().positive("Ornament weight must be greater than 0"),
-  scrapReceivedWeight: z.number().min(0, "Weight cannot be negative"),
-  dustReceivedWeight: z.number(),
+  receivedWeight: z.number().min(0, "Weight must be non-negative"),
+  scrapReceivedWeight: z.number().min(0, "Scrap weight must be non-negative"),
+  dustReceivedWeight: z.number(), // Can be negative
   castingLoss: z.number(),
-  castingScrap: z.number(),
-  castingDust: z.number()
+  totalReceivedWeight: z.number()
 });
 
 type UpdateFormData = z.infer<typeof updateFormSchema>;
@@ -64,8 +62,7 @@ const CastingDetailsPage = () => {
   const [scrapReceivedWeight, setScrapReceivedWeight] = useState<number>(0);
   const [dustReceivedWeight, setDustReceivedWeight] = useState<number>(0);
   const [castingLoss, setCastingLoss] = useState<number>(0);
-  const [castingScrap, setCastingScrap] = useState<number>(0);
-  const [castingDust, setCastingDust] = useState<number>(0);
+  const [totalReceivedWeight, setTotalReceivedWeight] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Partial<UpdateFormData>>({});
 
@@ -101,22 +98,15 @@ const CastingDetailsPage = () => {
     if (data) {
       const issuedWeight = data.casting.Issud_weight__c;
       
-      // Safely parse weights with null checks
-      const ornamentWeight = parseFloat(receivedWeight?.toString() || '0');
-      const scrapWeight = parseFloat(scrapReceivedWeight?.toString() || '0');
-      const dustWeight = dustReceivedWeight ? parseFloat(dustReceivedWeight.toString()) : 0;
+      // Calculate total received weight (including ornaments, scrap, and dust)
+      const totalReceived = (receivedWeight || 0) + (scrapReceivedWeight || 0) + (dustReceivedWeight || 0);
+      setTotalReceivedWeight(totalReceived);
       
-      // Calculate total received weight (excluding dust)
-      const totalReceivedWeight = ornamentWeight + scrapWeight;
-      
-      // Calculate loss (issued - received, excluding dust)
-      const totalLoss = issuedWeight - totalReceivedWeight;
-      
-      setCastingLoss(totalLoss);
-      setCastingScrap(scrapWeight);
-      setCastingDust(dustWeight);
+      // Calculate casting loss (issued - total received)
+      const loss = issuedWeight - totalReceived;
+      setCastingLoss(loss);
     }
-  }, [receivedWeight, scrapReceivedWeight, dustReceivedWeight, data]);
+  }, [data, receivedWeight, scrapReceivedWeight, dustReceivedWeight]);
 
   const updateCasting = async (castingNum: string, updateData: UpdateFormData) => {
     console.log('Updating casting:', castingNum);
@@ -131,7 +121,6 @@ const CastingDetailsPage = () => {
         body: JSON.stringify({
           ...updateData,
           receivedWeight: updateData.receivedWeight,
-          ornamentWeight: updateData.ornamentWeight,
           scrapReceivedWeight: updateData.scrapReceivedWeight,
           dustReceivedWeight: updateData.dustReceivedWeight,
         })
@@ -203,8 +192,7 @@ const CastingDetailsPage = () => {
         scrapReceivedWeight: scrapReceivedWeight,
         dustReceivedWeight: dustReceivedWeight,
         castingLoss: castingLoss,
-        castingScrap: castingScrap,
-        castingDust: castingDust
+        totalReceivedWeight: totalReceivedWeight
       };
 
       // Validate form
@@ -408,16 +396,16 @@ const CastingDetailsPage = () => {
                 </div>
                 <div>
                   <label className="text-sm text-gray-600 block mb-1.5">
-                    Received Weight of ornaments(g)
+                    Received Weight of Ornaments (g)
                   </label>
                   <Input
                     type="number"
-                    step="0.01"
+                    step="0.001"
                     value={receivedWeight || ''}
                     onChange={(e) => setReceivedWeight(parseFloat(e.target.value) || 0)}
                     className={`w-full h-9 ${formErrors.receivedWeight ? 'border-red-500' : ''}`}
                     required
-                    placeholder="Enter received weight"
+                    placeholder="Enter ornament weight"
                     disabled={isSubmitting}
                   />
                   {formErrors.receivedWeight && (
@@ -427,70 +415,74 @@ const CastingDetailsPage = () => {
                 
                 <div>
                   <label className="text-sm text-gray-600 block mb-1.5">
-                    Received Weight of scrap (g)
+                    Scrap Weight (g)
                   </label>
                   <Input
                     type="number"
-                    step="0.01"
+                    step="0.001"
                     value={scrapReceivedWeight || ''}
                     onChange={(e) => setScrapReceivedWeight(parseFloat(e.target.value) || 0)}
                     className={`w-full h-9 ${formErrors.scrapReceivedWeight ? 'border-red-500' : ''}`}
-                    required
-                    placeholder="Enter received weight"
+                    placeholder="Enter scrap weight"
                     disabled={isSubmitting}
                   />
-                  {formErrors.scrapReceivedWeight && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.scrapReceivedWeight}</p>
-                  )}
                 </div>
                 <div>
                   <label className="text-sm text-gray-600 block mb-1.5">
-                    Dust Weight (can be negative)
+                    Dust Weight (g)
                   </label>
                   <Input
-                    type="text"
+                    type="number"
+                    step="0.001"
                     value={dustReceivedWeight || ''}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      // Allow empty string or valid numbers (including decimals and negative)
-                      if (value === '' || !isNaN(parseFloat(value))) {
-                        setDustReceivedWeight(value === '' ? 0 : parseFloat(value));
-                      }
-                    }}
+                    onChange={(e) => setDustReceivedWeight(parseFloat(e.target.value) || 0)}
                     className="w-full h-9"
-                    placeholder="Enter dust weight (can be negative)"
+                    placeholder="Enter dust weight"
                     disabled={isSubmitting}
                   />
                 </div>
-                <div>
-                  <label className="text-sm text-gray-600 block mb-1.5">
-                    Casting Loss (g)
-                  </label>
-                  <Input
-                    type="number"
-                    value={castingLoss.toFixed(4)}
-                    readOnly
-                    className="w-full h-9 bg-gray-50"
-                    disabled={true}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-gray-600 block mb-1.5">
-                    Total Issued Weight
-                  </label>
-                  <Input
-                    type="number"
-                    value={data?.casting.Issud_weight__c.toFixed(4) || '0.0000'}
-                    className="w-full h-9 bg-gray-50"
-                    disabled={true}
-                  />
+
+                {/* Weight Summary Section */}
+                <div className="md:col-span-3">
+                  <div className="bg-gray-50 p-4 rounded-lg mt-4">
+                    <h3 className="text-sm font-medium mb-3">Weight Summary</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="text-xs text-gray-500">Total Issued</label>
+                        <div className="text-sm font-medium">
+                          {data?.casting.Issud_weight__c.toFixed(3)}g
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs text-gray-500">Total Received</label>
+                        <div className="text-sm font-medium">
+                          {totalReceivedWeight.toFixed(3)}g
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-gray-500">Casting Loss</label>
+                        <div className={`text-sm font-medium ${castingLoss > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {castingLoss.toFixed(3)}g
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-gray-500">Loss Percentage</label>
+                        <div className={`text-sm font-medium ${castingLoss > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {((castingLoss / data?.casting.Issud_weight__c) * 100).toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              <div className="mt-4 text-right">
+              <div className="mt-6 text-right">
                 <Button 
                   type="submit" 
-                  className="px-4 py-2 text-sm"
+                  className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? 'Updating...' : 'Update Received Details'}

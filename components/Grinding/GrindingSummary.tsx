@@ -39,67 +39,163 @@ import "react-datepicker/dist/react-datepicker.css";
 
   // Function to filter data by date range
   const filterDataByDateRange = (data: IGrinding[], range: string) => {
-    if (!data.length) {
+    if (!data || !data.length) {
+      console.log('No data to filter');
       setFilteredData([]);
       return;
     }
 
+    console.log('Filtering data:', { range, dataLength: data.length });
+
     const now = new Date();
     let startDate: Date;
+    let endDate: Date = now;
 
     switch (range) {
       case "day":
-        // Today
-        startDate = new Date(now);
-        startDate.setHours(0, 0, 0, 0);
-        filterByDateRange(data, startDate, now);
+        startDate = new Date(Date.UTC(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          0, 0, 0, 0
+        ));
+        endDate = new Date(Date.UTC(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          23, 59, 59, 999
+        ));
         break;
       case "week":
-        // Current week (last 7 days)
-        startDate = new Date(now);
-        startDate.setDate(startDate.getDate() - 7);
-        startDate.setHours(0, 0, 0, 0);
-        filterByDateRange(data, startDate, now);
+        startDate = new Date(Date.UTC(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() - 7,
+          0, 0, 0, 0
+        ));
+        endDate = new Date(Date.UTC(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          23, 59, 59, 999
+        ));
         break;
       case "month":
-        // Current month
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        startDate.setHours(0, 0, 0, 0);
-        filterByDateRange(data, startDate, now);
+        startDate = new Date(Date.UTC(
+          now.getFullYear(),
+          now.getMonth(),
+          1,
+          0, 0, 0, 0
+        ));
+        endDate = new Date(Date.UTC(
+          now.getFullYear(),
+          now.getMonth() + 1,
+          0,
+          23, 59, 59, 999
+        ));
         break;
       case "custom":
-        // Custom date range
         if (customStartDate && customEndDate) {
-          const endDate = new Date(customEndDate);
-          endDate.setHours(23, 59, 59, 999);
-          filterByDateRange(data, customStartDate, endDate);
+          startDate = new Date(Date.UTC(
+            customStartDate.getFullYear(),
+            customStartDate.getMonth(),
+            customStartDate.getDate(),
+            0, 0, 0, 0
+          ));
+          endDate = new Date(Date.UTC(
+            customEndDate.getFullYear(),
+            customEndDate.getMonth(),
+            customEndDate.getDate(),
+            23, 59, 59, 999
+          ));
+        } else {
+          console.log('Missing custom date range');
+          return;
         }
         break;
       default:
+        console.log('Setting all data');
         setFilteredData(data);
+        return;
     }
+
+    console.log('Date range:', { 
+      startDate: startDate.toISOString(), 
+      endDate: endDate.toISOString() 
+    });
+    filterByDateRange(data, startDate, endDate);
   };
 
   // Helper function to filter by date range
   const filterByDateRange = (data: IGrinding[], start: Date, end: Date) => {
+    console.log('Filtering with range:', { start, end });
+    
     const filtered = data.filter((item) => {
       try {
-        // Parse the ISO date string to Date object
-        const issuedDate = new Date(item.issuedDate);
-        
-        // Set the time to start of day for start date and end of day for end date
-        const startOfDay = new Date(start);
-        startOfDay.setHours(0, 0, 0, 0);
-        
-        const endOfDay = new Date(end);
-        endOfDay.setHours(23, 59, 59, 999);
+        // Parse the ISO date string properly
+        const itemDate = typeof item.issuedDate === 'string' 
+          ? new Date(item.issuedDate) // This will handle ISO format like "2025-04-23T20:27:00.000+0000"
+          : item.issuedDate;
 
-        return issuedDate >= startOfDay && issuedDate <= endOfDay;
+        // Debug log for date parsing
+        console.log('Date comparison:', {
+          original: item.issuedDate,
+          parsed: itemDate,
+          startDate: start,
+          endDate: end
+        });
+
+        // Ensure valid date
+        if (!(itemDate instanceof Date) || isNaN(itemDate.getTime())) {
+          console.warn('Invalid date:', item.issuedDate);
+          return false;
+        }
+
+        // Convert all dates to UTC for consistent comparison
+        const compareDate = new Date(Date.UTC(
+          itemDate.getUTCFullYear(),
+          itemDate.getUTCMonth(),
+          itemDate.getUTCDate(),
+          0, 0, 0, 0
+        ));
+        
+        const startOfDay = new Date(Date.UTC(
+          start.getFullYear(),
+          start.getMonth(),
+          start.getDate(),
+          0, 0, 0, 0
+        ));
+        
+        const endOfDay = new Date(Date.UTC(
+          end.getFullYear(),
+          end.getMonth(),
+          end.getDate(),
+          23, 59, 59, 999
+        ));
+
+        // Debug log for UTC comparison
+        console.log('UTC comparison:', {
+          compareDate: compareDate.toISOString(),
+          startOfDay: startOfDay.toISOString(),
+          endOfDay: endOfDay.toISOString()
+        });
+
+        return compareDate >= startOfDay && compareDate <= endOfDay;
       } catch (error) {
-        console.error('Error parsing date:', error, item.issuedDate);
+        console.error('Error filtering date:', error, item.issuedDate);
         return false;
       }
     });
+
+    console.log('Filtered results:', {
+      total: data.length,
+      filtered: filtered.length,
+      sampleDates: filtered.slice(0, 3).map(d => ({
+        original: d.issuedDate,
+        parsed: new Date(d.issuedDate).toISOString()
+      }))
+    });
+
     setFilteredData(filtered);
   };
 
@@ -182,6 +278,19 @@ import "react-datepicker/dist/react-datepicker.css";
   };
 
   const summaryData = calculateSummary();
+
+  // Add debug logging to track date handling
+  useEffect(() => {
+    console.log('Date Filter Debug:', {
+      dateRange,
+      customStartDate: customStartDate?.toISOString(),
+      customEndDate: customEndDate?.toISOString(),
+      sampleDates: filteredData.slice(0, 3).map(d => ({
+        original: d.issuedDate,
+        parsed: new Date(d.issuedDate).toISOString()
+      }))
+    });
+  }, [dateRange, customStartDate, customEndDate, filteredData]);
 
   return (
     <div className="w-full bg-white rounded-lg shadow-sm p-4">

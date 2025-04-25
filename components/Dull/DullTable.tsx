@@ -51,7 +51,8 @@ const departments: Department[] = [
   { value: 'grinding', label: 'Grinding', path: '/Departments/Grinding/add_grinding_details' },
   { value: 'setting', label: 'Setting', path: '/Departments/Setting/add_setting_details' },
   { value: 'polish', label: 'Polish', path: '/Departments/Polish/add_polish_details' },
-  { value: 'dull', label: 'Dull', path: '/Departments/Dull/add_dull_details' }
+  { value: 'dull', label: 'Dull', path: '/Departments/Dull/add_dull_details' },
+  { value: 'plating', label: 'Plating', path: '/Departments/Plating/add_plating_details' }
 ];
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -407,8 +408,8 @@ console.log("Deals State:", deals);
                               <TableCell>{deal.id}</TableCell>
                               <TableCell>{deal.issuedWeight}</TableCell>
                               <TableCell>{deal.receivedWeight}</TableCell>
-                              <TableCell>{formatIndianDateTime(deal.issuedDate)}</TableCell>
-                              <TableCell>{formatIndianDateTime(deal.receivedDate)}</TableCell>
+                              <TableCell>{deal.issuedDate}</TableCell>
+                              <TableCell>{deal.receivedDate}</TableCell>
                               <TableCell>
                                 <span 
                                   className={`bd-badge ${getStatusClass(deal.status)}`}

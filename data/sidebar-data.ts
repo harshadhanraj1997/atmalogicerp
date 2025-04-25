@@ -70,6 +70,8 @@ const sidebarData: SidebarCategory[] = [
           { label: "Setting", link: "/Departments/Setting/Setting_Table" },
           { label: "Polishing", link: "/Departments/Polishing/Polishing_Table" },
           { label: "Dull", link: "/Departments/Dull/Dull_Table" },
+          {label: "Plating", link: "/Departments/Plating/Plating_Table"},
+          {label: "Cutting", link: "/Departments/Cutting/Cutting_Table"},
           { label: "Refinery", link: "/Refinery" },
           
           

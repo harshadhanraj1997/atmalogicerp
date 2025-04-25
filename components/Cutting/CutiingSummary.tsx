@@ -1,29 +1,44 @@
 import React, { useState, useEffect } from "react";
 import SummarySingleCard from "@/components/common/SummarySingleCard";
-import { fetchPolishingData } from "@/data/crm/polishing-data";
-import { IPolishing } from "@/interface/table.interface";
+import fetchcuttingData from "@/data/crm/cutting-data"; 
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { toast } from "react-hot-toast";
 
-const PolishingSummary: React.FC = () => {
-  const [polishingData, setPolishingData] = useState<IPolishing[]>([]);
-  const [filteredData, setFilteredData] = useState<IPolishing[]>([]);
+// Updated interface to match actual data structure
+interface ICutting {
+  id: string;
+  issuedDate: string;
+  issuedWeight: number;
+  receivedDate: string;
+  returnedWeight: number;
+  CuttinfLoss: number; // Note: there's a typo in your data "CuttinfLoss" instead of "CuttingLoss"
+  status?: string;
+}
+
+const CuttingSummary: React.FC = () => {
+  const [cuttingData, setCuttingData] = useState<ICutting[]>([]);
+  const [filteredData, setFilteredData] = useState<ICutting[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [dateRange, setDateRange] = useState<string>("month");
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
   const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
   const [showCustomDatePicker, setShowCustomDatePicker] = useState<boolean>(false);
 
-  // Fetch casting data
+  // Fetch cutting data
   useEffect(() => {
     const getData = async () => {
       try {
         setLoading(true);
-        const data = await fetchPolishingData();
-        setPolishingData(data);
+        const data = await fetchcuttingData();
+        console.log('[Cutting Summary] Fetched data:', data);
+        setCuttingData(data);
         filterDataByDateRange(data, dateRange);
       } catch (error) {
-        console.error("Error fetching polishing data:", error);
+        console.error("Error fetching cutting data:", error);
+        toast.error("Failed to load cutting data");
+        setCuttingData([]);
+        setFilteredData([]);
       } finally {
         setLoading(false);
       }
@@ -34,16 +49,11 @@ const PolishingSummary: React.FC = () => {
 
   // Filter data when date range changes
   useEffect(() => {
-    console.log('[PolishingSummary] Date range changed:', {
-      dateRange,
-      customStartDate: customStartDate?.toISOString(),
-      customEndDate: customEndDate?.toISOString()
-    });
-    filterDataByDateRange(polishingData, dateRange);
-  }, [dateRange, customStartDate, customEndDate, polishingData]);
+    filterDataByDateRange(cuttingData, dateRange);
+  }, [dateRange, customStartDate, customEndDate, cuttingData]);
 
   // Function to filter data by date range
-  const filterDataByDateRange = (data: IPolishing[], range: string) => {
+  const filterDataByDateRange = (data: ICutting[], range: string) => {
     if (!data || !data.length) {
       console.log('No data to filter');
       setFilteredData([]);
@@ -58,61 +68,21 @@ const PolishingSummary: React.FC = () => {
 
     switch (range) {
       case "day":
-        startDate = new Date(Date.UTC(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate(),
-          0, 0, 0, 0
-        ));
-        endDate = new Date(Date.UTC(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate(),
-          23, 59, 59, 999
-        ));
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
         break;
       case "week":
-        startDate = new Date(Date.UTC(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate() - 7,
-          0, 0, 0, 0
-        ));
-        endDate = new Date(Date.UTC(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate(),
-          23, 59, 59, 999
-        ));
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 0, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
         break;
       case "month":
-        startDate = new Date(Date.UTC(
-          now.getFullYear(),
-          now.getMonth(),
-          1,
-          0, 0, 0, 0
-        ));
-        endDate = new Date(Date.UTC(
-          now.getFullYear(),
-          now.getMonth() + 1,
-          0,
-          23, 59, 59, 999
-        ));
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
         break;
       case "custom":
         if (customStartDate && customEndDate) {
-          startDate = new Date(Date.UTC(
-            customStartDate.getFullYear(),
-            customStartDate.getMonth(),
-            customStartDate.getDate(),
-            0, 0, 0, 0
-          ));
-          endDate = new Date(Date.UTC(
-            customEndDate.getFullYear(),
-            customEndDate.getMonth(),
-            customEndDate.getDate(),
-            23, 59, 59, 999
-          ));
+          startDate = new Date(customStartDate.getFullYear(), customStartDate.getMonth(), customStartDate.getDate(), 0, 0, 0, 0);
+          endDate = new Date(customEndDate.getFullYear(), customEndDate.getMonth(), customEndDate.getDate(), 23, 59, 59, 999);
         } else {
           console.log('Missing custom date range');
           return;
@@ -131,98 +101,76 @@ const PolishingSummary: React.FC = () => {
     filterByDateRange(data, startDate, endDate);
   };
 
-  // Helper function to filter by date range
-  const filterByDateRange = (data: IPolishing[], start: Date, end: Date) => {
-    console.log('Filtering with range:', { start, end });
+  // Helper function to filter by date range - updated to use correct property names
+  const filterByDateRange = (data: ICutting[], start: Date, end: Date) => {
+    console.log('Filtering with range:', { 
+      start: start.toISOString(), 
+      end: end.toISOString() 
+    });
     
     const filtered = data.filter((item) => {
       try {
-        // Parse the ISO date string properly
-        const itemDate = typeof item.issuedDate === 'string' 
-          ? new Date(item.issuedDate) // This will handle ISO format like "2025-04-23T20:27:00.000+0000"
-          : item.issuedDate;
+        if (!item.issuedDate) {
+          return false;
+        }
 
-        // Debug log for date parsing
-        console.log('Date comparison:', {
-          original: item.issuedDate,
-          parsed: itemDate,
-          startDate: start,
-          endDate: end
-        });
-
-        // Ensure valid date
-        if (!(itemDate instanceof Date) || isNaN(itemDate.getTime())) {
+        // Parse the date string directly from API format (2025-04-24T00:00:00.000+0000)
+        const itemDate = new Date(item.issuedDate);
+        
+        if (isNaN(itemDate.getTime())) {
           console.warn('Invalid date:', item.issuedDate);
           return false;
         }
 
-        // Convert all dates to UTC for consistent comparison
-        const compareDate = new Date(Date.UTC(
-          itemDate.getUTCFullYear(),
-          itemDate.getUTCMonth(),
-          itemDate.getUTCDate(),
-          0, 0, 0, 0
-        ));
+        // Create normalized dates (without time) for comparison
+        const itemDateNormalized = new Date(
+          itemDate.getFullYear(),
+          itemDate.getMonth(),
+          itemDate.getDate()
+        );
         
-        const startOfDay = new Date(Date.UTC(
+        const startDateNormalized = new Date(
           start.getFullYear(),
           start.getMonth(),
-          start.getDate(),
-          0, 0, 0, 0
-        ));
+          start.getDate()
+        );
         
-        const endOfDay = new Date(Date.UTC(
+        const endDateNormalized = new Date(
           end.getFullYear(),
           end.getMonth(),
-          end.getDate(),
-          23, 59, 59, 999
-        ));
+          end.getDate()
+        );
 
-        // Debug log for UTC comparison
-        console.log('UTC comparison:', {
-          compareDate: compareDate.toISOString(),
-          startOfDay: startOfDay.toISOString(),
-          endOfDay: endOfDay.toISOString()
-        });
-
-        return compareDate >= startOfDay && compareDate <= endOfDay;
+        return itemDateNormalized >= startDateNormalized && itemDateNormalized <= endDateNormalized;
       } catch (error) {
         console.error('Error filtering date:', error, item.issuedDate);
         return false;
       }
     });
 
-    console.log('Filtered results:', {
-      total: data.length,
-      filtered: filtered.length,
-      sampleDates: filtered.slice(0, 3).map(d => ({
-        original: d.issuedDate,
-        parsed: new Date(d.issuedDate).toISOString()
-      }))
-    });
-
+    console.log(`Filtered ${filtered.length} items out of ${data.length}`);
     setFilteredData(filtered);
   };
 
-  // Calculate summary statistics
+  // Calculate summary statistics with correct property names
   const calculateSummary = () => {
-    const totalPolishing = filteredData.length;
+    const totalCutting = filteredData.length;
     const totalIssuedWeight = filteredData.reduce(
       (sum, item) => sum + Number(item.issuedWeight || 0),
       0
     );
     const totalReceivedWeight = filteredData.reduce(
-      (sum, item) => sum + Number(item.receivedWeight || 0),
+      (sum, item) => sum + Number(item.returnedWeight || 0),
       0
     );
-    const totalPolishingLoss = filteredData.reduce(
-          (sum, item) => sum + Number(item.polishingLoss || 0),
+    const totalCuttingLoss = filteredData.reduce(
+      (sum, item) => sum + Number(item.CuttinfLoss || 0), // Note the typo in property name
       0
     );
 
     // Calculate percentages
-    const polishingLossPercentage = totalIssuedWeight
-      ? ((totalPolishingLoss / totalIssuedWeight) * 100).toFixed(2)
+    const cuttingLossPercentage = totalIssuedWeight
+      ? ((totalCuttingLoss / totalIssuedWeight) * 100).toFixed(2)
       : "0";
     
     const receivedPercentage = totalIssuedWeight 
@@ -231,10 +179,10 @@ const PolishingSummary: React.FC = () => {
 
     return [
       {
-        iconClass: "fa-light fa-gem",
-        title: "Polishing Issued",
-        value: totalPolishing.toString(),
-        description: "Total polishing jobs",
+        iconClass: "fa-light fa-layer-group",
+        title: "Cutting Issued",
+        value: totalCutting.toString(),
+        description: "Total cutting jobs",
         percentageChange: "",
         isIncrease: true,
       },
@@ -242,7 +190,7 @@ const PolishingSummary: React.FC = () => {
         iconClass: "fa-light fa-weight-scale",
         title: "Weight Issued",
         value: totalIssuedWeight.toFixed(2) + " g",
-            description: "Total gold issued",
+        description: "Total gold issued",
         percentageChange: "",
         isIncrease: true,
       },
@@ -250,16 +198,16 @@ const PolishingSummary: React.FC = () => {
         iconClass: "fa-light fa-scale-balanced",
         title: "Weight Received",
         value: totalReceivedWeight.toFixed(2) + " g",
-          description: receivedPercentage + "% of issued",
+        description: receivedPercentage + "% of issued",
         percentageChange: receivedPercentage,
         isIncrease: true,
       },  
       {
         iconClass: "fa-light fa-arrow-trend-down",
-        title: "Polishing Loss",
-        value: totalPolishingLoss.toFixed(2) + " g",
-        description: polishingLossPercentage + "% of issued",
-        percentageChange: polishingLossPercentage,
+        title: "Cutting Loss",
+        value: totalCuttingLoss.toFixed(2) + " g",
+        description: cuttingLossPercentage + "% of issued",
+        percentageChange: cuttingLossPercentage,
         isIncrease: false
       },
     ];
@@ -277,25 +225,14 @@ const PolishingSummary: React.FC = () => {
 
   const handleApplyCustomRange = () => {
     if (customStartDate && customEndDate) {
-      filterDataByDateRange(polishingData, "custom");
+      filterDataByDateRange(cuttingData, "custom");
       setShowCustomDatePicker(false);
+    } else {
+      toast.error("Please select both start and end dates");
     }
   };
 
   const summaryData = calculateSummary();
-
-  // Add debug logging to track date handling
-  useEffect(() => {
-    console.log('Date Filter Debug:', {
-      dateRange,
-      customStartDate: customStartDate?.toISOString(),
-      customEndDate: customEndDate?.toISOString(),
-      sampleDates: filteredData.slice(0, 3).map(d => ({
-        original: d.issuedDate,
-        parsed: new Date(d.issuedDate).toISOString()
-      }))
-    });
-  }, [dateRange, customStartDate, customEndDate, filteredData]);
 
   return (
     <div className="w-full bg-white rounded-lg shadow-sm p-4">
@@ -347,7 +284,7 @@ const PolishingSummary: React.FC = () => {
         
         {/* Custom Date Range Picker */}
         {showCustomDatePicker && (
-          <div className="flex items-center gap-2 mt-2 md:mt-0">
+          <div className="flex flex-wrap items-center gap-2 mt-2 md:mt-0">
             <DatePicker
               selected={customStartDate}
               onChange={(date) => setCustomStartDate(date)}
@@ -356,6 +293,7 @@ const PolishingSummary: React.FC = () => {
               endDate={customEndDate}
               placeholderText="Start Date"
               className="px-2 py-1 text-sm border rounded"
+              dateFormat="dd/MM/yyyy"
             />
             <span>to</span>
             <DatePicker
@@ -367,10 +305,12 @@ const PolishingSummary: React.FC = () => {
               minDate={customStartDate}
               placeholderText="End Date"
               className="px-2 py-1 text-sm border rounded"
+              dateFormat="dd/MM/yyyy"
             />
             <button
               onClick={handleApplyCustomRange}
               className="px-3 py-1 text-xs font-medium text-white rounded-md bg-primary"
+              disabled={!customStartDate || !customEndDate}
             >
               Apply
             </button>
@@ -378,11 +318,17 @@ const PolishingSummary: React.FC = () => {
         )}
       </div>
 
+      
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading ? (
           <div className="col-span-full text-center py-8 text-gray-500">
-                Loading polishing data...
+            Loading cutting data...
+          </div>
+        ) : filteredData.length === 0 ? (
+          <div className="col-span-full text-center py-8 text-gray-500">
+            No cutting data found for the selected date range.
           </div>
         ) : (
           summaryData.map((item, index) => (
@@ -396,4 +342,4 @@ const PolishingSummary: React.FC = () => {
   );
 };
 
-export default PolishingSummary;
+export default CuttingSummary;

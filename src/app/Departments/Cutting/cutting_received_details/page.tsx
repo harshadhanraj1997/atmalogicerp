@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 
 const apiBaseUrl = "https://needha-erp-server-xrdp.onrender.com";
 
-interface Setting {
+interface Cutting {
   Id: string;
   Name: string;
   Issued_Date__c: string;
@@ -17,50 +17,56 @@ interface Setting {
   Returned_Weight__c: number;
   Received_Date__c: string;
   Status__c: string;
-  Setting_l__c: number;
+  Cutting_Loss__c: number;
 }
 
 interface Pouch {
   Id: string;
   Name: string;
-  Isssued_Weight_Setting__c: number;
-  Received_Weight_Setting__c: number;
+  Issued_Weight_Cutting__c: number;
+  Received_Weight_Cutting__c: number;
 }
 
-interface SettingData {
-  setting: Setting;
+interface CuttingData {
+  cutting: Cutting;
   pouches: Pouch[];
 }
 
 // Form validation schema
 const updateFormSchema = z.object({
   receivedDate: z.string().min(1, "Received date is required"),
+  receivedTime: z.string().min(1, "Received time is required"),
   receivedWeight: z.number().min(0, "Weight must be non-negative"),
-  settingLoss: z.number(),
+  cuttingLoss: z.number(),
   pouches: z.array(z.object({
     pouchId: z.string(),
     receivedWeight: z.number().min(0, "Weight must be non-negative"),
-    settingLoss: z.number()
+    cuttingLoss: z.number()
   }))
 });
 
 type UpdateFormData = z.infer<typeof updateFormSchema>;
 
-const DullDetailsPage = () => {
-  const [data, setData] = useState<SettingData | null>(null);
+const CuttingDetailsPage = () => {
+  const [data, setData] = useState<CuttingData | null>(null);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
-  const dullId = searchParams.get('dullId');
+  const cuttingId = searchParams.get('cuttingId');
+  
+  // States for date and time components
   const [receivedDate, setReceivedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [receivedTime, setReceivedTime] = useState<string>(
+    new Date().toTimeString().split(' ')[0].slice(0, 5)  // Default to current time HH:MM
+  );
+  
   const [receivedWeight, setReceivedWeight] = useState<number>(0);
-  const [settingLoss, setSettingLoss] = useState<number>(0);
+  const [cuttingLoss, setCuttingLoss] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<Partial<UpdateFormData>>({});
   const [pouchReceivedWeights, setPouchReceivedWeights] = useState<{ [key: string]: number }>({});
   const [ornamentWeight, setOrnamentWeight] = useState<number>(0);
   const [scrapReceivedWeight, setScrapReceivedWeight] = useState<number>(0);
   const [dustReceivedWeight, setDustReceivedWeight] = useState<number>(0);
-  const [dullLoss, setDullLoss] = useState<number>(0);
   const [totalReceivedWeight, setTotalReceivedWeight] = useState<number>(0);
 
   // Update pouch weight handler
@@ -77,8 +83,8 @@ const DullDetailsPage = () => {
       setTotalReceivedWeight(newTotalReceived);
       setReceivedWeight(newTotalReceived);
       
-      // Calculate dull loss
-      setDullLoss(data?.dull.Issued_Weight__c ? data.dull.Issued_Weight__c - newTotalReceived : 0);
+      // Calculate cutting loss
+      setCuttingLoss(data?.cutting.Issued_Weight__c ? data.cutting.Issued_Weight__c - newTotalReceived : 0);
       
       return newWeights;
     });
@@ -96,43 +102,43 @@ const DullDetailsPage = () => {
     setReceivedWeight(totalWeight);
     
     if (data) {
-      const issuedWeight = data.dull.Issued_Weight__c;
+      const issuedWeight = data.cutting.Issued_Weight__c;
       const loss = issuedWeight - totalWeight;
-      setDullLoss(loss);
+      setCuttingLoss(loss);
     }
   }, [pouchReceivedWeights, scrapReceivedWeight, dustReceivedWeight, data]);
 
   // Update fetch details to include pouches
   useEffect(() => {
-    const fetchDullDetails = async () => {
-      if (!dullId) {
-        toast.error('No dull ID provided');
+    const fetchCuttingDetails = async () => {
+      if (!cuttingId) {
+        toast.error('No cutting ID provided');
         setLoading(false);
         return;
       }
 
       try {
-        const [prefix, date, month, year, number] = dullId.split('/');
+        const [prefix, date, month, year, number] = cuttingId.split('/');
         
         // Use the correct API endpoint
         const response = await fetch(
-          `${apiBaseUrl}/api/dull/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          `${apiBaseUrl}/api/cutting/${prefix}/${date}/${month}/${year}/${number}/pouches`
         );
 
-        console.log('[Dull Details] Fetching from:', 
-          `${apiBaseUrl}/api/dull/${prefix}/${date}/${month}/${year}/${number}/pouches`
+        console.log('[Cutting Details] Fetching from:', 
+          `${apiBaseUrl}/api/cutting/${prefix}/${date}/${month}/${year}/${number}/pouches`
         );
 
         const result = await response.json();
 
         if (!result.success) {
-          throw new Error(result.message || 'Failed to fetch setting details');
+          throw new Error(result.message || 'Failed to fetch cutting details');
         }
 
         // Initialize received weights from existing data
         const initialWeights: { [key: string]: number } = {};
         result.data.pouches.forEach((pouch: Pouch) => {
-          initialWeights[pouch.Id] = pouch.Received_Weight_Setting__c || 0;
+          initialWeights[pouch.Id] = pouch.Received_Weight_Cutting__c || 0;
         });
 
         setPouchReceivedWeights(initialWeights);
@@ -143,16 +149,27 @@ const DullDetailsPage = () => {
         setTotalReceivedWeight(total);
         setReceivedWeight(total);
 
+        // If there's an existing received date, set both date and time fields
+        if (result.data.cutting.Received_Date__c) {
+          const receivedDateTime = new Date(result.data.cutting.Received_Date__c);
+          setReceivedDate(receivedDateTime.toISOString().split('T')[0]);
+          
+          // Format time as HH:MM
+          const hours = receivedDateTime.getHours().toString().padStart(2, '0');
+          const minutes = receivedDateTime.getMinutes().toString().padStart(2, '0');
+          setReceivedTime(`${hours}:${minutes}`);
+        }
+
       } catch (error) {
-        console.error('[Dull Details] Error fetching details:', error);
-        toast.error(error.message || 'Failed to fetch dull details');
+        console.error('[Cutting Details] Error fetching details:', error);
+        toast.error(error.message || 'Failed to fetch cutting details');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchDullDetails();
-  }, [dullId]);
+    fetchCuttingDetails();
+  }, [cuttingId]);
 
   // Validate form data
   const validateForm = (data: UpdateFormData) => {
@@ -174,6 +191,13 @@ const DullDetailsPage = () => {
     }
   };
 
+  // Combine date and time into a full ISO datetime string
+  const getFullDateTimeISO = (date: string, time: string): string => {
+    // Create a date object from the date and time strings
+    const dateObj = new Date(`${date}T${time}:00`);
+    return dateObj.toISOString();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -182,22 +206,25 @@ const DullDetailsPage = () => {
       
       if (!data) return;
 
-      const [prefix, date, month, year, number] = dullId!.split('/');
+      const [prefix, date, month, year, number] = cuttingId!.split('/');
+
+      // Create full ISO datetime string
+      const receivedDateTime = getFullDateTimeISO(receivedDate, receivedTime);
 
       const response = await fetch(
-        `${apiBaseUrl}/api/dull/update/${prefix}/${date}/${month}/${year}/${number}`,
+        `${apiBaseUrl}/api/cutting/update/${prefix}/${date}/${month}/${year}/${number}`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            receivedDate,
+            receivedDate: receivedDateTime, // Send the full ISO datetime string
             receivedWeight: parseFloat(totalReceivedWeight.toFixed(4)),
             ornamentWeight: parseFloat(ornamentWeight.toFixed(4)),
             scrapReceivedWeight: parseFloat(scrapReceivedWeight.toFixed(4)),
             dustReceivedWeight: parseFloat(dustReceivedWeight.toFixed(4)),
-            dullLoss: parseFloat(dullLoss.toFixed(4)),
+            cuttingLoss: parseFloat(cuttingLoss.toFixed(4)),
             pouches: Object.entries(pouchReceivedWeights).map(([pouchId, weight]) => ({
               pouchId,
               receivedWeight: parseFloat(weight.toFixed(4))
@@ -209,68 +236,81 @@ const DullDetailsPage = () => {
       const result = await response.json();
 
       if (result.success) {
-        toast.success('Dull details updated successfully');
+        toast.success('Cutting details updated successfully');
         window.location.reload();
       } else {
-        throw new Error(result.message || 'Failed to update dull details');
+        throw new Error(result.message || 'Failed to update cutting details');
       }
     } catch (error) {
-      console.error('[DullReceived] Error:', error);
-      toast.error(error.message || 'Failed to update dull details');
+      console.error('[CuttingReceived] Error:', error);
+      toast.error(error.message || 'Failed to update cutting details');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   if (loading) {
-    return <div className="p-6">Loading dull details...</div>;
+    return <div className="p-6">Loading cutting details...</div>;
   }
 
-  if (!data || !data.dull) {
-    return <div className="p-6">Failed to load dull details</div>;
+  if (!data || !data.cutting) {
+    return <div className="p-6">Failed to load cutting details</div>;
   }
 
-  const { dull, pouches } = data;
+  const { cutting, pouches } = data;
 
   return (
     <div className="p-6">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-sm">
         <div className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Dull Details</h2>
+          <h2 className="text-xl font-semibold mb-4">Cutting Details</h2>
           
-          {/* Dull Info Grid */}
+          {/* Cutting Info Grid */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
-              <Label>Dull Number</Label>
-              <div className="mt-1">{dull?.Name || 'N/A'}</div>
+              <Label>Cutting Number</Label>
+              <div className="mt-1">{cutting?.Name || 'N/A'}</div>
             </div>
             <div>
               <Label>Issued Date</Label>
               <div className="mt-1">
-                {dull?.Issued_Date__c ? new Date(dull.Issued_Date__c).toLocaleDateString() : 'N/A'}
+                {cutting?.Issued_Date__c ? new Date(cutting.Issued_Date__c).toLocaleDateString() : 'N/A'}
               </div>
             </div>
             <div>
               <Label>Issued Weight</Label>
-              <div className="mt-1">{dull?.Issued_Weight__c?.toFixed(4) || '0.0000'}g</div>
+              <div className="mt-1">{cutting?.Issued_Weight__c?.toFixed(4) || '0.0000'}g</div>
             </div>
             <div>
               <Label>Status</Label>
-              <div className="mt-1">{dull?.Status__c || 'N/A'}</div>
+              <div className="mt-1">{cutting?.Status__c || 'N/A'}</div>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="mt-8">
             <div className="space-y-6">
-              <div>
-                <Label>Received Date</Label>
-                <Input
-                  type="date"
-                  value={receivedDate}
-                  onChange={(e) => setReceivedDate(e.target.value)}
-                  className="mt-1"
-                  required
-                />
+              {/* Date and Time Selection */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Received Date</Label>
+                  <Input
+                    type="date"
+                    value={receivedDate}
+                    onChange={(e) => setReceivedDate(e.target.value)}
+                    className="mt-1"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>Received Time</Label>
+                  <Input
+                    type="time"
+                    value={receivedTime}
+                    onChange={(e) => setReceivedTime(e.target.value)}
+                    className="mt-1"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Pouch Details Section */}
@@ -285,7 +325,7 @@ const DullDetailsPage = () => {
                       </div>
                       <div>
                         <Label>Issued Weight</Label>
-                        <div className="mt-1">{pouch.Issued_Weight_Dull__c?.toFixed(4) || '0.0000'}g</div>
+                        <div className="mt-1">{pouch.Issued_Weight_Cutting__c?.toFixed(4) || '0.0000'}g</div>
                       </div>
                       <div>
                         <Label>Received Weight</Label>
@@ -356,10 +396,10 @@ const DullDetailsPage = () => {
                   </div>
 
                   <div>
-                    <Label>Dull Loss (g)</Label>
+                    <Label>Cutting Loss (g)</Label>
                     <Input
                       type="number"
-                      value={dullLoss.toFixed(4)}
+                      value={cuttingLoss.toFixed(4)}
                       className="w-full h-9 bg-gray-50"
                       disabled={true}
                     />
@@ -372,7 +412,7 @@ const DullDetailsPage = () => {
                 disabled={isSubmitting || totalReceivedWeight === 0}
                 className="w-full mt-6"
               >
-                {isSubmitting ? 'Updating...' : 'Update Dull Details'}
+                {isSubmitting ? 'Updating...' : 'Update Cutting Details'}
               </Button>
             </div>
           </form>
@@ -382,4 +422,4 @@ const DullDetailsPage = () => {
   );
 };
 
-export default DullDetailsPage;
+export default CuttingDetailsPage;

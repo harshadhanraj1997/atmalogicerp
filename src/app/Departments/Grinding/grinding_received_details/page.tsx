@@ -254,7 +254,7 @@ const GrindingDetailsPage = () => {
 
       if (result.success) {
         toast.success('Grinding details updated successfully');
-        router.push('/Departments/Grinding');
+        
       } else {
         throw new Error(result.message || 'Failed to update grinding details');
       }

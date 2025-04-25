@@ -20,6 +20,7 @@ const FilingSummary: React.FC = () => {
       try {
         setLoading(true);
         const data = await fetchGrindingData();
+        console.log('Fetched Filing Data:', data);
         setFilingData(data);
         filterDataByDateRange(data, dateRange);
       } catch (error) {
@@ -39,67 +40,163 @@ const FilingSummary: React.FC = () => {
 
   // Function to filter data by date range
   const filterDataByDateRange = (data: IFiling[], range: string) => {
-    if (!data.length) {
+    if (!data || !data.length) {
+      console.log('No data to filter');
       setFilteredData([]);
       return;
     }
 
+    console.log('Filtering data:', { range, dataLength: data.length });
+
     const now = new Date();
     let startDate: Date;
+    let endDate: Date = now;
 
     switch (range) {
       case "day":
-        // Today
-        startDate = new Date(now);
-        startDate.setHours(0, 0, 0, 0);
-        filterByDateRange(data, startDate, now);
+        startDate = new Date(Date.UTC(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          0, 0, 0, 0
+        ));
+        endDate = new Date(Date.UTC(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          23, 59, 59, 999
+        ));
         break;
       case "week":
-        // Current week (last 7 days)
-        startDate = new Date(now);
-        startDate.setDate(startDate.getDate() - 7);
-        startDate.setHours(0, 0, 0, 0);
-        filterByDateRange(data, startDate, now);
+        startDate = new Date(Date.UTC(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() - 7,
+          0, 0, 0, 0
+        ));
+        endDate = new Date(Date.UTC(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          23, 59, 59, 999
+        ));
         break;
       case "month":
-        // Current month
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        startDate.setHours(0, 0, 0, 0);
-        filterByDateRange(data, startDate, now);
+        startDate = new Date(Date.UTC(
+          now.getFullYear(),
+          now.getMonth(),
+          1,
+          0, 0, 0, 0
+        ));
+        endDate = new Date(Date.UTC(
+          now.getFullYear(),
+          now.getMonth() + 1,
+          0,
+          23, 59, 59, 999
+        ));
         break;
       case "custom":
-        // Custom date range
         if (customStartDate && customEndDate) {
-          const endOfDay = new Date(customEndDate);
-          endOfDay.setHours(23, 59, 59, 999);
-          filterByDateRange(data, customStartDate, endOfDay);
+          startDate = new Date(Date.UTC(
+            customStartDate.getFullYear(),
+            customStartDate.getMonth(),
+            customStartDate.getDate(),
+            0, 0, 0, 0
+          ));
+          endDate = new Date(Date.UTC(
+            customEndDate.getFullYear(),
+            customEndDate.getMonth(),
+            customEndDate.getDate(),
+            23, 59, 59, 999
+          ));
+        } else {
+          console.log('Missing custom date range');
+          return;
         }
         break;
       default:
+        console.log('Setting all data');
         setFilteredData(data);
+        return;
     }
+
+    console.log('Date range:', { 
+      startDate: startDate.toISOString(), 
+      endDate: endDate.toISOString() 
+    });
+    filterByDateRange(data, startDate, endDate);
   };
 
   // Helper function to filter by date range
   const filterByDateRange = (data: IFiling[], start: Date, end: Date) => {
+    console.log('Filtering with range:', { start, end });
+    
     const filtered = data.filter((item) => {
       try {
-        // Parse the ISO date string to Date object
-        const issuedDate = new Date(item.issuedDate);
-        
-        // Set the time to start of day for start date and end of day for end date
-        const startOfDay = new Date(start);
-        startOfDay.setHours(0, 0, 0, 0);
-        
-        const endOfDay = new Date(end);
-        endOfDay.setHours(23, 59, 59, 999);
+        // Parse the ISO date string properly
+        const itemDate = typeof item.issuedDate === 'string' 
+          ? new Date(item.issuedDate) // This will handle ISO format like "2025-04-23T20:27:00.000+0000"
+          : item.issuedDate;
 
-        return issuedDate >= startOfDay && issuedDate <= endOfDay;
+        // Debug log for date parsing
+        console.log('Date comparison:', {
+          original: item.issuedDate,
+          parsed: itemDate,
+          startDate: start,
+          endDate: end
+        });
+
+        // Ensure valid date
+        if (!(itemDate instanceof Date) || isNaN(itemDate.getTime())) {
+          console.warn('Invalid date:', item.issuedDate);
+          return false;
+        }
+
+        // Convert all dates to UTC for consistent comparison
+        const compareDate = new Date(Date.UTC(
+          itemDate.getUTCFullYear(),
+          itemDate.getUTCMonth(),
+          itemDate.getUTCDate(),
+          0, 0, 0, 0
+        ));
+        
+        const startOfDay = new Date(Date.UTC(
+          start.getFullYear(),
+          start.getMonth(),
+          start.getDate(),
+          0, 0, 0, 0
+        ));
+        
+        const endOfDay = new Date(Date.UTC(
+          end.getFullYear(),
+          end.getMonth(),
+          end.getDate(),
+          23, 59, 59, 999
+        ));
+
+        // Debug log for UTC comparison
+        console.log('UTC comparison:', {
+          compareDate: compareDate.toISOString(),
+          startOfDay: startOfDay.toISOString(),
+          endOfDay: endOfDay.toISOString()
+        });
+
+        return compareDate >= startOfDay && compareDate <= endOfDay;
       } catch (error) {
-        console.error('Error parsing date:', error, item.issuedDate);
+        console.error('Error filtering date:', error, item.issuedDate);
         return false;
       }
     });
+
+    console.log('Filtered results:', {
+      total: data.length,
+      filtered: filtered.length,
+      sampleDates: filtered.slice(0, 3).map(d => ({
+        original: d.issuedDate,
+        parsed: new Date(d.issuedDate).toISOString()
+      }))
+    });
+
     setFilteredData(filtered);
   };
 
@@ -118,34 +215,32 @@ const FilingSummary: React.FC = () => {
 
   // Calculate summary statistics
   const calculateSummary = () => {
-    console.log('Calculating summary for data:', {
+    console.log('Calculating summary for filtered data:', {
       totalRecords: filteredData.length,
-      sampleDates: filteredData.slice(0, 3).map(d => ({
-        original: d.issuedDate,
-        parsed: new Date(d.issuedDate).toISOString()
-      }))
+      sample: filteredData.slice(0, 2)
     });
 
     const totalFilings = filteredData.length;
     const totalIssuedWeight = filteredData.reduce(
-      (sum, item) => sum + Number(item.issuedWeight || 0),
+      (sum, item) => sum + (Number(item.issuedWeight) || 0),
       0
     );
     const totalReceivedWeight = filteredData.reduce(
-      (sum, item) => sum + Number(item.receivedWeight || 0),
+      (sum, item) => sum + (Number(item.receivedWeight) || 0),
       0
     );
     
-    const totalFilingLoss = filteredData.reduce((sum, item) => {
-      return sum + Number(item.grindingLoss || 0);
-    }, 0);
+    const totalFilingLoss = filteredData.reduce(
+      (sum, item) => sum + (Number(item.grindingLoss) || 0),
+      0
+    );
 
-    // Calculate percentages
-    const filingLossPercentage = totalIssuedWeight
+    // Calculate percentages with null checks
+    const filingLossPercentage = totalIssuedWeight > 0
       ? ((totalFilingLoss / totalIssuedWeight) * 100).toFixed(2)
       : "0";
     
-    const receivedPercentage = totalIssuedWeight 
+    const receivedPercentage = totalIssuedWeight > 0
       ? ((totalReceivedWeight / totalIssuedWeight) * 100).toFixed(2)
       : "0";
 

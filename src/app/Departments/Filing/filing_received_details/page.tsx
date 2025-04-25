@@ -26,7 +26,7 @@ interface PouchDetails {
 // Form validation schema
 const updateFormSchema = z.object({
   receivedDate: z.string().min(1, "Received date is required"),
-  receivedWeight: z.number().positive("Weight must be greater than 0"),
+  receivedWeight: z.number().min(0, "Weight must be non-negative"),
   grindingLoss: z.number()
 });
 
@@ -416,11 +416,11 @@ const FilingDetailsPage = () => {
                   <Input
                     type="number"
                     step="0.0001"
+                    min="0"
                     value={scrapReceivedWeight || ''}
                     onChange={(e) => setScrapReceivedWeight(parseFloat(e.target.value) || 0)}
                     className={`w-full h-9 ${formErrors.scrapReceivedWeight ? 'border-red-500' : ''}`}
-                    required
-                    placeholder="Enter scrap weight"
+                    placeholder="Enter scrap weight (can be 0)"
                     disabled={isSubmitting}
                   />
                   {formErrors.scrapReceivedWeight && (
@@ -434,11 +434,11 @@ const FilingDetailsPage = () => {
                   <Input
                     type="number"
                     step="0.0001"
+                    min="0"
                     value={dustReceivedWeight || ''}
                     onChange={(e) => setDustReceivedWeight(parseFloat(e.target.value) || 0)}
                     className={`w-full h-9 ${formErrors.dustReceivedWeight ? 'border-red-500' : ''}`}
-                    required
-                    placeholder="Enter dust weight"
+                    placeholder="Enter dust weight (can be 0)"
                     disabled={isSubmitting}
                   />
                   {formErrors.dustReceivedWeight && (
@@ -461,7 +461,7 @@ const FilingDetailsPage = () => {
                 <Button 
                   type="submit" 
                   className="px-4 py-2 text-sm"
-                  disabled={isSubmitting || totalReceivedWeight === 0}
+                  disabled={isSubmitting || !receivedDate}
                 >
                   {isSubmitting ? 'Updating...' : 'Update Received Details'}
                 </Button>

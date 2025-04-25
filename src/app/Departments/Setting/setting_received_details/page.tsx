@@ -35,13 +35,11 @@ interface SettingData {
 // Form validation schema
 const updateFormSchema = z.object({
   receivedDate: z.string().min(1, "Received date is required"),
-  receivedWeight: z.number().positive("Weight must be greater than 0"),
-  settingLoss: z.number(),
-  pouches: z.array(z.object({
-    pouchId: z.string(),
-    receivedWeight: z.number(),
-    settingLoss: z.number()
-  }))
+  receivedWeight: z.number().min(0, "Weight must be non-negative"),
+  ornamentWeight: z.number().min(0, "Ornament weight must be non-negative"),
+  scrapReceivedWeight: z.number().min(0, "Weight cannot be negative"),
+  dustReceivedWeight: z.number().min(0, "Weight cannot be negative"),
+  settingLoss: z.number()
 });
 
 type UpdateFormData = z.infer<typeof updateFormSchema>;
@@ -76,8 +74,8 @@ const SettingDetailsPage = () => {
   // Update the form validation schema
   const updateFormSchema = z.object({
     receivedDate: z.string().min(1, "Received date is required"),
-    receivedWeight: z.number().positive("Weight must be greater than 0"),
-    ornamentWeight: z.number().positive("Ornament weight must be greater than 0"),
+    receivedWeight: z.number().min(0, "Weight must be non-negative"),
+    ornamentWeight: z.number().min(0, "Ornament weight must be non-negative"),
     scrapReceivedWeight: z.number().min(0, "Weight cannot be negative"),
     dustReceivedWeight: z.number().min(0, "Weight cannot be negative"),
     settingLoss: z.number()
@@ -466,11 +464,11 @@ const SettingDetailsPage = () => {
                   <Input
                     type="number"
                     step="0.0001"
+                    min="0"
                     value={scrapReceivedWeight || ''}
                     onChange={(e) => setScrapReceivedWeight(parseFloat(e.target.value) || 0)}
                     className={`w-full h-9 ${formErrors.scrapReceivedWeight ? 'border-red-500' : ''}`}
-                    required
-                    placeholder="Enter scrap weight"
+                    placeholder="Enter scrap weight (can be 0)"
                     disabled={isSubmitting}
                   />
                   {formErrors.scrapReceivedWeight && (
@@ -483,11 +481,11 @@ const SettingDetailsPage = () => {
                   <Input
                     type="number"
                     step="0.0001"
+                    min="0"
                     value={dustReceivedWeight || ''}
                     onChange={(e) => setDustReceivedWeight(parseFloat(e.target.value) || 0)}
                     className={`w-full h-9 ${formErrors.dustReceivedWeight ? 'border-red-500' : ''}`}
-                    required
-                    placeholder="Enter dust weight"
+                    placeholder="Enter dust weight (can be 0)"
                     disabled={isSubmitting}
                   />
                   {formErrors.dustReceivedWeight && (
@@ -528,7 +526,7 @@ const SettingDetailsPage = () => {
 
               <Button
                 type="submit"
-                disabled={isSubmitting || totalReceivedWeight === 0}
+                disabled={isSubmitting || !receivedDate}
                 className="w-full"
               >
                 {isSubmitting ? 'Updating...' : 'Update Setting Details'}

@@ -19,7 +19,7 @@ export const fetchDullData = async (): Promise<IDull[]> => {
             id: dull.Name,
             issuedWeight: dull.Issued_Weight__c || 0,  // Updated to match server field
             issuedDate: dull.Issued_Date__c || '-',    // Updated to match server field
-            receivedWeight: dull.Received_Weight__c || 0, // Updated to match server field
+            receivedWeight: dull.Returned_weight__c || 0, // Updated to match server field
             receivedDate: dull.Received_Date__c || '-',  // Updated to match server field
             status: dull.status__c,           // Updated to match server field
             dullLoss: dull.Dull_loss__c || 0 // Calculate loss

@@ -543,13 +543,14 @@ interface DepartmentRecord {
 }
 
 export interface IPlating {
-  id: string;
-  issuedWeight: number;
-  issuedDate: string;
-  receivedWeight: number;
-  receivedDate: string;
-  status: string;
-  platingLoss: number;
+  Id: string;
+  Name: string;
+  Issued_Date__c: string;
+  Issued_Weight__c: number;
+  Received_Weight__c: number;
+  Received_Date__c: string;
+  Status__c: string;
+  Plating_Loss__c: number;
 }
 
 
@@ -562,4 +563,10 @@ export interface ICutting {
   status: string;
   cuttingLoss: number;
   
+}
+
+export interface IPlatingResponse {
+  success: boolean;
+  data: IPlating[];
+  message?: string;
 }
