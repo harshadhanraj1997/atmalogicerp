@@ -192,32 +192,96 @@ export default function DealsTable() {
     });
   }, []);
 
-  // Filter effect
+  // Apply all filters in a single effect
   useEffect(() => {
-    const newFilteredDeals = deals.filter(deal => {
-      if (statusFilter !== 'all' && 
-          deal.status?.toLowerCase() !== statusFilter.toLowerCase()) {
-        return false;
-      }
-      if (startDate || endDate) {
-        const dealDate = new Date(deal.createdDate).toISOString().split('T')[0];
-        if (startDate && dealDate < startDate) return false;
-        if (endDate && dealDate > endDate) return false;
-      }
-      if (partyNameFilter !== 'all' && deal.dealName !== partyNameFilter) {
-        return false;
-      }
-      return true;
+    if (!deals || !Array.isArray(deals)) {
+      console.error('Invalid deals data for filtering');
+      return;
+    }
+
+    console.log('Applying filters:', { 
+      statusFilter, 
+      partyNameFilter, 
+      startDate, 
+      endDate, 
+      searchQuery,
+      totalDeals: deals.length 
     });
     
-    setFilteredDeals(newFilteredDeals);
-    
-    // If current page would be empty with new filtered data, reset to page 1
-    const maxPage = Math.ceil(newFilteredDeals.length / 10);
+    try {
+      // Start with all deals
+      let newFilteredDeals = [...deals];
+      
+      // Apply status filter
+      if (statusFilter && statusFilter !== 'all') {
+        console.log(`Filtering by status: ${statusFilter}`);
+        newFilteredDeals = newFilteredDeals.filter(deal => {
+          if (!deal || !deal.status) return false;
+          const dealStatus = deal.status.toLowerCase();
+          const filterStatus = statusFilter.toLowerCase();
+          console.log(`Deal status: ${dealStatus}, Filter status: ${filterStatus}`);
+          return dealStatus === filterStatus;
+        });
+        console.log(`After status filter: ${newFilteredDeals.length} deals`);
+      }
+      
+      // Apply date filter
+      if (startDate || endDate) {
+        console.log(`Filtering by date range: ${startDate} to ${endDate}`);
+        newFilteredDeals = newFilteredDeals.filter(deal => {
+          if (!deal || !deal.createdDate) return false;
+          const dealDate = new Date(deal.createdDate).toISOString().split('T')[0];
+          if (startDate && dealDate < startDate) return false;
+          if (endDate && dealDate > endDate) return false;
+          return true;
+        });
+        console.log(`After date filter: ${newFilteredDeals.length} deals`);
+      }
+      
+      // Apply party name filter
+      if (partyNameFilter && partyNameFilter !== 'all') {
+        console.log(`Filtering by party name: ${partyNameFilter}`);
+        newFilteredDeals = newFilteredDeals.filter(deal => {
+          if (!deal || !deal.dealName) return false;
+          return deal.dealName === partyNameFilter;
+        });
+        console.log(`After party filter: ${newFilteredDeals.length} deals`);
+      }
+      
+      // Apply search filter directly here
+      if (searchQuery && searchQuery.trim() !== '') {
+        const query = searchQuery.toLowerCase().trim();
+        console.log(`Filtering by search query: ${query}`);
+        newFilteredDeals = newFilteredDeals.filter(deal => {
+          if (!deal) return false;
+          return Object.entries(deal).some(([key, value]) => {
+            if (value === null || value === undefined) return false;
+            return String(value).toLowerCase().includes(query);
+          });
+        });
+        console.log(`After search filter: ${newFilteredDeals.length} deals`);
+      }
+      
+      console.log(`Filtered from ${deals.length} to ${newFilteredDeals.length} deals`);
+      
+      // Update the filtered deals
+      setFilteredDeals(newFilteredDeals);
+      
+      // Also update the rows in the table hook to ensure pagination works correctly
+      setRows(newFilteredDeals);
+    } catch (error) {
+      console.error('Error applying filters:', error);
+    }
+  }, [deals, startDate, endDate, statusFilter, partyNameFilter, searchQuery]);
+
+  // Handle pagination reset when filtered data changes
+  useEffect(() => {
+    // Reset to page 1 when filters change and current page would be empty
+    const maxPage = Math.ceil(filteredDeals.length / 10);
     if (page > maxPage && maxPage > 0) {
       handleChangePage(1);
     }
-  }, [deals, startDate, endDate, statusFilter, partyNameFilter]);
+  }, [filteredDeals.length, page]);
 
   // Monitor pagination for debugging
   useEffect(() => {
@@ -239,10 +303,17 @@ export default function DealsTable() {
   };
 
   const handleResetFilters = () => {
+    console.log('Resetting all filters');
     setStartDate('');
     setEndDate('');
     setStatusFilter('all');
     setPartyNameFilter('all');
+    // Also reset search query
+    if (searchQuery) {
+      // Create a fake event to pass to handleSearchChange
+      const fakeEvent = { target: { value: '' } } as React.ChangeEvent<HTMLInputElement>;
+      handleSearchChange(fakeEvent);
+    }
   };
 
   const handlePrint = (pdfUrl: string | null) => {
@@ -507,7 +578,11 @@ export default function DealsTable() {
           <div className="manaz-common-mat-list w-full table__wrapper table-responsive">
             <OrderTableControls
               searchQuery={searchQuery}
-              handleSearchChange={handleSearchChange}
+              handleSearchChange={(e) => {
+                // Call the material table hook's search handler
+                handleSearchChange(e);
+                // This will update searchQuery state which is used in our filter effect
+              }}
               startDate={startDate}
               endDate={endDate}
               handleDateChange={handleDateChange}

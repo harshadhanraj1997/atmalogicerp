@@ -79,7 +79,7 @@ const OrderTableControls: React.FC<OrderTableControlsProps> = ({
             >
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="finished">Finished</SelectItem>
             </SelectContent>
           </Select>
         </div>
