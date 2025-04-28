@@ -17,10 +17,14 @@ import { useRouter } from 'next/navigation';
 interface Pouch {
   Id: string;
   Name: string;
+  Order_Id__c?: string;
+  Product__c?: string;
+  Quantity__c?: number;
   Received_Weight_Grinding__c?: number;
   Received_Weight_Setting__c?: number;
   Received_Weight_Polishing__c?: number;
   Received_Weight_Dull__c?: number;
+  categories?: Array<{Category__c: string, Quantity__c: number}>;
 }
 
 interface DepartmentRecord {
@@ -94,9 +98,9 @@ export default function CreateSettingFromDepartment() {
 
       try {
         setLoading(true);
-        const [prefix, date, month, year, number] = selectedRecord.split('/');
+        const [prefix, date, month, year, number,  subnumber] = selectedRecord.split('/');
         // Use the standard API pattern for pouches
-        const endpoint = `${apiBaseUrl}/api/${selectedDepartment.toLowerCase()}/${prefix}/${date}/${month}/${year}/${number}/pouches`;
+        const endpoint = `${apiBaseUrl}/api/${selectedDepartment.toLowerCase()}/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`;
         console.log('Fetching pouches from:', endpoint);
         
         const response = await fetch(endpoint);
@@ -128,13 +132,13 @@ export default function CreateSettingFromDepartment() {
   // Update the useEffect for ID generation
   useEffect(() => {
     if (selectedRecord) {
-      const [_, date, month, year, number] = selectedRecord.split('/');
+      const [_, date, month, year, number, subnumber] = selectedRecord.split('/');
       // Create prefix based on selected department (P + first letter of department)
       const deptPrefix = {
         'Dull': 'PD'
       }[selectedDepartment] || 'P';
       
-      const newPolishingId = `${deptPrefix}/${date}/${month}/${year}/${number}`;
+      const newPolishingId = `${deptPrefix}/${date}/${month}/${year}/${number}/${subnumber}`;
       setFilingId(newPolishingId);
 
       // Update pouch IDs to match the new format
@@ -224,6 +228,8 @@ export default function CreateSettingFromDepartment() {
           return {
             pouchId: newPouchId,
             orderId: sourcePouch.Order_Id__c,
+            name: sourcePouch.Product__c,
+            quantity: sourcePouch.Quantity__c,
             weight: parseFloat(weight.toFixed(4)),
             categories: categories.map(cat => ({
               category: cat.Category__c,
@@ -233,10 +239,17 @@ export default function CreateSettingFromDepartment() {
         })
         .filter(Boolean);
 
+      // Get the first pouch data for the main record
+      const firstPouch = pouchData.length > 0 ? pouchData[0] : null;
+
       const requestData = {
         polishingId: filingId,
         issuedWeight: parseFloat(totalWeight.toFixed(4)),
         issuedDate: new Date().toISOString(),
+        // Include orderId, name, and quantity in the main request data
+        orderId: firstPouch?.orderId || null,
+        name: firstPouch?.name || null,
+        quantity: firstPouch?.quantity || null,
         pouches: pouchData
       };
 

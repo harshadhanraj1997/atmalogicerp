@@ -488,7 +488,7 @@ export default function CastingTable() {
                         <TableCell>Received Weight</TableCell>
                         <TableCell>Issued Date</TableCell>
                         <TableCell>Received Date</TableCell>
-                        <TableCell>Created Date</TableCell>
+                        
                         <TableCell>Status</TableCell>
                         <TableCell>Casting Loss</TableCell>
                         <TableCell>Actions</TableCell>
@@ -534,7 +534,7 @@ export default function CastingTable() {
                               </TableCell>
                               <TableCell>{deal.issuedDate}</TableCell>
                               <TableCell>{deal.receivedDate}</TableCell>
-                              <TableCell>{deal.created_date}</TableCell>
+                              
                               <TableCell>
                                 <span 
                                   className={`bd-badge ${getStatusClass(deal.status)}`}

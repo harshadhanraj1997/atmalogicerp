@@ -17,10 +17,14 @@ import { useRouter } from 'next/navigation';
 interface Pouch {
   Id: string;
   Name: string;
+  Order_Id__c?: string;
+  Product__c?: string;
+  Quantity__c?: number;
   Received_Weight_Grinding__c?: number;
   Received_Weight_Setting__c?: number;
   Received_Weight_Polishing__c?: number;
   Received_Weight_Dull__c?: number;
+  categories?: Array<{Category__c: string, Quantity__c: number}>;
 }
 
 interface DepartmentRecord {
@@ -94,9 +98,9 @@ export default function CreateGrindingFromDepartment() {
 
       try {
         setLoading(true);
-        const [prefix, date, month, year, number] = selectedRecord.split('/');
+        const [prefix, date, month, year, number, subnumber] = selectedRecord.split('/');
         // Use the standard API pattern for pouches
-        const endpoint = `${apiBaseUrl}/api/${selectedDepartment.toLowerCase()}/${prefix}/${date}/${month}/${year}/${number}/pouches`;
+        const endpoint = `${apiBaseUrl}/api/${selectedDepartment.toLowerCase()}/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`;
         console.log('Fetching pouches from:', endpoint);
         
         const response = await fetch(endpoint);
@@ -128,7 +132,7 @@ export default function CreateGrindingFromDepartment() {
   // Generate Filing ID and Pouch IDs
   useEffect(() => {
     if (selectedRecord) {
-      const [_, date, month, year, number] = selectedRecord.split('/');
+      const [_, date, month, year, number, subnumber] = selectedRecord.split('/');
       // Create prefix based on selected department (G + first letter of department)
       const deptPrefix = {
         'Setting': 'GS',
@@ -136,7 +140,7 @@ export default function CreateGrindingFromDepartment() {
         'Dull': 'GD'
       }[selectedDepartment] || 'G';
       
-      const newFilingId = `${deptPrefix}/${date}/${month}/${year}/${number}`;
+      const newFilingId = `${deptPrefix}/${date}/${month}/${year}/${number}/${subnumber || '001'}`;
       setFilingId(newFilingId);
     }
   }, [selectedRecord, selectedDepartment]);
@@ -223,6 +227,8 @@ export default function CreateGrindingFromDepartment() {
             sourcePouch: sourcePouch.Name,
             newId: newPouchId,
             orderId: sourcePouch.Order_Id__c,
+            product: sourcePouch.Product__c,
+            quantity: sourcePouch.Quantity__c,
             weight: weight,
             categories: categories
           });
@@ -230,6 +236,8 @@ export default function CreateGrindingFromDepartment() {
           return {
             pouchId: newPouchId,
             orderId: sourcePouch.Order_Id__c,
+            name: sourcePouch.Product__c,
+            quantity: sourcePouch.Quantity__c,
             weight: parseFloat(weight.toFixed(4)),
             categories: categories.map(cat => ({
               category: cat.Category__c,
@@ -239,10 +247,17 @@ export default function CreateGrindingFromDepartment() {
         })
         .filter(Boolean); // Remove any null entries
 
+      // Get the first pouch data for the main record
+      const firstPouch = pouchData.length > 0 ? pouchData[0] : null;
+
       const requestData = {
         grindingId: filingId, // Changed from filingId to grindingId
         issuedWeight: parseFloat(totalWeight.toFixed(4)),
         issuedDate: new Date().toISOString(),
+        // Include orderId, name, and quantity in the main request data
+        orderId: firstPouch?.orderId || null,
+        name: firstPouch?.name || null,
+        quantity: firstPouch?.quantity || null,
         pouches: pouchData
       };
 
@@ -251,12 +266,17 @@ export default function CreateGrindingFromDepartment() {
         grinding: {
           id: filingId,
           weight: totalWeight,
-          date: new Date().toISOString()
+          date: new Date().toISOString(),
+          orderId: requestData.orderId,
+          name: requestData.name,
+          quantity: requestData.quantity
         },
         pouchCount: pouchData.length,
         pouches: pouchData.map(p => ({
           pouchId: p.pouchId,
           orderId: p.orderId,
+          name: p.name,
+          quantity: p.quantity,
           weight: p.weight,
           categoriesCount: p.categories?.length || 0
         }))
@@ -277,6 +297,32 @@ export default function CreateGrindingFromDepartment() {
       console.log('Server Response:', result);
 
       if (result.success) {
+        // Check if data is returned in the response
+        if (result.data) {
+          if (Array.isArray(result.data) && result.data.length > 0) {
+            // If response data is an array
+            const recordData = result.data[0];
+            console.log('Record data from server:', recordData);
+            
+            if (recordData.orderId) {
+              console.log('Order ID received from server:', recordData.orderId);
+            }
+            
+            // Log other important fields
+            console.log('Product from server:', recordData.name);
+            console.log('Quantity from server:', recordData.quantity);
+          } else if (result.data.orderId || result.data.OrderId) {
+            // If response data is an object with orderId/OrderId directly
+            const orderId = result.data.orderId || result.data.OrderId;
+            const productName = result.data.name || result.data.product;
+            const quantity = result.data.quantity;
+            
+            console.log('Order ID received from server:', orderId);
+            console.log('Product from server:', productName);
+            console.log('Quantity from server:', quantity);
+          }
+        }
+        
         toast.success('Grinding record created successfully');
         router.push('/Departments/Grinding');
       } else {

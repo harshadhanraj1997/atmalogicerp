@@ -17,6 +17,9 @@ import { useRouter } from 'next/navigation';
 interface Pouch {
   Id: string;
   Name: string;
+  Order_Id__c?: string;
+  Product__c?: string;
+  Quantity__c?: number;
   Received_Weight_Grinding__c?: number;
   Received_Weight_Setting__c?: number;
   Received_Weight_Polishing__c?: number;
@@ -128,7 +131,7 @@ export default function CreateFilingFromDepartment() {
   // Generate Filing ID and Pouch IDs
   useEffect(() => {
     if (selectedRecord) {
-      const [_, date, month, year, number] = selectedRecord.split('/');
+      const [_, date, month, year, number, subnumber] = selectedRecord.split('/');
       const deptPrefix = {
         'Grinding': 'FG',
         'Setting': 'FS',
@@ -136,7 +139,7 @@ export default function CreateFilingFromDepartment() {
         'Dull': 'FD'
       }[selectedDepartment] || 'F';
       
-      const newFilingId = `${deptPrefix}/${date}/${month}/${year}/${number}/${subnumber}`;
+      const newFilingId = `${deptPrefix}/${date}/${month}/${year}/${number}/${subnumber || '001'}`;
       setFilingId(newFilingId);
     }
   }, [selectedRecord, selectedDepartment]);
@@ -219,22 +222,33 @@ export default function CreateFilingFromDepartment() {
           console.log('Processing Pouch:', {
             sourcePouch: sourcePouch.Name,
             newId: newPouchId,
-            orderId: sourcePouch.Order_Id__c,
+            OrderId: sourcePouch.Order_Id__c,
+            product: sourcePouch.Product__c,
+            quantity: sourcePouch.Quantity__c,
             weight: weight
           });
 
           return {
             pouchId: newPouchId,
             orderId: sourcePouch.Order_Id__c,
+            name: sourcePouch.Product__c,
+            quantity: sourcePouch.Quantity__c,
             weight: parseFloat(weight.toFixed(4))
           };
         })
         .filter(Boolean); // Remove any null entries
 
+      // Get the first pouch data for the main record
+      const firstPouch = pouchData.length > 0 ? pouchData[0] : null;
+        
       const requestData = {
         filingId: filingId,
         issuedWeight: parseFloat(totalWeight.toFixed(4)),
         issuedDate: new Date().toISOString(),
+        // Include OrderId, product, and quantity in the main filing details
+        orderId: firstPouch?.orderId || null,
+        name: firstPouch?.name || null,
+        quantity: firstPouch?.quantity || null,
         pouches: pouchData
       };
 
@@ -248,7 +262,9 @@ export default function CreateFilingFromDepartment() {
         pouchCount: pouchData.length,
         pouches: pouchData.map(p => ({
           pouchId: p.pouchId,
-          orderId: p.orderId,
+          OrderId: p.OrderId,
+          product: p.product,
+          quantity: p.quantity,
           weight: p.weight
         }))
       });
@@ -269,7 +285,7 @@ export default function CreateFilingFromDepartment() {
 
       if (result.success) {
         toast.success('Filing record created successfully');
-        router.push('/Departments/Filing');
+        router.push('/Departments/Filing/add_filing_details/Grinding_Table');
       } else {
         throw new Error(result.message || 'Failed to create filing record');
       }
