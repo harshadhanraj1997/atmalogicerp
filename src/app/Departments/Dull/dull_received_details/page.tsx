@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { z } from 'zod';
 import { Label } from "@/components/ui/label";
+import { useRouter } from 'next/navigation';
 
 const apiBaseUrl = "https://needha-erp-server-xrdp.onrender.com";
 
@@ -35,6 +36,7 @@ interface SettingData {
 // Form validation schema
 const updateFormSchema = z.object({
   receivedDate: z.string().min(1, "Received date is required"),
+  receivedTime: z.string().min(1, "Received time is required"),
   receivedWeight: z.number().min(0, "Weight must be non-negative"),
   settingLoss: z.number(),
   pouches: z.array(z.object({
@@ -51,7 +53,12 @@ const DullDetailsPage = () => {
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const dullId = searchParams.get('dullId');
+  const router = useRouter();
   const [receivedDate, setReceivedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [receivedTime, setReceivedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
   const [receivedWeight, setReceivedWeight] = useState<number>(0);
   const [settingLoss, setSettingLoss] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -112,15 +119,15 @@ const DullDetailsPage = () => {
       }
 
       try {
-        const [prefix, date, month, year, number] = dullId.split('/');
+        const [prefix, date, month, year, number, subnumber] = dullId.split('/');
         
         // Use the correct API endpoint
         const response = await fetch(
-          `${apiBaseUrl}/api/dull/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          `${apiBaseUrl}/api/dull/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
         );
 
         console.log('[Dull Details] Fetching from:', 
-          `${apiBaseUrl}/api/dull/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          `${apiBaseUrl}/api/dull/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
         );
 
         const result = await response.json();
@@ -182,17 +189,17 @@ const DullDetailsPage = () => {
       
       if (!data) return;
 
-      const [prefix, date, month, year, number] = dullId!.split('/');
+      const [prefix, date, month, year, number, subnumber] = dullId!.split('/');
 
       const response = await fetch(
-        `${apiBaseUrl}/api/dull/update/${prefix}/${date}/${month}/${year}/${number}`,
+        `${apiBaseUrl}/api/dull/update/${prefix}/${date}/${month}/${year}/${number}/${subnumber}`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            receivedDate,
+            receivedDate: `${receivedDate}T${receivedTime}:00.000Z`,
             receivedWeight: parseFloat(totalReceivedWeight.toFixed(4)),
             ornamentWeight: parseFloat(ornamentWeight.toFixed(4)),
             scrapReceivedWeight: parseFloat(scrapReceivedWeight.toFixed(4)),
@@ -210,7 +217,10 @@ const DullDetailsPage = () => {
 
       if (result.success) {
         toast.success('Dull details updated successfully');
-        window.location.reload();
+        // Add a slight delay before redirecting to allow the toast to be seen
+        setTimeout(() => {
+          router.push('/Departments/Dull/Dull_Table');
+        }, 1500);
       } else {
         throw new Error(result.message || 'Failed to update dull details');
       }
@@ -268,6 +278,16 @@ const DullDetailsPage = () => {
                   type="date"
                   value={receivedDate}
                   onChange={(e) => setReceivedDate(e.target.value)}
+                  className="mt-1"
+                  required
+                />
+              </div>
+              <div>
+                <Label>Received Time</Label>
+                <Input
+                  type="time"
+                  value={receivedTime}
+                  onChange={(e) => setReceivedTime(e.target.value)}
                   className="mt-1"
                   required
                 />

@@ -108,8 +108,8 @@ const FilingDetailsPage = () => {
     
     try {
       // Parse the filing number to get components
-      const [prefix, date, month, year, number] = filingNumber.split('/');
-      const apiEndpoint = `${apiBaseUrl}/api/filing/update/${prefix}/${date}/${month}/${year}/${number}`;
+      const [prefix, date, month, year, number,subnumber] = filingNumber.split('/');
+      const apiEndpoint = `${apiBaseUrl}/api/filing/update/${prefix}/${date}/${month}/${year}/${number}/${subnumber}`;
       
       console.log('[FilingReceived] Making API call to:', apiEndpoint);
       console.log('[FilingReceived] With data:', JSON.stringify(updateData, null, 2));
@@ -235,6 +235,11 @@ const FilingDetailsPage = () => {
         console.log('[FilingReceived] Update successful');
         toast.success('Filing details updated successfully');
         await refreshData();
+        
+        // Redirect back to the filing table page after successful submission
+        setTimeout(() => {
+          window.location.href = '/Departments/Filing/add_filing_details/Grinding_Table';
+        }, 1500); // Short delay to allow the user to see the success message
       } else {
         console.log('[FilingReceived] Update failed:', result.message);
         throw new Error(result.message || 'Failed to update filing details');
@@ -475,5 +480,3 @@ const FilingDetailsPage = () => {
 };
 
 export default FilingDetailsPage;
-
-

@@ -147,6 +147,21 @@ export default function CastingTable() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  
+  // Custom pagination control functions
+  const handlePageChange = (newPage: number) => {
+    console.log(`Changing page from ${page} to ${newPage}`);
+    // Update our internal page state
+    setPage(newPage);
+  };
+  
+  // Add a direct function to change rows per page
+  const handleRowsPerPageChange = (newRowsPerPage: number) => {
+    console.log(`Changing rows per page from ${rowsPerPage} to ${newRowsPerPage}`);
+    setRowsPerPage(newRowsPerPage);
+    // Reset to first page when changing rows per page
+    setPage(0);
+  };
   const [showConfirmation, setShowConfirmation] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -161,7 +176,8 @@ export default function CastingTable() {
         setLoading(true);
         const data = await fetchDealData();
         setDeals(data);
-        setFilteredDeals(data);
+        
+        // Initial data is loaded - filters will be applied in the next useEffect
       } catch (error) {
         console.error("Error loading deals:", error);
         setError("Failed to load deals");
@@ -171,39 +187,126 @@ export default function CastingTable() {
     };
 
     loadDeals();
-
   }, []);
   
-console.log("Deals State:", deals);
+  // Get material table hook functions to handle pagination, sorting, etc.
+  // Extract only what we need from the hook, override pagination functions
+  const {
+    order,
+    orderBy,
+    selected,
+    searchQuery,
+    handleDelete,
+    handleRequestSort,
+    handleSelectAllClick,
+    handleClick,
+    // Do not use these from the hook, use our local state handlers
+    // handleChangePage,
+    // handleChangeRowsPerPage,
+    handleSearchChange,
+  } = useMaterialTableHook(filteredDeals, rowsPerPage);
 
+  // Apply filters and sorting
   useEffect(() => {
     let filtered = [...deals];
-
-    // Apply status filter
+    
+    // First apply all filters
+    
+    // 1. Status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(deal => 
         deal.status?.toLowerCase() === statusFilter.toLowerCase()
       );
     }
 
-    // Apply date filter
+    // 2. Date filter - improved parsing
     if (startDate || endDate) {
       filtered = filtered.filter(deal => {
-        const dealDate = deal.created_date;
-        if (startDate && dealDate < startDate) return false;
-        if (endDate && dealDate > endDate) return false;
-        return true;
+        try {
+          // Use issued date as primary, no fallback needed
+          const dateStr = deal.issuedDate;
+          if (!dateStr) return true; // Include if no date
+          
+          // Parse date to consistent format
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return true; // Include if invalid date
+          
+          const formattedDate = date.toISOString().split('T')[0];
+          
+          // Check against range
+          if (startDate && formattedDate < startDate) return false;
+          if (endDate && formattedDate > endDate) return false;
+          return true;
+        } catch (error) {
+          console.error('Error in date filter:', error);
+          return true; // Include on error
+        }
       });
     }
-
+    
+    // 3. Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(deal => {
+        return (
+          // Search in multiple fields
+          String(deal.id || '').toLowerCase().includes(query) ||
+          String(deal.status || '').toLowerCase().includes(query) ||
+          String(deal.issuedDate || '').toLowerCase().includes(query) ||
+          String(deal.receivedDate || '').toLowerCase().includes(query) ||
+          String(deal.issuedWeight || '').toLowerCase().includes(query) ||
+          String(deal.receivedWeight || '').toLowerCase().includes(query)
+        );
+      });
+    }
+    
+    // Then sort by issued date in descending order by default
+    filtered.sort((a, b) => {
+      try {
+        const dateA = new Date(a.issuedDate || '0');
+        const dateB = new Date(b.issuedDate || '0');
+        
+        // Most recent first (descending)
+        return dateB.getTime() - dateA.getTime();
+      } catch (error) {
+        return 0; // Maintain order on error
+      }
+    });
+    
+    console.log('Filtered deals:', filtered.length);
     setFilteredDeals(filtered);
-  }, [deals, startDate, endDate, statusFilter]);
+  }, [deals, startDate, endDate, statusFilter, searchQuery]);
 
-  // Calculate paginated data from filtered deals
-  const paginatedDeals = useMemo(() => {
+  // Paginated data calculation - simplified to ensure proper updates
+  // We're not using useMemo here to force recalculation on each render
+  let paginatedDeals: ICasting[] = [];
+  // Only process if we have data
+  if (filteredDeals && filteredDeals.length > 0) {
+    // Basic pagination calculation
     const startIndex = page * rowsPerPage;
-    return filteredDeals.slice(startIndex, startIndex + rowsPerPage);
-  }, [filteredDeals, page, rowsPerPage]);
+    const endIndex = startIndex + rowsPerPage;
+    
+    // Make sure we don't exceed array bounds
+    if (startIndex < filteredDeals.length) {
+      paginatedDeals = filteredDeals.slice(startIndex, endIndex);
+      console.log(`Showing page ${page+1}, records ${startIndex+1}-${Math.min(endIndex, filteredDeals.length)} of ${filteredDeals.length}`);
+      console.log(`Displaying ${paginatedDeals.length} records`);
+      
+      // Reset to page 0 if we somehow ended up on an invalid page
+      if (paginatedDeals.length === 0 && filteredDeals.length > 0) {
+        console.warn('No records on current page but filtered deals exist - resetting to page 0');
+        setTimeout(() => setPage(0), 0);
+        paginatedDeals = filteredDeals.slice(0, rowsPerPage);
+      }
+    } else {
+      // We're out of bounds, reset to first page
+      console.warn(`Page ${page} is out of bounds (total pages: ${Math.ceil(filteredDeals.length/rowsPerPage)})`);
+      setTimeout(() => setPage(0), 0);
+      paginatedDeals = filteredDeals.slice(0, rowsPerPage);
+    }
+  } else {
+    console.log('No filtered deals available');
+  }
 
   const handleDateChange = (type: 'start' | 'end', value: string) => {
     if (type === 'start') setStartDate(value);
@@ -219,20 +322,6 @@ console.log("Deals State:", deals);
     setEndDate('');
     setStatusFilter('all');
   };
-
-  const {
-    order,
-    orderBy,
-    selected,
-    searchQuery,
-    handleDelete,
-    handleRequestSort,
-    handleSelectAllClick,
-    handleClick,
-    handleChangePage,
-    handleChangeRowsPerPage,
-    handleSearchChange,
-  } = useMaterialTableHook(filteredDeals, 10);
 
   const handlePrint = (pdfUrl: string | null) => {
     if (pdfUrl) {
@@ -352,6 +441,9 @@ console.log("Deals State:", deals);
     );
   };
 
+  // Calculate empty rows to maintain consistent height
+  const emptyRows = Math.max(0, (1 + page) * rowsPerPage - filteredDeals.length);
+
   if (loading) return <div>Loading deals...</div>;
   if (error) return <div>Error: {error}</div>;
 
@@ -363,7 +455,7 @@ console.log("Deals State:", deals);
             <TableControls
               rowsPerPage={rowsPerPage}
               searchQuery={searchQuery}
-              handleChangeRowsPerPage={handleChangeRowsPerPage}
+              handleRowsPerPageChange={handleRowsPerPageChange}
               handleSearchChange={handleSearchChange}
               startDate={startDate}
               endDate={endDate}
@@ -618,7 +710,7 @@ console.log("Deals State:", deals);
               <Pagination
                 count={Math.ceil(filteredDeals.length / rowsPerPage)}
                 page={page + 1}
-                onChange={(e, value) => handleChangePage(value - 1)}
+                onChange={(e, value) => handlePageChange(value - 1)}
                 variant="outlined"
                 shape="rounded"
                 className="manaz-pagination-button"

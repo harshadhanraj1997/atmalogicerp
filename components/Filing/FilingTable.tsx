@@ -136,59 +136,100 @@ const FilingTable = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  // Custom pagination control functions
+  const handlePageChange = (newPage: number) => {
+    console.log(`Changing page from ${page} to ${newPage}`);
+    // Update our internal page state
+    setPage(newPage);
+  };
+
+  // Function to change rows per page
+  const handleRowsPerPageChange = (newRowsPerPage: number) => {
+    console.log(`Changing rows per page from ${rowsPerPage} to ${newRowsPerPage}`);
+    setRowsPerPage(newRowsPerPage);
+    // Reset to first page when changing rows per page
+    setPage(0);
+  };
+
   useEffect(() => {
     const loadDeals = async () => {
       try {
         setLoading(true);
         const data = await fetchGrindingData();
         console.log("Fetched Deals:", data);
-        setDeals(data);
+        if (Array.isArray(data) && data.length > 0) {
+          setDeals(data);
+        } else {
+          console.warn("No filing data returned from API or empty array");
+          setDeals([]);
+        }
       } catch (error) {
         console.error("Error loading deals:", error);
         setError("Failed to load deals");
+        setDeals([]);
       } finally {
         setLoading(false);
       }
     };
 
     loadDeals();
-
   }, []);
   
 console.log("Deals State:", deals);
 
   // Memoize the filtered deals to prevent infinite loops
   const filteredDeals = useMemo(() => {
-    return deals.filter(deal => {
-      try {
-        // If no dates selected, show all records
-        if (!startDate && !endDate) {
+    if (!deals || deals.length === 0) {
+      console.log('No deals data available to filter');
+      return [];
+    }
+    
+    console.log('Filtering from', deals.length, 'deals');
+    
+    // Start with all deals
+    let filtered = [...deals];
+    
+    // Filter by date range
+    if (startDate || endDate) {
+      filtered = filtered.filter(deal => {
+        try {
+          // Safely format the filing date
+          const dateStr = deal.issuedDate;
+          if (!dateStr) return true; // Include if no date
+          
+          // Parse date to consistent format
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return true; // Include if invalid date
+          
+          const formattedDate = date.toISOString().split('T')[0];
+          
+          // Check against range
+          if (startDate && formattedDate < startDate) return false;
+          if (endDate && formattedDate > endDate) return false;
           return true;
+        } catch (error) {
+          console.error('Error in date filter:', error);
+          return true; // Include on error
         }
-
-        // Safely format the filing date
-        const filingDateStr = deal.issuedDate ? formatDate(deal.issuedDate) : '';
-        if (!filingDateStr) {
-          console.warn('Invalid or missing date for filing:', deal.id);
-          return true; // Include records with invalid dates
-        }
-
-        // Apply start date filter if exists
-        if (startDate && filingDateStr < startDate) {
-          return false;
-        }
-
-        // Apply end date filter if exists
-        if (endDate && filingDateStr > endDate) {
-          return false;
-        }
-
-        return true;
+      });
+    }
+    
+    // Sort by issued date in descending order by default (most recent first)
+    filtered.sort((a, b) => {
+      try {
+        if (!a.issuedDate || !b.issuedDate) return 0;
+        const dateA = new Date(a.issuedDate);
+        const dateB = new Date(b.issuedDate);
+        
+        // Most recent first (descending)
+        return dateB.getTime() - dateA.getTime();
       } catch (error) {
-        console.error('Date filtering error for filing:', deal.id, error);
-        return true; // Include on error
+        return 0; // Maintain order on error
       }
     });
+    
+    console.log('Filtered to', filtered.length, 'deals');
+    return filtered;
   }, [deals, startDate, endDate]);
 
   const {
@@ -221,17 +262,13 @@ console.log("Deals State:", deals);
 
   // Add debug logging for filtered results
   useEffect(() => {
-    console.log('Date Filter Debug:', {
+    console.log('Filing Table - Filtered Data:', {
       totalFilings: deals.length,
       filteredFilings: filteredRows.length,
-      startDate,
-      endDate,
-      sampleDates: deals.slice(0, 3).map(d => ({
-        id: d.id,
-        date: d.issuedDate ? formatDate(d.issuedDate) : null
-      }))
+      searchTerm: searchQuery,
+      dateRange: { startDate, endDate }
     });
-  }, [deals, filteredRows, startDate, endDate]);
+  }, [deals, filteredRows, searchQuery, startDate, endDate]);
 
   // Add a helper function to safely format dates
   const formatDate = (dateString: string): string => {
@@ -297,9 +334,8 @@ console.log("Deals State:", deals);
       
       if (result.success) {
         toast.success('Order approved successfully');
-        if (onUpdate) {
-          onUpdate();
-        }
+        // Refresh data after successful approval
+        window.location.reload();
       } else {
         toast.error(result.message || 'Failed to approve order');
       }
@@ -312,9 +348,24 @@ console.log("Deals State:", deals);
     }
   };
 
-  const startIndex = page * rowsPerPage;
+  // Calculate paginated rows for display
+  // Ensure page is correctly adjusted for zero-based indexing
+  const pageForCalculation = page;
+  const startIndex = pageForCalculation * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
-  const paginatedRows = deals.slice(startIndex, endIndex);
+  
+  // Use filteredRows when available, or fall back to original deals
+  const rowsToDisplay = filteredRows && filteredRows.length > 0 ? filteredRows : deals;
+  const paginatedRows = rowsToDisplay.slice(startIndex, endIndex);
+  
+  // Debug pagination with more details
+  console.log('Filing Pagination:', {
+    page: pageForCalculation,
+    rowsPerPage,
+    totalRows: rowsToDisplay.length,
+    displaying: `${startIndex + 1}-${Math.min(endIndex, rowsToDisplay.length)} of ${rowsToDisplay.length}`,
+    paginatedRowCount: paginatedRows.length
+  });
 
   if (loading) return <div>Loading deals...</div>;
   if (error) return <div>Error: {error}</div>;
@@ -327,7 +378,7 @@ console.log("Deals State:", deals);
             <TableControls
               rowsPerPage={rowsPerPage}
               searchQuery={searchQuery}
-              handleChangeRowsPerPage={handleChangeRowsPerPage}
+              handleChangeRowsPerPage={handleRowsPerPageChange}
               handleSearchChange={handleSearchChange}
               startDate={startDate}
               endDate={endDate}
@@ -369,6 +420,9 @@ console.log("Deals State:", deals);
                         <TableCell>Received Weight</TableCell>
                         <TableCell>Issued Date</TableCell>
                         <TableCell>Received Date</TableCell>
+                        <TableCell>Order Id</TableCell>
+                        <TableCell>Product</TableCell>
+                        <TableCell>Quantity</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Filing Loss</TableCell>
                         <TableCell>Actions</TableCell>
@@ -398,6 +452,9 @@ console.log("Deals State:", deals);
                               <TableCell>{deal.receivedWeight}</TableCell>
                               <TableCell>{deal.issuedDate}</TableCell>
                               <TableCell>{deal.receivedDate}</TableCell>
+                              <TableCell>{deal.orderId}</TableCell> 
+                              <TableCell>{deal.product}</TableCell>
+                              <TableCell>{deal.quantity}</TableCell>
                               <TableCell>
                                 <span 
                                   className={`bd-badge ${getStatusClass(deal.status)}`}
@@ -569,9 +626,9 @@ console.log("Deals State:", deals);
                 )} of ${filteredRows.length} entries`}
               </Box>
               <Pagination
-                count={Math.ceil(filteredRows.length / rowsPerPage)}
-                page={page}
-                onChange={(e, value) => handleChangePage(value)}
+                count={Math.ceil(rowsToDisplay.length / rowsPerPage)}
+                page={page + 1} // Mui Pagination is 1-based, our state is 0-based
+                onChange={(e, value) => handlePageChange(value - 1)} // Convert 1-based UI page to 0-based state
                 variant="outlined"
                 shape="rounded"
                 className="manaz-pagination-button"

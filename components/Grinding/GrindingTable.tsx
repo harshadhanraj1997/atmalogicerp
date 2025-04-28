@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Box from "@mui/material/Box";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -133,6 +133,30 @@ const GrindingTable = () => {
   const [showConfirmation, setShowConfirmation] = useState<number | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc');
+  const [orderBy, setOrderBy] = useState<string>('issuedDate');
+
+  // Custom pagination control functions
+  const handlePageChange = (newPage: number) => {
+    console.log(`Changing page from ${page} to ${newPage}`);
+    // Update our internal page state
+    setPage(newPage);
+  };
+
+  // Add a direct function to change rows per page
+  const handleRowsPerPageChange = (newRowsPerPage: number) => {
+    console.log(`Changing rows per page from ${rowsPerPage} to ${newRowsPerPage}`);
+    setRowsPerPage(newRowsPerPage);
+    // Reset to first page when changing rows per page
+    setPage(0);
+  };
+
+  // Add sorting functionality
+  const handleRequestSort = (property: string) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+  };
 
   useEffect(() => {
     const loadDeals = async () => {
@@ -152,22 +176,52 @@ const GrindingTable = () => {
     loadDeals();
 
   }, []);
+
+  // Get sorted and filtered data
+  const getSortedData = (data: any[]) => {
+    if (!data || data.length === 0) return [];
+    
+    return [...data].sort((a, b) => {
+      // Handle different data types
+      if (orderBy === 'issuedDate' || orderBy === 'receivedDate') {
+        // Date comparison
+        const dateA = a[orderBy] ? new Date(a[orderBy]).getTime() : 0;
+        const dateB = b[orderBy] ? new Date(b[orderBy]).getTime() : 0;
+        return (order === 'asc' ? 1 : -1) * (dateA - dateB);
+      } else if (typeof a[orderBy] === 'number' || !isNaN(Number(a[orderBy]))) {
+        // Number comparison
+        const numA = Number(a[orderBy]) || 0;
+        const numB = Number(b[orderBy]) || 0;
+        return (order === 'asc' ? 1 : -1) * (numA - numB);
+      } else {
+        // String comparison
+        const strA = String(a[orderBy] || '').toLowerCase();
+        const strB = String(b[orderBy] || '').toLowerCase();
+        return (order === 'asc' ? 1 : -1) * strA.localeCompare(strB);
+      }
+    });
+  };
+
+  // Apply sorting
+  const sortedDeals = getSortedData(deals);
   
-console.log("Deals State:", deals);
+  console.log("Deals State:", deals.length, "Sorted deals:", sortedDeals.length);
+
+  const startIndex = page * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedRows = sortedDeals.slice(startIndex, endIndex);
+  const filteredRows = sortedDeals; // For compatibility with existing code
+
   const {
-    order,
-    orderBy,
     selected,
     searchQuery,
-    filteredRows,
     handleDelete,
-    handleRequestSort,
     handleSelectAllClick,
     handleClick,
     handleChangePage,
     handleChangeRowsPerPage,
     handleSearchChange,
-  } = useMaterialTableHook<IDeal | any>(deals, 10);
+  } = useMaterialTableHook<IFiling>(filteredRows, rowsPerPage);
 
   const handlePrint = (pdfUrl: string | null) => {
     if (pdfUrl) {
@@ -233,10 +287,6 @@ console.log("Deals State:", deals);
     }
   };
 
-  const startIndex = page * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const paginatedRows = deals.slice(startIndex, endIndex);
-
   if (loading) return <div>Loading deals...</div>;
   if (error) return <div>Error: {error}</div>;
 
@@ -248,7 +298,7 @@ console.log("Deals State:", deals);
             <TableControls
               rowsPerPage={rowsPerPage}
               searchQuery={searchQuery}
-              handleChangeRowsPerPage={handleChangeRowsPerPage}
+              handleChangeRowsPerPage={handleRowsPerPageChange}
               handleSearchChange={handleSearchChange}
             />
             <Box sx={{ width: "100%" }} className="table-responsive">
@@ -281,13 +331,146 @@ console.log("Deals State:", deals);
                             size="small"
                           />
                         </TableCell>
-                        <TableCell>Grinding Id</TableCell>
-                        <TableCell>Issued Weight</TableCell>
-                        <TableCell>Received Weight</TableCell>
-                        <TableCell>Issued Date</TableCell>
-                        <TableCell>Received Date</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Grinding Loss</TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={orderBy === 'id'}
+                            direction={orderBy === 'id' ? order : 'asc'}
+                            onClick={() => handleRequestSort('id')}
+                          >
+                            Grinding Id
+                            {orderBy === 'id' ? (
+                              <Box component="span" sx={visuallyHidden}>
+                                {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                              </Box>
+                            ) : null}
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={orderBy === 'issuedWeight'}
+                            direction={orderBy === 'issuedWeight' ? order : 'asc'}
+                            onClick={() => handleRequestSort('issuedWeight')}
+                          >
+                            Issued Weight
+                            {orderBy === 'issuedWeight' ? (
+                              <Box component="span" sx={visuallyHidden}>
+                                {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                              </Box>
+                            ) : null}
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={orderBy === 'receivedWeight'}
+                            direction={orderBy === 'receivedWeight' ? order : 'asc'}
+                            onClick={() => handleRequestSort('receivedWeight')}
+                          >
+                            Received Weight
+                            {orderBy === 'receivedWeight' ? (
+                              <Box component="span" sx={visuallyHidden}>
+                                {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                              </Box>
+                            ) : null}
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={orderBy === 'issuedDate'}
+                            direction={orderBy === 'issuedDate' ? order : 'asc'}
+                            onClick={() => handleRequestSort('issuedDate')}
+                          >
+                            Issued Date
+                            {orderBy === 'issuedDate' ? (
+                              <Box component="span" sx={visuallyHidden}>
+                                {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                              </Box>
+                            ) : null}
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={orderBy === 'receivedDate'}
+                            direction={orderBy === 'receivedDate' ? order : 'asc'}
+                            onClick={() => handleRequestSort('receivedDate')}
+                          >
+                            Received Date
+                            {orderBy === 'receivedDate' ? (
+                              <Box component="span" sx={visuallyHidden}>
+                                {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                              </Box>
+                            ) : null}
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={orderBy === 'status'}
+                            direction={orderBy === 'status' ? order : 'asc'}
+                            onClick={() => handleRequestSort('status')}
+                          >
+                            Status
+                            {orderBy === 'status' ? (
+                              <Box component="span" sx={visuallyHidden}>
+                                {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                              </Box>
+                            ) : null}
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={orderBy === 'orderId'}
+                            direction={orderBy === 'orderId' ? order : 'asc'}
+                            onClick={() => handleRequestSort('orderId')}
+                          >
+                            Order ID
+                            {orderBy === 'orderId' ? (
+                              <Box component="span" sx={visuallyHidden}>
+                                {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                              </Box>
+                            ) : null}
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={orderBy === 'product'}
+                            direction={orderBy === 'product' ? order : 'asc'}
+                            onClick={() => handleRequestSort('product')}
+                          >
+                            Product
+                            {orderBy === 'product' ? (
+                              <Box component="span" sx={visuallyHidden}>
+                                {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                              </Box>
+                            ) : null}
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={orderBy === 'quantity'}
+                            direction={orderBy === 'quantity' ? order : 'asc'}
+                            onClick={() => handleRequestSort('quantity')}
+                          >
+                            Quantity
+                            {orderBy === 'quantity' ? (
+                              <Box component="span" sx={visuallyHidden}>
+                                {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                              </Box>
+                            ) : null}
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell>
+                          <TableSortLabel
+                            active={orderBy === 'grindingLoss'}
+                            direction={orderBy === 'grindingLoss' ? order : 'asc'}
+                            onClick={() => handleRequestSort('grindingLoss')}
+                          >
+                            Grinding Loss
+                            {orderBy === 'grindingLoss' ? (
+                              <Box component="span" sx={visuallyHidden}>
+                                {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                              </Box>
+                            ) : null}
+                          </TableSortLabel>
+                        </TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -329,6 +512,9 @@ console.log("Deals State:", deals);
                                   {deal.status}
                                 </span>
                               </TableCell>
+                              <TableCell>{deal.orderId}</TableCell>
+                              <TableCell>{deal.product}</TableCell>
+                              <TableCell>{deal.quantity}</TableCell>
                               <TableCell>{deal.grindingLoss}</TableCell>
                               <TableCell className="table__icon-box">
                                 <div className="flex items-center justify-start gap-[10px]">
@@ -480,15 +666,15 @@ console.log("Deals State:", deals);
             </Box>
             <Box className="table-search-box mt-[30px]" sx={{ p: 2 }}>
               <Box>
-                {`Showing ${(page - 1) * rowsPerPage + 1} to ${Math.min(
-                  page * rowsPerPage,
+                {`Showing ${page * rowsPerPage + 1} to ${Math.min(
+                  (page + 1) * rowsPerPage,
                   filteredRows.length
                 )} of ${filteredRows.length} entries`}
               </Box>
               <Pagination
                 count={Math.ceil(filteredRows.length / rowsPerPage)}
-                page={page}
-                onChange={(e, value) => handleChangePage(value)}
+                page={page + 1}
+                onChange={(e, value) => handlePageChange(value - 1)}
                 variant="outlined"
                 shape="rounded"
                 className="manaz-pagination-button"

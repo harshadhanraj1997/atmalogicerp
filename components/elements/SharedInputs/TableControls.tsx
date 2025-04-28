@@ -20,6 +20,8 @@ interface TableControlsProps {
   statusFilter: string;
   handleStatusChange: (value: string) => void;
   statusOptions?: StatusOption[];
+  rowsPerPage?: number;
+  handleChangeRowsPerPage?: (rowsPerPage: number) => void;
 }
 
 const defaultStatusOptions: StatusOption[] = [
@@ -38,6 +40,8 @@ const TableControls: React.FC<TableControlsProps> = ({
   statusFilter,
   handleStatusChange,
   statusOptions = defaultStatusOptions,
+  rowsPerPage,
+  handleChangeRowsPerPage,
 }) => {
   return (
     <div className="flex justify-between items-center mb-4 p-4 bg-white rounded-lg shadow-sm">

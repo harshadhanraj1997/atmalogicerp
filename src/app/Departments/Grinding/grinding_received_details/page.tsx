@@ -61,6 +61,9 @@ const GrindingDetailsPage = () => {
   const [formErrors, setFormErrors] = useState<Partial<UpdateFormData>>({});
   const [pouchReceivedWeights, setPouchReceivedWeights] = useState<{ [key: string]: number }>({});
   const [totalReceivedWeight, setTotalReceivedWeight] = useState<number>(0);
+  const [idParts, setIdParts] = useState<{prefix: string, date: string, month: string, year: string, number: string, subnumber: string}>({
+    prefix: '', date: '', month: '', year: '', number: '', subnumber: ''
+  });
   const router = useRouter();
 
   // Update pouch weight handler
@@ -100,16 +103,19 @@ const GrindingDetailsPage = () => {
 
       try {
         const parts = grindingId.split('/');
-        let prefix, date, month, year, number;
+        let prefix, date, month, year, number, subnumber;
         
         if (parts[0].length > 1) {
-          [prefix, date, month, year, number] = parts;
+          [prefix, date, month, year, number, subnumber] = parts;
         } else {
-          [prefix, date, month, year, number] = parts;
+          [prefix, date, month, year, number, subnumber] = parts;
         }
 
+        // Store the ID parts for later use
+        setIdParts({prefix, date, month, year, number, subnumber});
+
         const response = await fetch(
-          `${apiBaseUrl}/api/grinding/${prefix}/${date}/${month}/${year}/${number}`
+          `${apiBaseUrl}/api/grinding/${prefix}/${date}/${month}/${year}/${number}/${subnumber}`
         );
         const result = await response.json();
         
@@ -213,9 +219,6 @@ const GrindingDetailsPage = () => {
       // Get current date and time in ISO format
       const currentDateTime = new Date().toISOString();
 
-      const parts = data.grinding.Name.split('/');
-      const [prefix, date, month, year, number] = parts;
-
       // Prepare pouch data with weights
       const pouchData = data.pouches.map(pouch => ({
         pouchId: pouch.Id,
@@ -240,7 +243,7 @@ const GrindingDetailsPage = () => {
       console.log('Submitting data:', formData);
 
       const response = await fetch(
-        `${apiBaseUrl}/api/grinding/update/${prefix}/${date}/${month}/${year}/${number}`,
+        `${apiBaseUrl}/api/grinding/update/${idParts.prefix}/${idParts.date}/${idParts.month}/${idParts.year}/${idParts.number}/${idParts.subnumber}`,
         {
           method: 'POST',
           headers: {
@@ -254,7 +257,10 @@ const GrindingDetailsPage = () => {
 
       if (result.success) {
         toast.success('Grinding details updated successfully');
-        
+        // Add a short delay before redirecting to allow the toast to be seen
+        setTimeout(() => {
+          window.location.href = '/Departments/Grinding/Grinding_Table';
+        }, 1500);
       } else {
         throw new Error(result.message || 'Failed to update grinding details');
       }

@@ -13,8 +13,8 @@ import TableSortLabel from "@mui/material/TableSortLabel";
 import Paper from "@mui/material/Paper";
 import { visuallyHidden } from "@mui/utils";
 import useMaterialTableHook from "@/hooks/useMaterialTableHook";
-import { IDeal, IFiling } from "@/interface/table.interface";
-import { IDull } from "@/interface/table.interface";              
+import { IDeal } from "@/interface/table.interface";
+import { ICasting } from "@/interface/table.interface";
 
 import { dealHeadCells } from "@/data/table-head-cell/table-head";
 import * as pdfjs from "pdfjs-dist";
@@ -26,34 +26,13 @@ import {
 import { Checkbox, Button } from "@mui/material";
 //import DealsDetailsModal from "./orderdeatilsModal";
 //import EditDealsModal from "./editorderModal";
-import { fetchDullData } from "@/data/crm/dull-data";
+import { fetchDealData } from "@/data/crm/casting-data";
 import TableControls from "@/components/elements/SharedInputs/TableControls";
 import DeleteModal from "@/components/common/DeleteModal";
 import { PDFDocument } from 'pdf-lib';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { fetchPolishingData } from "@/data/crm/polishing-data";
-
-interface Department {
-  value: string;
-  label: string;
-  path: string;
-}
-
-const departments: Department[] = [
-  { value: 'grinding', label: 'Grinding', path: '/Departments/Grinding/add_grinding_details' },
-  { value: 'setting', label: 'Setting', path: '/Departments/Setting/add_setting_details' },
-  { value: 'polish', label: 'Polish', path: '/Departments/Polish/add_polish_details' },
-  { value: 'dull', label: 'Dull', path: '/Departments/Dull/add_dull_details' },
-  { value: 'plating', label: 'Plating', path: '/Departments/Plating/add_plating_details' }
-];
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 const downloadPDF = async (pdfUrl: string) => {
@@ -121,64 +100,84 @@ const getStatusClass = (status: string) => {
   }
 };
 
-const formatIndianDateTime = (date: string | null): string => {
-  if (!date) return '';
-  
-  // Convert to Indian timezone (UTC+5:30)
-  const utcDate = new Date(date);
-  const indianDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
-  
-  // Format as "DD/MM/YYYY HH:mm:ss"
-  return indianDate.toLocaleString('en-IN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  });
-};
+const departments = [
+  /*{ 
+    value: 'Grinding', 
+    label: 'Grinding',
+    path: '/Departments/Grinding/add_grinding_details'
+  },*/
+  { 
+    value: 'Filing', 
+    label: 'Filing',
+    path: '/Departments/Filing/add_filing_details'
+  },
+ /* { 
+    value: 'Setting', 
+    label: 'Setting',
+    path: '/Departments/Setting/add_setting_details'
+  },*/
+ /* { 
+    value: 'Polishing', 
+    label: 'Polishing',
+    path: '/Departments/Polishing/add_polishing_details'
+  },*/
+  /*{ 
+    value: 'Dull', 
+    label: 'Dull',
+    path: '/Departments/Dull/add_dull_details'
+  },*/
+];
 
-const DullTable = () => {
+// Add this type for weight breakdown
+interface WeightBreakdown {
+  ornamentWeight: number;
+  scrapWeight: number;
+  dustWeight: number;
+}
+
+export default function CastingTable() {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [editData, setEditData] = useState<IDeal | null>(null);
   const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number>(0);
-  const [deals, setDeals] = useState<IDull[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [deals, setDeals] = useState<ICasting[]>([]);
+  const [filteredDeals, setFilteredDeals] = useState<ICasting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [showConfirmation, setShowConfirmation] = useState<number | null>(null);
+  
+  // Custom pagination control functions
+  const handlePageChange = (newPage: number) => {
+    console.log(`Changing page from ${page} to ${newPage}`);
+    // Update our internal page state
+    setPage(newPage);
+  };
+  
+  // Add a direct function to change rows per page
+  const handleRowsPerPageChange = (newRowsPerPage: number) => {
+    console.log(`Changing rows per page from ${rowsPerPage} to ${newRowsPerPage}`);
+    setRowsPerPage(newRowsPerPage);
+    // Reset to first page when changing rows per page
+    setPage(0);
+  };
+  const [showConfirmation, setShowConfirmation] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showTransferMenu, setShowTransferMenu] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     const loadDeals = async () => {
       try {
         setLoading(true);
-        const data = await fetchDullData();
-        
-        // Add detailed logging
-        console.log("=== DULL TABLE DATA FROM SERVER ===");
-        console.log("Raw Response:", data);
-        console.log("Sample Record:", data[0]);
-        console.log("Date Fields:", {
-          issuedDate: data[0]?.issuedDate,
-          receivedDate: data[0]?.receivedDate,
-          formattedIssuedDate: formatIndianDateTime(data[0]?.issuedDate),
-          formattedReceivedDate: formatIndianDateTime(data[0]?.receivedDate)
-        });
-        console.log("Total Records:", data.length);
-        console.log("================================");
-
+        const data = await fetchDealData();
         setDeals(data);
+        
+        // Initial data is loaded - filters will be applied in the next useEffect
       } catch (error) {
         console.error("Error loading deals:", error);
         setError("Failed to load deals");
@@ -190,40 +189,41 @@ const DullTable = () => {
     loadDeals();
   }, []);
   
-console.log("Deals State:", deals);
+  // Get material table hook functions to handle pagination, sorting, etc.
+  // Extract only what we need from the hook, override pagination functions
+  const {
+    order,
+    orderBy,
+    selected,
+    searchQuery,
+    handleDelete,
+    handleRequestSort,
+    handleSelectAllClick,
+    handleClick,
+    // Do not use these from the hook, use our local state handlers
+    // handleChangePage,
+    // handleChangeRowsPerPage,
+    handleSearchChange,
+  } = useMaterialTableHook(filteredDeals, rowsPerPage);
 
-  // Custom pagination control functions
-  const handlePageChange = (newPage: number) => {
-    console.log(`Changing page from ${page} to ${newPage}`);
-    // Update our internal page state
-    setPage(newPage);
-  };
-
-  // Function to change rows per page
-  const handleRowsPerPageChange = (newRowsPerPage: number) => {
-    console.log(`Changing rows per page from ${rowsPerPage} to ${newRowsPerPage}`);
-    setRowsPerPage(newRowsPerPage);
-    // Reset to first page when changing rows per page
-    setPage(0);
-  };
-
-  // Memoize the filtered deals to prevent infinite loops
-  const filteredDeals = useMemo(() => {
-    if (!deals || deals.length === 0) {
-      console.log('No deals data available to filter');
-      return [];
-    }
-    
-    console.log('Filtering from', deals.length, 'deals');
-    
-    // Start with all deals
+  // Apply filters and sorting
+  useEffect(() => {
     let filtered = [...deals];
     
-    // Filter by date range
+    // First apply all filters
+    
+    // 1. Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(deal => 
+        deal.status?.toLowerCase() === statusFilter.toLowerCase()
+      );
+    }
+
+    // 2. Date filter - improved parsing
     if (startDate || endDate) {
       filtered = filtered.filter(deal => {
         try {
-          // Safely format the filing date
+          // Use issued date as primary, no fallback needed
           const dateStr = deal.issuedDate;
           if (!dateStr) return true; // Include if no date
           
@@ -244,19 +244,27 @@ console.log("Deals State:", deals);
       });
     }
     
-    // Filter by status
-    if (statusFilter && statusFilter !== 'all') {
+    // 3. Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
       filtered = filtered.filter(deal => {
-        return deal.status?.toLowerCase() === statusFilter.toLowerCase();
+        return (
+          // Search in multiple fields
+          String(deal.id || '').toLowerCase().includes(query) ||
+          String(deal.status || '').toLowerCase().includes(query) ||
+          String(deal.issuedDate || '').toLowerCase().includes(query) ||
+          String(deal.receivedDate || '').toLowerCase().includes(query) ||
+          String(deal.issuedWeight || '').toLowerCase().includes(query) ||
+          String(deal.receivedWeight || '').toLowerCase().includes(query)
+        );
       });
     }
     
-    // Sort by issued date in descending order by default (most recent first)
+    // Then sort by issued date in descending order by default
     filtered.sort((a, b) => {
       try {
-        if (!a.issuedDate || !b.issuedDate) return 0;
-        const dateA = new Date(a.issuedDate);
-        const dateB = new Date(b.issuedDate);
+        const dateA = new Date(a.issuedDate || '0');
+        const dateB = new Date(b.issuedDate || '0');
         
         // Most recent first (descending)
         return dateB.getTime() - dateA.getTime();
@@ -265,74 +273,55 @@ console.log("Deals State:", deals);
       }
     });
     
-    console.log('Filtered to', filtered.length, 'deals');
-    return filtered;
-  }, [deals, startDate, endDate, statusFilter]);
+    console.log('Filtered deals:', filtered.length);
+    setFilteredDeals(filtered);
+  }, [deals, startDate, endDate, statusFilter, searchQuery]);
 
-  const {
-    order,
-    orderBy,
-    selected,
-    filteredRows,
-    handleDelete,
-    handleRequestSort,
-    handleSelectAllClick,
-    handleClick,
-    handleChangePage,
-    handleChangeRowsPerPage,
-    handleSearchChange,
-  } = useMaterialTableHook<IDull>(filteredDeals, 10);
+  // Paginated data calculation - simplified to ensure proper updates
+  // We're not using useMemo here to force recalculation on each render
+  let paginatedDeals: ICasting[] = [];
+  // Only process if we have data
+  if (filteredDeals && filteredDeals.length > 0) {
+    // Basic pagination calculation
+    const startIndex = page * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    
+    // Make sure we don't exceed array bounds
+    if (startIndex < filteredDeals.length) {
+      paginatedDeals = filteredDeals.slice(startIndex, endIndex);
+      console.log(`Showing page ${page+1}, records ${startIndex+1}-${Math.min(endIndex, filteredDeals.length)} of ${filteredDeals.length}`);
+      console.log(`Displaying ${paginatedDeals.length} records`);
+      
+      // Reset to page 0 if we somehow ended up on an invalid page
+      if (paginatedDeals.length === 0 && filteredDeals.length > 0) {
+        console.warn('No records on current page but filtered deals exist - resetting to page 0');
+        setTimeout(() => setPage(0), 0);
+        paginatedDeals = filteredDeals.slice(0, rowsPerPage);
+      }
+    } else {
+      // We're out of bounds, reset to first page
+      console.warn(`Page ${page} is out of bounds (total pages: ${Math.ceil(filteredDeals.length/rowsPerPage)})`);
+      setTimeout(() => setPage(0), 0);
+      paginatedDeals = filteredDeals.slice(0, rowsPerPage);
+    }
+  } else {
+    console.log('No filtered deals available');
+  }
 
   const handleDateChange = (type: 'start' | 'end', value: string) => {
-    console.log(`Setting ${type} date to ${value}`);
-    if (type === 'start') {
-      setStartDate(value);
-    } else {
-      setEndDate(value);
-    }
+    if (type === 'start') setStartDate(value);
+    else setEndDate(value);
   };
 
-  const handleResetDates = () => {
-    console.log('Resetting date filters');
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value);
+  };
+
+  const handleResetFilters = () => {
     setStartDate('');
     setEndDate('');
     setStatusFilter('all');
   };
-
-  const handleStatusChange = (value: string) => {
-    console.log(`Setting status filter to ${value}`);
-    setStatusFilter(value);
-  };
-
-  // Add debug logging for filtered results
-  useEffect(() => {
-    console.log('Dull Table - Filtered Data:', {
-      totalDull: deals.length,
-      filteredDull: filteredRows?.length || 0,
-      searchTerm: searchQuery,
-      dateRange: { startDate, endDate },
-      statusFilter
-    });
-  }, [deals, filteredRows, searchQuery, startDate, endDate, statusFilter]);
-
-  // Calculate paginated rows for display
-  // Ensure page is correctly adjusted for zero-based indexing
-  const pageForCalculation = page;
-  const startIndex = pageForCalculation * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  
-  // Use filteredRows when available, or fall back to original deals
-  const rowsToDisplay = filteredRows && filteredRows.length > 0 ? filteredRows : deals;
-  const paginatedRows = rowsToDisplay.slice(startIndex, endIndex);
-  
-  // Debug pagination with more details
-  console.log('Dull Pagination:', {
-    page: pageForCalculation,
-    rowsPerPage,
-    totalRows: rowsToDisplay.length,
-    displaying: `${startIndex + 1} to ${Math.min(endIndex, rowsToDisplay.length)} of ${rowsToDisplay.length}`,
-    paginatedRowCount: paginatedRows.length
-  });
 
   const handlePrint = (pdfUrl: string | null) => {
     if (pdfUrl) {
@@ -398,6 +387,63 @@ console.log("Deals State:", deals);
     }
   };
 
+  // Add click-away listener
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showTransferMenu && !(event.target as HTMLElement).closest('.relative')) {
+        setShowTransferMenu(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showTransferMenu]);
+
+  // Function to format weight with 4 decimal places
+  const formatWeight = (weight: number) => weight?.toFixed(4) || '0.0000';
+
+  // Function to render weight breakdown tooltip content
+  const renderWeightBreakdown = (deal: ICasting) => {
+    return (
+      <div className="bg-white p-3 rounded-lg shadow-xl border border-gray-200 text-sm w-[250px]">
+        <div className="font-semibold mb-3 text-gray-800 border-b pb-2">
+          Weight Breakdown
+        </div>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center bg-blue-50 p-2 rounded">
+            <div className="text-blue-700">Ornament Weight:</div>
+            <div className="font-medium text-blue-800">
+              {formatWeight(deal.ornamentWeight)}g
+            </div>
+          </div>
+          <div className="flex justify-between items-center bg-green-50 p-2 rounded">
+            <div className="text-green-700">Scrap Weight:</div>
+            <div className="font-medium text-green-800">
+              {formatWeight(deal.scrapWeight)}g
+            </div>
+          </div>
+          <div className="flex justify-between items-center bg-purple-50 p-2 rounded">
+            <div className="text-purple-700">Dust Weight:</div>
+            <div className="font-medium text-purple-800">
+              {formatWeight(deal.dustWeight)}g
+            </div>
+          </div>
+          <div className="flex justify-between items-center bg-gray-100 p-2 rounded mt-3 border-t border-gray-200">
+            <div className="font-semibold text-gray-700">Total:</div>
+            <div className="font-bold text-gray-800">
+              {formatWeight(deal.receivedWeight)}g
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Calculate empty rows to maintain consistent height
+  const emptyRows = Math.max(0, (1 + page) * rowsPerPage - filteredDeals.length);
+
   if (loading) return <div>Loading deals...</div>;
   if (error) return <div>Error: {error}</div>;
 
@@ -407,21 +453,17 @@ console.log("Deals State:", deals);
         <div className="card__wrapper">
           <div className="manaz-common-mat-list w-full table__wrapper table-responsive">
             <TableControls
-              rowsPerPage={rowsPerPage}
-              searchQuery={searchQuery}
-              handleChangeRowsPerPage={handleRowsPerPageChange}
-              handleSearchChange={handleSearchChange}
+              currentPage={page}
+              rowCount={filteredDeals.length}
               startDate={startDate}
               endDate={endDate}
               handleDateChange={handleDateChange}
-              handleResetDates={handleResetDates}
               statusFilter={statusFilter}
               handleStatusChange={handleStatusChange}
-              statusOptions={[
-                { value: 'all', label: 'All Status' },
-                { value: 'pending', label: 'Pending' },
-                { value: 'finished', label: 'Finished' }
-              ]}
+              onSearchChange={handleSearchChange}
+              onRowsPerPageChange={(value) => handleRowsPerPageChange(parseInt(value))}
+              searchValue={searchQuery}
+              rowsPerPageValue={rowsPerPage.toString()}
             />
             <Box sx={{ width: "100%" }} className="table-responsive">
               <Paper sx={{ width: "100%", mb: 2 }}>
@@ -436,39 +478,26 @@ console.log("Deals State:", deals);
                           <Checkbox
                             className="custom-checkbox checkbox-small"
                             color="primary"
-                            indeterminate={
-                              selected.length > 0 &&
-                              selected.length < filteredRows.length
-                            }
-                            checked={
-                              filteredRows.length > 0 &&
-                              selected.length === filteredRows.length
-                            }
-                            onChange={(e) =>
-                              handleSelectAllClick(
-                                e.target.checked,
-                                filteredRows
-                              )
-                            }
+                            indeterminate={selected.length > 0 && selected.length < filteredDeals.length}
+                            checked={filteredDeals.length > 0 && selected.length === filteredDeals.length}
+                            onChange={(e) => handleSelectAllClick(e.target.checked, filteredDeals)}
                             size="small"
                           />
                         </TableCell>
-                        <TableCell>Dull  Id</TableCell>
+                        <TableCell>Casting Id</TableCell>
                         <TableCell>Issued Weight</TableCell>
                         <TableCell>Received Weight</TableCell>
                         <TableCell>Issued Date</TableCell>
                         <TableCell>Received Date</TableCell>
-                        <TableCell>Order Id</TableCell>
-                        <TableCell>Product</TableCell>
-                        <TableCell>Quantity</TableCell>
+                        <TableCell>Created Date</TableCell>
                         <TableCell>Status</TableCell>
-                        <TableCell>Dull Loss</TableCell>
+                        <TableCell>Casting Loss</TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody className="table__body">
-                      {paginatedRows.length > 0 ? (
-                        paginatedRows.map((deal, index) => {
+                      {paginatedDeals.length > 0 ? (
+                        paginatedDeals.map((deal, index) => {
                           const stausClass = useTableStatusHook(deal?.status);
                           const phaseClass = useTablePhaseHook(deal?.phase);
                           return (
@@ -487,12 +516,26 @@ console.log("Deals State:", deals);
                               </TableCell>
                               <TableCell>{deal.id}</TableCell>
                               <TableCell>{deal.issuedWeight}</TableCell>
-                              <TableCell>{deal.receivedWeight}</TableCell>
+                              <TableCell>
+                                <div 
+                                  className="relative group cursor-help"
+                                  title="Hover to see weight breakdown"
+                                >
+                                  <span className="hover:text-blue-600 transition-colors">
+                                    {formatWeight(deal.receivedWeight)}g
+                                  </span>
+                                  <div className="absolute z-[1000] invisible group-hover:visible 
+                                                left-0 top-full mt-1
+                                                animate-fade-in duration-200">
+                                    {renderWeightBreakdown(deal)}
+                                    <div className="absolute -top-2 left-4 
+                                                  border-8 border-transparent border-b-white"></div>
+                                  </div>
+                                </div>
+                              </TableCell>
                               <TableCell>{deal.issuedDate}</TableCell>
                               <TableCell>{deal.receivedDate}</TableCell>
-                              <TableCell>{deal.orderId}</TableCell>
-                              <TableCell>{deal.Product}</TableCell>
-                              <TableCell>{deal.Quantity}</TableCell>
+                              <TableCell>{deal.created_date}</TableCell>
                               <TableCell>
                                 <span 
                                   className={`bd-badge ${getStatusClass(deal.status)}`}
@@ -500,17 +543,156 @@ console.log("Deals State:", deals);
                                     padding: '4px 8px',
                                     borderRadius: '4px',
                                     color: 'white',
-                                    fontSize: '12px', 
+                                    fontSize: '12px',
                                     fontWeight: '500'
                                   }}
                                 >
                                   {deal.status}
                                 </span>
                               </TableCell>
-                              <TableCell>{deal.dullLoss}</TableCell>
+                              <TableCell>{deal.castingLoss}</TableCell>
                               <TableCell className="table__icon-box">
                                 <div className="flex items-center justify-start gap-[10px]">
-                                  <Link href={`/Departments/Dull/show_dull_details?dullId=${deal.id}`} passHref>
+                                  <Link href={`/Departments/Casting/show_casting_details?castingId=${deal.id}`} passHref>
+                                    <button
+                                      type="button"
+                                      className="table__icon edit"
+                                      style={{
+                                        display: 'inline-block',
+                                        backgroundColor: 'green',
+                                        color: 'white',
+                                        borderRadius: '4px',
+                                        padding: '5px',
+                                        textDecoration: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <i className="fa-regular fa-eye"></i>
+                                    </button>
+                                  </Link>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={10} align="center">
+                            No records found
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      
+                      {emptyRows > 0 && (
+                        <TableRow style={{ height: 53 * emptyRows }}>
+                          <TableCell colSpan={10} />
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Box>
+            <Pagination
+              count={Math.ceil(filteredDeals.length / rowsPerPage)}
+              page={page + 1}
+              onChange={(e, value) => {
+                // Convert 1-based UI page number to 0-based state
+                const newPage = value - 1;
+                console.log(`Pagination clicked: ${value} (state: ${newPage})`);
+                // Directly set page state for immediate update
+                setPage(newPage);
+              }}
+              variant="outlined"
+              shape="rounded"
+              className="manaz-pagination-button"
+            />
+          </div>
+        </div>
+      </div>
+                      <TableRow className="table__title">
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            className="custom-checkbox checkbox-small"
+                            color="primary"
+                            indeterminate={selected.length > 0 && selected.length < filteredDeals.length}
+                            checked={filteredDeals.length > 0 && selected.length === filteredDeals.length}
+                            onChange={(e) => handleSelectAllClick(e.target.checked, filteredDeals)}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>Casting Id</TableCell>
+                        <TableCell>Issued Weight</TableCell>
+                        <TableCell>Received Weight</TableCell>
+                        <TableCell>Issued Date</TableCell>
+                        <TableCell>Received Date</TableCell>
+                        <TableCell>Created Date</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Casting Loss</TableCell>
+                        <TableCell>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody className="table__body">
+                      {paginatedDeals.length > 0 ? (
+                        paginatedDeals.map((deal, index) => {
+                          const stausClass = useTableStatusHook(deal?.status);
+                          const phaseClass = useTablePhaseHook(deal?.phase);
+                          return (
+                            <TableRow
+                              key={deal.id}
+                              selected={selected.includes(index)}
+                              onClick={() => handleClick(index)}
+                            >
+                              <TableCell padding="checkbox">
+                                <Checkbox
+                                  className="custom-checkbox checkbox-small"
+                                  checked={selected.includes(index)}
+                                  size="small"
+                                  onChange={() => handleClick(index)}
+                                />
+                              </TableCell>
+                              <TableCell>{deal.id}</TableCell>
+                              <TableCell>{deal.issuedWeight}</TableCell>
+                              <TableCell>
+                                <div 
+                                  className="relative group cursor-help"
+                                  title="Hover to see weight breakdown"
+                                >
+                                  <span className="hover:text-blue-600 transition-colors">
+                                    {formatWeight(deal.receivedWeight)}g
+                                  </span>
+                                  <div className="absolute z-[1000] invisible group-hover:visible 
+                                                left-0 top-full mt-1
+                                                animate-fade-in duration-200">
+                                    {renderWeightBreakdown(deal)}
+                                    <div className="absolute -top-2 left-4 
+                                                  border-8 border-transparent border-b-white"></div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>{deal.issuedDate}</TableCell>
+                              <TableCell>{deal.receivedDate}</TableCell>
+                              <TableCell>{deal.created_date}</TableCell>
+                              <TableCell>
+                                <span 
+                                  className={`bd-badge ${getStatusClass(deal.status)}`}
+                                  style={{
+                                    padding: '4px 8px',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    fontSize: '12px',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  {deal.status}
+                                </span>
+                              </TableCell>
+                              <TableCell>{deal.castingLoss}</TableCell>
+                              <TableCell className="table__icon-box">
+                                <div className="flex items-center justify-start gap-[10px]">
+                                  <Link href={`/Departments/Casting/show_casting_details?castingId=${deal.id}`} passHref>
                                     <button
                                       type="button"
                                       className="table__icon edit"
@@ -530,8 +712,9 @@ console.log("Deals State:", deals);
                                     </button>
                                   </Link>
 
+                                  {/* Edit button - disabled when status is Finished */}
                                   {deal.status?.toLowerCase() !== 'finished' ? (
-                                    <Link href={`/Departments/Dull/dull_received_details?dullId=${deal.id}`} passHref>
+                                    <Link href={`/Departments/Casting/casting_received_details?castingId=${deal.id}`} passHref>
                                       <button
                                         type="button"
                                         className="table__icon edit"
@@ -602,11 +785,12 @@ console.log("Deals State:", deals);
                                     <i className="fa-solid fa-check"></i>
                                   </button>
 
+                                  {/* Transfer select - always enabled */}
                                   <Select
                                     onValueChange={(value) => {
                                       const dept = departments.find(d => d.value === value);
                                       if (dept) {
-                                        window.location.href = `${dept.path}?dullId=${deal.id}`;
+                                        window.location.href = `${dept.path}?castingId=${deal.id}`;
                                       }
                                     }}
                                   >
@@ -658,19 +842,29 @@ console.log("Deals State:", deals);
             </Box>
             <Box className="table-search-box mt-[30px]" sx={{ p: 2 }}>
               <Box>
-                {`Showing ${startIndex + 1} to ${Math.min(
-                  endIndex,
-                  rowsToDisplay.length
-                )} of ${rowsToDisplay.length} entries`}
+                {`Showing ${page * rowsPerPage + 1} to ${Math.min(
+                  (page + 1) * rowsPerPage,
+                  filteredDeals.length
+                )} of ${filteredDeals.length} entries`}
               </Box>
               <Pagination
-                count={Math.ceil(rowsToDisplay.length / rowsPerPage)}
-                page={pageForCalculation + 1}
-                onChange={(e, value) => handlePageChange(value - 1)}
+                count={Math.ceil(filteredDeals.length / rowsPerPage)}
+                page={page + 1}
+                onChange={(e, value) => {
+                  // Convert 1-based UI page number to 0-based state
+                  const newPage = value - 1;
+                  console.log(`Pagination clicked: ${value} (state: ${newPage})`);
+                  // Directly set page state for immediate update
+                  setPage(newPage);
+                }}
                 variant="outlined"
                 shape="rounded"
                 className="manaz-pagination-button"
               />
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
             </Box>
           </div>
         </div>
@@ -810,6 +1004,5 @@ console.log("Deals State:", deals);
         </div>
       )}
     </>
-  );
+  ); 
 }
-export default DullTable;

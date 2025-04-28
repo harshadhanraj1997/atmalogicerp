@@ -253,6 +253,9 @@ const CuttingTable = () => {
                         <TableCell>Received Weight</TableCell>
                         <TableCell>Issued Date</TableCell>
                         <TableCell>Received Date</TableCell>
+                        <TableCell>Order Id</TableCell>
+                        <TableCell>Product</TableCell>
+                        <TableCell>Quantity</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Cutting Loss</TableCell>
                         <TableCell>Actions</TableCell>
@@ -279,6 +282,9 @@ const CuttingTable = () => {
                             <TableCell>{deal.Returned_Weight__c}</TableCell>
                             <TableCell>{deal.Issued_Date__c}</TableCell>
                             <TableCell>{deal.Received_Date__c}</TableCell>
+                            <TableCell>{deal.Order_Id__c}</TableCell>
+                            <TableCell>{deal.Product__c}</TableCell>
+                            <TableCell>{deal.Quantity__c}</TableCell>
                             <TableCell>
                               <span className={`bd-badge ${getStatusClass(deal.Status__c)}`}
                                 style={{

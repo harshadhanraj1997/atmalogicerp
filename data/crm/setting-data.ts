@@ -22,6 +22,9 @@ export const fetchSettingData = async (): Promise<ISetting[]> => {
             receivedWeight: setting.Returned_weight__c || 0,
             receivedDate: setting.Received_Date__c || '-',  // Updated to match server field
             status: setting.status__c,  
+            product: setting.Product__c || 'N/A',
+            quantity: setting.Quantity__c || 0,
+            orderId: setting.Order_Id__c || '',
             stoneWeight: setting.Stone_Weight__c || 0,
             grindingLoss: setting.Setting_l__c || 0 // Calculate loss
           };

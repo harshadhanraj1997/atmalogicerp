@@ -13,6 +13,8 @@ interface Pouch {
   Issued_Weight_Plating__c: number;
   Received_Weight_Plating__c: number;
   Issued_Pouch_weight__c?: number;
+  Product__c?: string;
+  Quantity__c?: number;
 }
 
 export default function AddCuttingDetails() {
@@ -22,9 +24,15 @@ export default function AddCuttingDetails() {
   const [formattedId, setFormattedId] = useState<string>('');
   const [pouches, setPouches] = useState<Pouch[]>([]);
   const [pouchWeights, setPouchWeights] = useState<{ [key: string]: number }>({});
+  const [pouchQuantities, setPouchQuantities] = useState<{ [key: string]: number }>({});
   const [issuedDate, setIssuedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [issuedTime, setIssuedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
   const [totalWeight, setTotalWeight] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderId, setOrderId] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
@@ -37,18 +45,18 @@ export default function AddCuttingDetails() {
       }
 
       try {
-        const [prefix, date, month, year, number] = platingId.split('/');
-        console.log('[Add Cutting] Plating ID parts:', { prefix, date, month, year, number });
+        const [prefix, date, month, year, number, subnumber] = platingId.split('/');
+        console.log('[Add Cutting] Plating ID parts:', { prefix, date, month, year, number, subnumber });
 
-        const generatedCuttingId = `CUT/${date}/${month}/${year}/${number}`;
+        const generatedCuttingId = `CUT/${date}/${month}/${year}/${number}/${subnumber}`;
         setFormattedId(generatedCuttingId);
 
         console.log('[Add Cutting] Fetching pouches from:', {
-          url: `${process.env.NEXT_PUBLIC_API_URL}/api/plating/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          url: `${process.env.NEXT_PUBLIC_API_URL}/api/plating/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
         });
 
         const pouchResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/plating/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          `${process.env.NEXT_PUBLIC_API_URL}/api/plating/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
         );
 
         const pouchResult = await pouchResponse.json();
@@ -70,10 +78,14 @@ export default function AddCuttingDetails() {
         setPouches(formattedPouches);
         
         const weights: { [key: string]: number } = {};
+        const quantities: { [key: string]: number } = {};
         formattedPouches.forEach((pouch: Pouch) => {
           weights[pouch.Id] = pouch.Issued_Pouch_weight__c || 0;
+          quantities[pouch.Id] = pouch.Quantity__c || 0;
+          setOrderId(pouch.Order_Id__c || '');
         });
         setPouchWeights(weights);
+        setPouchQuantities(quantities);
         
         const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
         setTotalWeight(total);
@@ -108,6 +120,13 @@ export default function AddCuttingDetails() {
     });
   };
 
+  const handleQuantityChange = (pouchId: string, quantity: number) => {
+    setPouchQuantities(prev => ({
+      ...prev,
+      [pouchId]: quantity
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -117,12 +136,15 @@ export default function AddCuttingDetails() {
       // Prepare pouch data
       const pouchData = pouches.map(pouch => ({
         pouchId: pouch.Id,
-        cuttingWeight: pouchWeights[pouch.Id] || 0
+        cuttingWeight: pouchWeights[pouch.Id] || 0,
+        product: pouch.Product__c || '',
+        quantity: pouchQuantities[pouch.Id] || 0
       }));
 
       console.log('[Add Cutting] Preparing submission with:', {
         cuttingId: formattedId,
         issuedDate,
+        issuedTime,
         pouchCount: pouchData.length,
         totalWeight,
         pouches: pouchData,
@@ -133,9 +155,14 @@ export default function AddCuttingDetails() {
       const cuttingData = {
         cuttingId: formattedId,
         issuedDate: issuedDate,
+        issuedTime: issuedTime,
         pouches: pouchData,
         totalWeight: totalWeight,
-        status: 'Pending'
+        status: 'Pending',
+        product: pouches[0]?.Product__c || 'N/A',
+        quantity: pouchQuantities[pouches[0]?.Id] || 0,
+        orderId: orderId
+
       };
 
       console.log('[Add Cutting] Submitting to API:', {
@@ -166,8 +193,10 @@ export default function AddCuttingDetails() {
         // Reset form
         setPouches([]);
         setPouchWeights({});
+        setPouchQuantities({});
         setTotalWeight(0);
         setIssuedDate(new Date().toISOString().split('T')[0]);
+        setIssuedTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
         setFormattedId('');
         setLoading(false);
         
@@ -216,6 +245,16 @@ export default function AddCuttingDetails() {
                   className="h-10"
                 />
               </div>
+              <div>
+                <Label htmlFor="issuedTime">Issued Time</Label>
+                <Input
+                  id="issuedTime"
+                  type="time"
+                  value={issuedTime}
+                  onChange={(e) => setIssuedTime(e.target.value)}
+                  className="h-10"
+                />
+              </div>
             </div>
           </div>
 
@@ -245,6 +284,19 @@ export default function AddCuttingDetails() {
                         className="h-10"
                       />
                     </div>
+                    <div>
+                      <Label>Product</Label>
+                      <div className="h-10 flex items-center">{pouch.Product__c}</div>
+                    </div>
+                    <div>
+                      <Label>Quantity</Label>
+                      <Input
+                        type="number"
+                        value={pouchQuantities[pouch.Id] || ''}
+                        onChange={(e) => handleQuantityChange(pouch.Id, parseInt(e.target.value) || 0)}
+                        className="h-10"
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -264,9 +316,16 @@ export default function AddCuttingDetails() {
               </Button>
             </div>
           </form>
+          {orderId && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="text-sm font-medium flex items-center">
+                <span className="mr-2">Order ID:</span>
+                <span className="text-blue-600 font-bold">{orderId}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 } 
-

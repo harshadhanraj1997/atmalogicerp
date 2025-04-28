@@ -13,6 +13,8 @@ interface Pouch {
   Isssued_Weight_Grinding__c: number;
   Received_Weight_Grinding__c: number;
   Issued_Pouch_weight__c?: number;
+  Product__c?: string;
+  Quantity__c?: number;
 }
 
 export default function AddDullDetails() {
@@ -22,12 +24,15 @@ export default function AddDullDetails() {
   const [formattedId, setFormattedId] = useState<string>('');
   const [pouches, setPouches] = useState<Pouch[]>([]);
   const [pouchWeights, setPouchWeights] = useState<{ [key: string]: number }>({});
+  const [pouchQuantities, setPouchQuantities] = useState<{ [key: string]: number }>({});
   const [issuedDate, setIssuedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [issuedTime, setIssuedTime] = useState(
-    new Date().toTimeString().split(' ')[0].substring(0, 5)
-  );
+  const [issuedTime, setIssuedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
   const [totalWeight, setTotalWeight] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderId, setOrderId] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
@@ -40,18 +45,18 @@ export default function AddDullDetails() {
       }
 
       try {
-        const [prefix, date, month, year, number] = polishingId.split('/');
-        console.log('[Add Dull] Polishing ID parts:', { prefix, date, month, year, number });
+        const [prefix, date, month, year, number, subnumber] = polishingId.split('/');
+        console.log('[Add Dull] Polishing ID parts:', { prefix, date, month, year, number, subnumber });
 
-        const generatedDullId = `DULL/${date}/${month}/${year}/${number}`;
+        const generatedDullId = `DULL/${date}/${month}/${year}/${number}/${subnumber}`;
         setFormattedId(generatedDullId);
 
         console.log('[Add Dull] Fetching pouches from:', {
-          url: `${process.env.NEXT_PUBLIC_API_URL}/api/polishing/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          url: `${process.env.NEXT_PUBLIC_API_URL}/api/polish/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
         });
 
         const pouchResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/polishing/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          `${process.env.NEXT_PUBLIC_API_URL}/api/polish/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
         );
 
         const pouchResult = await pouchResponse.json();
@@ -65,7 +70,9 @@ export default function AddDullDetails() {
           ...pouch,
           Name: pouch.Name,
           Issued_Pouch_weight__c: pouch.Issued_Weight_Polishing__c || 0,
-          Received_Weight_Grinding__c: pouch.Received_Weight_Polishing__c || 0
+          Received_Weight_Grinding__c: pouch.Received_Weight_Polishing__c || 0,
+          Product__c: pouch.Product__c || '',
+          Quantity__c: pouch.Quantity__c || 0
         }));
 
         console.log('[Add Dull] Formatted pouches:', formattedPouches);
@@ -73,10 +80,14 @@ export default function AddDullDetails() {
         setPouches(formattedPouches);
         
         const weights: { [key: string]: number } = {};
+        const quantities: { [key: string]: number } = {};
         formattedPouches.forEach((pouch: Pouch) => {
           weights[pouch.Id] = pouch.Issued_Pouch_weight__c || 0;
+          quantities[pouch.Id] = pouch.Quantity__c || 0;
+          setOrderId(pouch.Order_Id__c || '');
         });
         setPouchWeights(weights);
+        setPouchQuantities(quantities);
         
         const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
         setTotalWeight(total);
@@ -103,12 +114,19 @@ export default function AddDullDetails() {
   }, [polishingId]);
 
   const handleWeightChange = (pouchId: string, weight: number) => {
-    setPouchWeights(prev => {
-      const newWeights = { ...prev, [pouchId]: weight };
-      const newTotal = Object.values(newWeights).reduce((sum, w) => sum + (w || 0), 0);
-      setTotalWeight(newTotal);
-      return newWeights;
+    setPouchWeights((prev) => {
+      const updated = { ...prev, [pouchId]: weight };
+      const total = Object.values(updated).reduce((sum, w) => sum + w, 0);
+      setTotalWeight(total);
+      return updated;
     });
+  };
+
+  const handleQuantityChange = (pouchId: string, quantity: number) => {
+    setPouchQuantities(prev => ({
+      ...prev,
+      [pouchId]: quantity
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,34 +136,40 @@ export default function AddDullDetails() {
       setIsSubmitting(true);
 
       // Prepare pouch data
-      const pouchData = pouches.map(pouch => ({
+      const pouchesWithWeights = pouches.map(pouch => ({
         pouchId: pouch.Id,
-        dullWeight: pouchWeights[pouch.Id] || 0
+        dullWeight: pouchWeights[pouch.Id] || 0,
+        quantity: pouchQuantities[pouch.Id] || 0,
+        product: pouch.Product__c || 'N/A'
       }));
 
       // Combine date and time for issued datetime
-      const issuedDateTime = `${issuedDate}T${issuedTime}:00`;
+      const combinedDateTime = `${issuedDate}T${issuedTime}:00.000Z`;
+      console.log('[Add Dull] Combined datetime:', combinedDateTime);
 
       console.log('[Add Dull] Preparing submission with:', {
         dullId: formattedId,
         issuedDate,
         issuedTime,
-        issuedDateTime,
-        pouchCount: pouchData.length,
+        issuedDateTime: combinedDateTime,
+        pouchCount: pouchesWithWeights.length,
         totalWeight,
-        pouches: pouchData,
+        pouches: pouchesWithWeights,
         pouchWeights
       });
 
       // Prepare dull data
       const dullData = {
         dullId: formattedId,
-        issuedDate: issuedDate,
-        issuedTime: issuedTime,
-        issuedDateTime: issuedDateTime,
-        pouches: pouchData,
+        issuedDate: combinedDateTime, // Use combined date and time
+        pouches: pouchesWithWeights,
         totalWeight: totalWeight,
-        status: 'Pending'
+        status: 'Pending',
+        product: pouches[0]?.Product__c || 'N/A',
+        quantity: pouchQuantities[pouches[0]?.Id] || 0,
+        orderId: orderId
+
+
       };
 
       console.log('[Add Dull] Submitting to API:', {
@@ -168,7 +192,7 @@ export default function AddDullDetails() {
         console.log('[Add Dull] Submission successful:', {
           dullId: result.data.dullId,
           dullRecordId: result.data.dullRecordId,
-          pouchData: pouchData
+          pouchData: pouchesWithWeights
         });
         
         toast.success('Dull details saved successfully');
@@ -176,9 +200,10 @@ export default function AddDullDetails() {
         // Reset form
         setPouches([]);
         setPouchWeights({});
+        setPouchQuantities({});
         setTotalWeight(0);
         setIssuedDate(new Date().toISOString().split('T')[0]);
-        setIssuedTime(new Date().toTimeString().split(' ')[0].substring(0, 5));
+        setIssuedTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
         setFormattedId('');
         setLoading(false);
         
@@ -245,7 +270,7 @@ export default function AddDullDetails() {
               <h3 className="font-medium">Pouch Details</h3>
               {pouches.map((pouch) => (
                 <div key={pouch.Id} className="p-4 border rounded-lg">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-5 gap-4">
                     <div>
                       <Label>Pouch ID</Label>
                       <div className="h-10 flex items-center">{pouch.Name}</div>
@@ -263,6 +288,20 @@ export default function AddDullDetails() {
                         step="0.00001"
                         value={pouchWeights[pouch.Id] || ''}
                         onChange={(e) => handleWeightChange(pouch.Id, parseFloat(e.target.value) || 0)}
+                        className="h-10"
+                      />
+                    </div>
+                    <div>
+                      <Label>Product</Label>
+                      <div className="h-10 flex items-center">{pouch.Product__c || 'N/A'}</div>
+                    </div>
+                    <div>
+                      <Label>Quantity</Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        value={pouchQuantities[pouch.Id] || ''}
+                        onChange={(e) => handleQuantityChange(pouch.Id, parseInt(e.target.value) || 0)}
                         className="h-10"
                       />
                     </div>
@@ -285,6 +324,14 @@ export default function AddDullDetails() {
               </Button>
             </div>
           </form>
+          {orderId && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="text-sm font-medium flex items-center">
+                <span className="mr-2">Order ID:</span>
+                <span className="text-blue-600 font-bold">{orderId}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

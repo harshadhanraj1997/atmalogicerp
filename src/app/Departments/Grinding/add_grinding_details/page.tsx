@@ -10,6 +10,9 @@ interface Pouch {
   Id: string;
   Name: string;
   Issued_Pouch_weight__c: number;
+  Received_Pouch_weight__c: number;
+  Product__c: string;
+  Quantity__c: number;
 }
 
 export default function AddGrindingDetails() {
@@ -19,6 +22,7 @@ export default function AddGrindingDetails() {
   const [formattedId, setFormattedId] = useState<string>('');
   const [pouches, setPouches] = useState<Pouch[]>([]);
   const [pouchWeights, setPouchWeights] = useState<{ [key: string]: number }>({});
+  const [pouchQuantities, setPouchQuantities] = useState<{ [key: string]: number }>({});
   const [issuedDate, setIssuedDate] = useState(new Date().toISOString().split('T')[0]);
   const [issuedTime, setIssuedTime] = useState<string>(() => {
     const now = new Date();
@@ -26,6 +30,7 @@ export default function AddGrindingDetails() {
   });
   const [totalWeight, setTotalWeight] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderId, setOrderId] = useState<string>('');
 
   useEffect(() => {
     const initializeGrinding = async () => {
@@ -35,29 +40,41 @@ export default function AddGrindingDetails() {
       }
 
       try {
-        const [prefix, date, month, year, number] = filingId.split('/');
-        console.log('[AddGrinding] Filing ID parts:', { prefix, date, month, year, number });
+        const [prefix, date, month, year, number,subnumber] = filingId.split('/');
+        console.log('[AddGrinding] Filing ID parts:', { prefix, date, month, year, number,subnumber });
 
-        const generatedGrindingId = `GRIND/${date}/${month}/${year}/${number}`;
+        const generatedGrindingId = `GRIND/${date}/${month}/${year}/${number}/${subnumber}`;
         setFormattedId(generatedGrindingId);
 
         const pouchResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/filing/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          `${process.env.NEXT_PUBLIC_API_URL}/api/filing/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
         );
 
         const pouchResult = await pouchResponse.json();
+        console.log('[AddGrinding] Pouch fetch response:', pouchResult);
 
+const pouchData = pouches.map(pouch => ({
+  pouchId: pouch.Id,
+  grindingWeight: pouchWeights[pouch.Id] || 0,
+  quantity: pouchQuantities[pouch.Id] || 0
+
+}));
         if (!pouchResult.success) {
           throw new Error(pouchResult.message || 'Failed to fetch pouches');
+
         }
 
         setPouches(pouchResult.data.pouches);
         
         const weights: { [key: string]: number } = {};
+        const quantities: { [key: string]: number } = {};
         pouchResult.data.pouches.forEach((pouch: Pouch) => {
           weights[pouch.Id] = pouch.Issued_Pouch_weight__c || 0;
+          quantities[pouch.Id] = pouch.Quantity__c || 0;
+          setOrderId(pouch.Order_Id__c || '');
         });
         setPouchWeights(weights);
+        setPouchQuantities(quantities);
         
         const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
         setTotalWeight(total);
@@ -82,6 +99,13 @@ export default function AddGrindingDetails() {
     });
   };
 
+  const handleQuantityChange = (pouchId: string, quantity: number) => {
+    setPouchQuantities(prev => ({
+      ...prev,
+      [pouchId]: quantity
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -94,7 +118,9 @@ export default function AddGrindingDetails() {
       // Prepare pouch data
       const pouchData = pouches.map(pouch => ({
         pouchId: pouch.Id,
-        grindingWeight: pouchWeights[pouch.Id] || 0
+        grindingWeight: pouchWeights[pouch.Id] || 0,
+        quantity: pouchQuantities[pouch.Id] || 0,
+        product: pouch.Product__c || 'N/A'
       }));
 
       // Prepare grinding data
@@ -103,7 +129,10 @@ export default function AddGrindingDetails() {
         issuedDate: combinedDateTime, // Use combined date and time
         pouches: pouchData,
         totalWeight: totalWeight,
-        status: 'Pending'
+        status: 'Pending',
+        product: pouches[0].Product__c || 'N/A',
+        quantity: pouchQuantities[pouches[0].Id] || 0,
+        orderId: orderId
       };
 
       console.log('[AddGrinding] Submitting data:', grindingData);
@@ -117,8 +146,15 @@ export default function AddGrindingDetails() {
       });
 
       const result = await response.json();
+      console.log('[AddGrinding] Server response:', result);
 
       if (result.success) {
+        // Capture the order ID from the server response
+        if (result.data && result.data.orderId) {
+          setOrderId(result.data.orderId);
+          console.log('[AddGrinding] Order ID received:', result.data.orderId);
+        }
+        
         toast.success('Grinding details saved successfully');
         // Optionally redirect to a success page or grinding list
       } else {
@@ -182,10 +218,14 @@ export default function AddGrindingDetails() {
               <h3 className="font-medium">Pouch Details</h3>
               {pouches.map((pouch) => (
                 <div key={pouch.Id} className="p-4 border rounded-lg">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <Label>Pouch ID</Label>
                       <div className="h-10 flex items-center">{pouch.Name}</div>
+                    </div>
+                    <div>
+                      <Label>Product</Label>
+                      <div className="h-10 flex items-center">{pouch.Product__c || 'N/A'}</div>
                     </div>
                     <div>
                       <Label>Received Weight from filing (g)</Label>
@@ -198,6 +238,15 @@ export default function AddGrindingDetails() {
                         step="0.00001"
                         value={pouchWeights[pouch.Id] || ''}
                         onChange={(e) => handleWeightChange(pouch.Id, parseFloat(e.target.value) || 0)}
+                        className="h-10"
+                      />
+                    </div>
+                    <div>
+                      <Label>Quantity</Label>
+                      <Input
+                        type="number"
+                        value={pouchQuantities[pouch.Id] || ''}
+                        onChange={(e) => handleQuantityChange(pouch.Id, parseInt(e.target.value) || 0)}
                         className="h-10"
                       />
                     </div>
@@ -220,6 +269,14 @@ export default function AddGrindingDetails() {
               </Button>
             </div>
           </form>
+          {orderId && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="text-sm font-medium flex items-center">
+                <span className="mr-2">Order ID:</span>
+                <span className="text-blue-600 font-bold">{orderId}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

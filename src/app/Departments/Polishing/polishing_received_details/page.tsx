@@ -79,7 +79,7 @@ export default function PolishingReceivedDetails() {
       }
 
       try {
-        const [prefix, date, month, year, number] = polishingId.split('/');
+        const [prefix, date, month, year, number, subnumber] = polishingId.split('/');
         
         console.log('[Polishing Details] Fetching details for:', {
           prefix, date, month, year, number,
@@ -87,7 +87,7 @@ export default function PolishingReceivedDetails() {
         });
 
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/polishing/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          `${process.env.NEXT_PUBLIC_API_URL}/api/polishing/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
         );
 
         const result = await response.json();
@@ -180,14 +180,14 @@ export default function PolishingReceivedDetails() {
     try {
       setIsSubmitting(true);
 
-      const [prefix, date, month, year, number] = polishingId!.split('/');
+      const [prefix, date, month, year, number, subnumber] = polishingId!.split('/');
 
       // Combine date and time for received datetime
       const combinedDateTime = `${receivedDate}T${receivedTime}:00.000Z`;
       console.log('[PolishingReceived] Combined datetime:', combinedDateTime);
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/polishing/update/${prefix}/${date}/${month}/${year}/${number}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/polishing/update/${prefix}/${date}/${month}/${year}/${number}/${subnumber}`,
         {
           method: 'POST',
           headers: {
@@ -212,15 +212,10 @@ export default function PolishingReceivedDetails() {
 
       if (result.success) {
         toast.success('Polishing details updated successfully');
-        // Reset form
-        setReceivedDate(new Date().toISOString().split('T')[0]);
-        setReceivedTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
-        setPouchReceivedWeights({});
-        setTotalReceivedWeight(0);
-        setPolishingLoss(0);
-        
-        alert('Polishing details have been updated successfully!');
-        
+        // Add a short delay before redirecting to allow the toast to be seen
+        setTimeout(() => {
+          window.location.href = '/Departments/Polishing/Polishing_Table';
+        }, 1500);
       } else {
         throw new Error(result.message || 'Failed to update polishing details');
       }

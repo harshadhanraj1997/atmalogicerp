@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,7 @@ const CastingDetailsPage = () => {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const castingId = searchParams.get('castingId');
   const [receivedDate, setReceivedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [receivedTime, setReceivedTime] = useState<string>(
@@ -213,16 +214,20 @@ const CastingDetailsPage = () => {
         toast.success('Success!', {
           id: 'updateCasting',
           description: `Casting ${castingId} has been updated successfully.`,
-          duration: 5000,
+          duration: 3000,
           action: {
             label: 'Dismiss',
             onClick: () => toast.dismiss('updateCasting')
           },
         });
         
-        // Reset form and refresh data
+        // Reset form
         resetForm();
-        await refreshData();
+        
+        // Redirect to casting table page after a short delay to allow the toast to be seen
+        setTimeout(() => {
+          router.push('/Departments/Casting/casting_table');
+        }, 1500);
       } else {
         toast.error('Update Failed', {
           id: 'updateCasting',

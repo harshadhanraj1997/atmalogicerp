@@ -78,9 +78,9 @@ const FilingDetailsPage = () => {
       }
 
       try {
-        const [prefix, date, month, year, number] = filingId.split('/');
+        const [prefix, date, month, year, number,subnumber] = filingId.split('/');
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/filing-details/${prefix}/${date}/${month}/${year}/${number}`
+          `${process.env.NEXT_PUBLIC_API_URL}/api/filing-details/${prefix}/${date}/${month}/${year}/${number}/${subnumber}`
         );
         const result = await response.json();
         

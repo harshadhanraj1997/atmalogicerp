@@ -59,21 +59,6 @@ const departments: Department[] = [
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
-const formatIndianDateTime = (date: string | null): string => {
-  if (!date) return '';
-  const utcDate = new Date(date);
-  const indianDate = new Date(utcDate.getTime() + (5.5 * 60 * 60 * 1000));
-  return indianDate.toLocaleString('en-IN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  });
-};
-
 const getStatusClass = (status: string) => {
   switch (status?.toLowerCase()) {
     case 'pending':
@@ -157,7 +142,7 @@ const PlatingTable = () => {
       const startDateTime = new Date(startDate);
       startDateTime.setHours(0, 0, 0, 0);
       filtered = filtered.filter(deal => 
-        new Date(deal.Issued_Date__c).getTime() + (5.5 * 60 * 60 * 1000) >= startDateTime.getTime()
+        new Date(deal.Issued_Date__c).getTime() >= startDateTime.getTime()
       );
     }
 
@@ -165,7 +150,7 @@ const PlatingTable = () => {
       const endDateTime = new Date(endDate);
       endDateTime.setHours(23, 59, 59, 999);
       filtered = filtered.filter(deal => 
-        new Date(deal.Issued_Date__c).getTime() + (5.5 * 60 * 60 * 1000) <= endDateTime.getTime()
+        new Date(deal.Issued_Date__c).getTime() <= endDateTime.getTime()
       );
     }
 
@@ -259,6 +244,9 @@ const PlatingTable = () => {
                         <TableCell>Received Weight</TableCell>
                         <TableCell>Issued Date</TableCell>
                         <TableCell>Received Date</TableCell>
+                        <TableCell>Order Id</TableCell>
+                        <TableCell>Product</TableCell>
+                        <TableCell>Quantity</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Plating Loss</TableCell>
                         <TableCell>Actions</TableCell>
@@ -283,8 +271,11 @@ const PlatingTable = () => {
                             <TableCell>{deal.Name}</TableCell>
                             <TableCell>{deal.Issued_Weight__c}</TableCell>
                             <TableCell>{deal.Returned_Weight__c}</TableCell>
-                            <TableCell>{formatIndianDateTime(deal.Issued_Date__c)}</TableCell>
-                            <TableCell>{formatIndianDateTime(deal.Received_Date__c)}</TableCell>
+                            <TableCell>{deal.Issued_Date__c || ''}</TableCell>
+                            <TableCell>{deal.Received_Date__c || ''}</TableCell>
+                            <TableCell>{deal.Order_Id__c || ' '}</TableCell>
+                            <TableCell>{deal.Product__c || ''}</TableCell>
+                            <TableCell>{deal.Quantity__c || ''}</TableCell>
                             <TableCell>
                               <span className={`bd-badge ${getStatusClass(deal.Status__c)}`}
                                 style={{

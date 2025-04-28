@@ -27,8 +27,8 @@ const DullSummary: React.FC = () => {
       indianDate.setHours(0, 0, 0, 0);
     }
     
-    // Format as YYYY-MM-DD HH:mm:ss
-    return indianDate.toISOString().slice(0, 19).replace('T', ' ');
+    // Format as YYYY-MM-DDTHH:mm:ss.000+0000
+    return indianDate.toISOString().replace(/Z$/, '+0000');
   };
 
   // Update the useEffect for data fetching
@@ -145,15 +145,32 @@ const DullSummary: React.FC = () => {
     });
 
     const filtered = data.filter((item) => {
-      const issuedDate = new Date(item.issuedDate);
-      // Convert to Indian timezone for comparison
-      const indianIssuedDate = new Date(issuedDate.getTime() + (5.5 * 60 * 60 * 1000));
-      
-      // Convert filter dates to Indian timezone
-      const indianStart = new Date(start.getTime() + (5.5 * 60 * 60 * 1000));
-      const indianEnd = new Date(end.getTime() + (5.5 * 60 * 60 * 1000));
-      
-      return indianIssuedDate >= indianStart && indianIssuedDate <= indianEnd;
+      try {
+        // Handle the format "2025-04-27T22:00:00.000+0000"
+        const issuedDateStr = item.issuedDate;
+        
+        // Convert to standard ISO format by replacing +0000 with Z
+        const standardIsoDate = issuedDateStr.replace(/\+0000$/, 'Z');
+        const issuedDate = new Date(standardIsoDate);
+        
+        // Check if the date is valid
+        if (isNaN(issuedDate.getTime())) {
+          console.warn("Invalid date format:", issuedDateStr);
+          return false;
+        }
+        
+        // Convert to Indian timezone for comparison
+        const indianIssuedDate = new Date(issuedDate.getTime() + (5.5 * 60 * 60 * 1000));
+        
+        // Convert filter dates to Indian timezone
+        const indianStart = new Date(start.getTime() + (5.5 * 60 * 60 * 1000));
+        const indianEnd = new Date(end.getTime() + (5.5 * 60 * 60 * 1000));
+        
+        return indianIssuedDate >= indianStart && indianIssuedDate <= indianEnd;
+      } catch (error) {
+        console.error("Error parsing date:", error, item.issuedDate);
+        return false;
+      }
     });
 
     console.log("Filtering Results:", {

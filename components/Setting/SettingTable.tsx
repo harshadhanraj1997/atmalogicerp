@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Box from "@mui/material/Box";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -133,6 +133,47 @@ const SettingTable = () => {
   const [showConfirmation, setShowConfirmation] = useState<number | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  // Custom pagination control functions
+  const handlePageChange = (newPage: number) => {
+    console.log(`Changing page from ${page} to ${newPage}`);
+    // Update our internal page state
+    setPage(newPage);
+  };
+
+  // Function to change rows per page
+  const handleRowsPerPageChange = (newRowsPerPage: number) => {
+    console.log(`Changing rows per page from ${rowsPerPage} to ${newRowsPerPage}`);
+    setRowsPerPage(newRowsPerPage);
+    // Reset to first page when changing rows per page
+    setPage(0);
+  };
+
+  // Date filtering handlers
+  const handleDateChange = (type: 'start' | 'end', value: string) => {
+    console.log(`Setting ${type} date to ${value}`);
+    if (type === 'start') {
+      setStartDate(value);
+    } else {
+      setEndDate(value);
+    }
+  };
+
+  const handleResetDates = () => {
+    console.log('Resetting date filters');
+    setStartDate('');
+    setEndDate('');
+    setStatusFilter('all');
+  };
+
+  // Status filtering handler
+  const handleStatusChange = (value: string) => {
+    console.log(`Setting status filter to ${value}`);
+    setStatusFilter(value);
+  };
 
   useEffect(() => {
     const loadDeals = async () => {
@@ -152,8 +193,71 @@ const SettingTable = () => {
     loadDeals();
 
   }, []);
-  
-console.log("Deals State:", deals);
+
+  console.log("Deals State:", deals);
+
+  // Memoize the filtered deals to prevent infinite loops
+  const filteredDeals = useMemo(() => {
+    if (!deals || deals.length === 0) {
+      console.log('No deals data available to filter');
+      return [];
+    }
+    
+    console.log('Filtering from', deals.length, 'deals');
+    
+    // Start with all deals
+    let filtered = [...deals];
+    
+    // Filter by date range
+    if (startDate || endDate) {
+      filtered = filtered.filter(deal => {
+        try {
+          // Safely format the filing date
+          const dateStr = deal.issuedDate;
+          if (!dateStr) return true; // Include if no date
+          
+          // Parse date to consistent format
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return true; // Include if invalid date
+          
+          const formattedDate = date.toISOString().split('T')[0];
+          
+          // Check against range
+          if (startDate && formattedDate < startDate) return false;
+          if (endDate && formattedDate > endDate) return false;
+          return true;
+        } catch (error) {
+          console.error('Error in date filter:', error);
+          return true; // Include on error
+        }
+      });
+    }
+    
+    // Filter by status
+    if (statusFilter && statusFilter !== 'all') {
+      filtered = filtered.filter(deal => {
+        return deal.status?.toLowerCase() === statusFilter.toLowerCase();
+      });
+    }
+    
+    // Sort by issued date in descending order by default (most recent first)
+    filtered.sort((a, b) => {
+      try {
+        if (!a.issuedDate || !b.issuedDate) return 0;
+        const dateA = new Date(a.issuedDate);
+        const dateB = new Date(b.issuedDate);
+        
+        // Most recent first (descending)
+        return dateB.getTime() - dateA.getTime();
+      } catch (error) {
+        return 0; // Maintain order on error
+      }
+    });
+    
+    console.log('Filtered to', filtered.length, 'deals');
+    return filtered;
+  }, [deals, startDate, endDate, statusFilter]);
+
   const {
     order,
     orderBy,
@@ -167,75 +271,37 @@ console.log("Deals State:", deals);
     handleChangePage,
     handleChangeRowsPerPage,
     handleSearchChange,
-  } = useMaterialTableHook<IDeal | any>(deals, 10);
+  } = useMaterialTableHook<ISetting>(filteredDeals, 10);
 
-  const handlePrint = (pdfUrl: string | null) => {
-    if (pdfUrl) {
-      // Convert URL to a file and open it
-      window.open(pdfUrl, "_blank");
-    } else {
-      alert("No PDF available to print.");
-    }
-  };
-  const handlePdfClick = (pdfUrl: string) => {
-    if (!pdfUrl) {
-      alert("No PDF available to print.");
-      return;
-    }
+  // Add debug logging for filtered results
+  useEffect(() => {
+    console.log('Setting Table - Filtered Data:', {
+      totalSettings: deals.length,
+      filteredSettings: filteredRows?.length || 0,
+      searchTerm: searchQuery,
+      dateRange: { startDate, endDate },
+      statusFilter
+    });
+  }, [deals, filteredRows, searchQuery, startDate, endDate, statusFilter]);
 
-    // Create an HTML page with an embedded PDF
-    const html = `
-      <html>
-        <head>
-          <title>PDF Preview</title>
-        </head>
-        <body style="margin:0">
-          <iframe src="${pdfUrl}" style="border:none; width:100%; height:100vh;"></iframe>
-        </body>
-      </html>
-    `;
-
-    // Open the HTML page in a new tab
-    const newWindow = window.open();
-    if (newWindow) {
-      newWindow.document.write(html);
-      newWindow.document.close();
-    }
-  };
-
-  const handleApproveOrder = async (orderId: string) => {
-    try {
-      setIsUpdating(true);
-      const response = await fetch(`${apiBaseUrl}/api/update-order-status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ orderId }),
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        toast.success('Order approved successfully');
-        if (onUpdate) {
-          onUpdate();
-        }
-      } else {
-        toast.error(result.message || 'Failed to approve order');
-      }
-    } catch (error) {
-      console.error('Error approving order:', error);
-      toast.error('Failed to approve order');
-    } finally {
-      setIsUpdating(false);
-      setShowConfirmation(null);
-    }
-  };
-
-  const startIndex = page * rowsPerPage;
+  // Calculate paginated rows for display
+  // Ensure page is correctly adjusted for zero-based indexing
+  const pageForCalculation = page;
+  const startIndex = pageForCalculation * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
-  const paginatedRows = deals.slice(startIndex, endIndex);
+  
+  // Use filteredRows when available, or fall back to original deals
+  const rowsToDisplay = filteredRows && filteredRows.length > 0 ? filteredRows : deals;
+  const paginatedRows = rowsToDisplay.slice(startIndex, endIndex);
+  
+  // Debug pagination with more details
+  console.log('Setting Pagination:', {
+    page: pageForCalculation,
+    rowsPerPage,
+    totalRows: rowsToDisplay.length,
+    displaying: `${startIndex + 1}-${Math.min(endIndex, rowsToDisplay.length)} of ${rowsToDisplay.length}`,
+    paginatedRowCount: paginatedRows.length
+  });
 
   if (loading) return <div>Loading deals...</div>;
   if (error) return <div>Error: {error}</div>;
@@ -248,8 +314,19 @@ console.log("Deals State:", deals);
             <TableControls
               rowsPerPage={rowsPerPage}
               searchQuery={searchQuery}
-              handleChangeRowsPerPage={handleChangeRowsPerPage}
+              handleChangeRowsPerPage={handleRowsPerPageChange}
               handleSearchChange={handleSearchChange}
+              startDate={startDate}
+              endDate={endDate}
+              handleDateChange={handleDateChange}
+              handleResetDates={handleResetDates}
+              statusFilter={statusFilter}
+              handleStatusChange={handleStatusChange}
+              statusOptions={[
+                { value: 'all', label: 'All Status' },
+                { value: 'pending', label: 'Pending' },
+                { value: 'finished', label: 'Finished' }
+              ]}
             />
             <Box sx={{ width: "100%" }} className="table-responsive">
               <Paper sx={{ width: "100%", mb: 2 }}>
@@ -287,7 +364,10 @@ console.log("Deals State:", deals);
                         <TableCell>Issued Date</TableCell>
                         <TableCell>Received Date</TableCell>
                         <TableCell>Status</TableCell>
-                        <TableCell> Setting Loss</TableCell>
+                        <TableCell>Order Id</TableCell>
+                        <TableCell>Product</TableCell>
+                        <TableCell>Quantity</TableCell>
+                        <TableCell>Setting Loss</TableCell>
                         <TableCell>Stone Weight</TableCell>
                         <TableCell>Actions</TableCell>
                       </TableRow>
@@ -330,6 +410,9 @@ console.log("Deals State:", deals);
                                   {deal.status}
                                 </span>
                               </TableCell>
+                              <TableCell>{deal.orderId}</TableCell>
+                              <TableCell>{deal.product}</TableCell>
+                              <TableCell>{deal.quantity}</TableCell>
                               <TableCell>{deal.grindingLoss}</TableCell>
                               <TableCell>{deal.stoneWeight}</TableCell>
                               <TableCell className="table__icon-box">
@@ -482,15 +565,15 @@ console.log("Deals State:", deals);
             </Box>
             <Box className="table-search-box mt-[30px]" sx={{ p: 2 }}>
               <Box>
-                {`Showing ${(page - 1) * rowsPerPage + 1} to ${Math.min(
-                  page * rowsPerPage,
-                  filteredRows.length
-                )} of ${filteredRows.length} entries`}
+                {`Showing ${startIndex + 1} to ${Math.min(
+                  endIndex,
+                  rowsToDisplay.length
+                )} of ${rowsToDisplay.length} entries`}
               </Box>
               <Pagination
-                count={Math.ceil(filteredRows.length / rowsPerPage)}
-                page={page}
-                onChange={(e, value) => handleChangePage(value)}
+                count={Math.ceil(rowsToDisplay.length / rowsPerPage)}
+                page={pageForCalculation + 1}
+                onChange={(e, value) => handlePageChange(value - 1)}
                 variant="outlined"
                 shape="rounded"
                 className="manaz-pagination-button"

@@ -13,6 +13,8 @@ interface Pouch {
   Isssued_Weight_Grinding__c: number;
   Received_Weight_Grinding__c: number;
   Issued_Pouch_weight__c?: number;
+  Product__c?: string;
+  Quantity__c?: number;
 }
 
 export default function AddPlatingDetails() {
@@ -22,12 +24,15 @@ export default function AddPlatingDetails() {
   const [formattedId, setFormattedId] = useState<string>('');
   const [pouches, setPouches] = useState<Pouch[]>([]);
   const [pouchWeights, setPouchWeights] = useState<{ [key: string]: number }>({});
+  const [pouchQuantities, setPouchQuantities] = useState<{ [key: string]: number }>({});
   const [issuedDate, setIssuedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [issuedTime, setIssuedTime] = useState(
-    new Date().toTimeString().split(' ')[0].substring(0, 5)
-  );
+  const [issuedTime, setIssuedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  });
   const [totalWeight, setTotalWeight] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderId, setOrderId] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
@@ -40,18 +45,18 @@ export default function AddPlatingDetails() {
       }
 
       try {
-        const [prefix, date, month, year, number] = dullId.split('/');
-        console.log('[Add Plating] Dull ID parts:', { prefix, date, month, year, number });
+        const [prefix, date, month, year, number, subnumber] = dullId.split('/');
+        console.log('[Add Plating] Dull ID parts:', { prefix, date, month, year, number, subnumber });
 
-        const generatedPlatingId = `PLAT/${date}/${month}/${year}/${number}`;
+        const generatedPlatingId = `PLAT/${date}/${month}/${year}/${number}/  ${subnumber}`;
         setFormattedId(generatedPlatingId);
 
         console.log('[Add Plating] Fetching pouches from:', {
-          url: `${process.env.NEXT_PUBLIC_API_URL}/api/dull/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          url: `${process.env.NEXT_PUBLIC_API_URL}/api/dull/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
         });
 
         const pouchResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/dull/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          `${process.env.NEXT_PUBLIC_API_URL}/api/dull/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
         );
 
         const pouchResult = await pouchResponse.json();
@@ -65,7 +70,9 @@ export default function AddPlatingDetails() {
           ...pouch,
           Name: pouch.Name,
           Issued_Pouch_weight__c: pouch.Issued_Weight_Dull__c || 0,
-          Received_Weight_Grinding__c: pouch.Received_Weight_Dull__c || 0
+          Received_Weight_Grinding__c: pouch.Received_Weight_Dull__c || 0,
+          Product__c: pouch.Product__c || '',
+          Quantity__c: pouch.Quantity__c || 0
         }));
 
         console.log('[Add Plating] Formatted pouches:', formattedPouches);
@@ -73,10 +80,14 @@ export default function AddPlatingDetails() {
         setPouches(formattedPouches);
         
         const weights: { [key: string]: number } = {};
+        const quantities: { [key: string]: number } = {};
         formattedPouches.forEach((pouch: Pouch) => {
           weights[pouch.Id] = pouch.Issued_Pouch_weight__c || 0;
+          quantities[pouch.Id] = pouch.Quantity__c || 0;
+          setOrderId(pouch.Order_Id__c || '');
         });
         setPouchWeights(weights);
+        setPouchQuantities(quantities);
         
         const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
         setTotalWeight(total);
@@ -105,9 +116,15 @@ export default function AddPlatingDetails() {
   const handleWeightChange = (pouchId: string, weight: number) => {
     setPouchWeights(prev => {
       const newWeights = { ...prev, [pouchId]: weight };
-      const newTotal = Object.values(newWeights).reduce((sum, w) => sum + (w || 0), 0);
-      setTotalWeight(newTotal);
+      const total = Object.values(newWeights).reduce((sum, w) => sum + (w || 0), 0);
+      setTotalWeight(total);
       return newWeights;
+    });
+  };
+
+  const handleQuantityChange = (pouchId: string, quantity: number) => {
+    setPouchQuantities(prev => {
+      return { ...prev, [pouchId]: quantity };
     });
   };
 
@@ -120,32 +137,34 @@ export default function AddPlatingDetails() {
       // Prepare pouch data
       const pouchData = pouches.map(pouch => ({
         pouchId: pouch.Id,
-        platingWeight: pouchWeights[pouch.Id] || 0
+        platingWeight: pouchWeights[pouch.Id] || 0,
+        product: pouch.Product__c || '',
+        quantity: pouchQuantities[pouch.Id] || 0
       }));
 
-      // Combine date and time for issued datetime
-      const issuedDateTime = `${issuedDate}T${issuedTime}:00`;
+      // Combine date and time for issued datetime - without Z to avoid timezone conversion
+      const issuedDateTime = `${issuedDate}T${issuedTime}:00.000Z`;
 
       console.log('[Add Plating] Preparing submission with:', {
         platingId: formattedId,
-        issuedDate,
-        issuedTime,
         issuedDateTime,
         pouchCount: pouchData.length,
         totalWeight,
         pouches: pouchData,
-        pouchWeights
+        pouchWeights,
+        pouchQuantities
       });
 
       // Prepare plating data
       const platingData = {
         platingId: formattedId,
-        issuedDate: issuedDate,
-        issuedTime: issuedTime,
-        issuedDateTime: issuedDateTime,
+        issuedDate: issuedDateTime, // Send combined date and time as issuedDate
         pouches: pouchData,
         totalWeight: totalWeight,
-        status: 'Pending'
+        status: 'Pending',
+        product: pouches[0]?.Product__c || 'N/A',
+        quantity: pouchQuantities[pouches[0]?.Id] || 0,
+        orderId: orderId
       };
 
       console.log('[Add Plating] Submitting to API:', {
@@ -176,9 +195,10 @@ export default function AddPlatingDetails() {
         // Reset form
         setPouches([]);
         setPouchWeights({});
+        setPouchQuantities({});
         setTotalWeight(0);
         setIssuedDate(new Date().toISOString().split('T')[0]);
-        setIssuedTime(new Date().toTimeString().split(' ')[0].substring(0, 5));
+        setIssuedTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
         setFormattedId('');
         setLoading(false);
         
@@ -245,10 +265,16 @@ export default function AddPlatingDetails() {
               <h3 className="font-medium">Pouch Details</h3>
               {pouches.map((pouch) => (
                 <div key={pouch.Id} className="p-4 border rounded-lg">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-5 gap-4">
                     <div>
                       <Label>Pouch ID</Label>
                       <div className="h-10 flex items-center">{pouch.Name}</div>
+                    </div>
+                    <div>
+                      <Label>Product</Label>
+                      <div className="h-10 flex items-center text-gray-600">
+                        {pouch.Product__c || 'N/A'}
+                      </div>
                     </div>
                     <div>
                       <Label>Received Weight from Dull (g)</Label>
@@ -263,6 +289,15 @@ export default function AddPlatingDetails() {
                         step="0.00001"
                         value={pouchWeights[pouch.Id] || ''}
                         onChange={(e) => handleWeightChange(pouch.Id, parseFloat(e.target.value) || 0)}
+                        className="h-10"
+                      />
+                    </div>
+                    <div>
+                      <Label>Quantity</Label>
+                      <Input
+                        type="number"
+                        value={pouchQuantities[pouch.Id] || ''}
+                        onChange={(e) => handleQuantityChange(pouch.Id, parseInt(e.target.value) || 0)}
                         className="h-10"
                       />
                     </div>
@@ -285,6 +320,14 @@ export default function AddPlatingDetails() {
               </Button>
             </div>
           </form>
+          {orderId && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="text-sm font-medium flex items-center">
+                <span className="mr-2">Order ID:</span>
+                <span className="text-blue-600 font-bold">{orderId}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

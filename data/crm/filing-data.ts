@@ -26,6 +26,9 @@ export const fetchGrindingData = async (): Promise<IFiling[]> => {
             receivedWeight: grinding.Received_Weight || 0,
             receivedDate: grinding.Received_Date || '-',
             status: grinding.Status || 'Open',
+            orderId: grinding.OrderId || '',
+            product :grinding.product || '',  
+            quantity:grinding.quantity || 0,  
             grindingLoss: grinding.Filing_Loss
              || 0
           };

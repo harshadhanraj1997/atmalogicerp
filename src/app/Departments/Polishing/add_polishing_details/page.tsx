@@ -15,6 +15,8 @@ interface Pouch {
   Received_Weight_Setting__c?: number;
   partyName?: string;
   orderNumber?: string;
+  Product__c: string;
+  Quantity__c: number;
 }
 
 export default function AddPolishingDetails() {
@@ -28,6 +30,7 @@ export default function AddPolishingDetails() {
   const [formattedId, setFormattedId] = useState<string>('');
   const [pouches, setPouches] = useState<Pouch[]>([]);
   const [pouchWeights, setPouchWeights] = useState<{ [key: string]: number }>({});
+  const [pouchQuantities, setPouchQuantities] = useState<{ [key: string]: number }>({});
   const [issuedDate, setIssuedDate] = useState(new Date().toISOString().split('T')[0]);
   const [issuedTime, setIssuedTime] = useState<string>(() => {
     const now = new Date();
@@ -35,6 +38,7 @@ export default function AddPolishingDetails() {
   });
   const [totalWeight, setTotalWeight] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderId, setOrderId] = useState<string>('');
   const [totalReceivedFromSetting, setTotalReceivedFromSetting] = useState(0);
 
   useEffect(() => {
@@ -50,7 +54,7 @@ export default function AddPolishingDetails() {
         console.log('[AddPolishing] Processing source ID:', sourceId);
 
         const idParts = sourceId!.split('/');
-        const [prefix, date, month, year, number] = idParts;
+        const [prefix, date, month, year, number, subnumber] = idParts;
 
         // Determine source type by checking the prefix
         const isGrinding = prefix === 'GRIND';
@@ -65,17 +69,17 @@ export default function AddPolishingDetails() {
         });
 
         // Generate polishing ID
-        const generatedPolishingId = `POLISH/${date}/${month}/${year}/${number}`;
+        const generatedPolishingId = `POLISH/${date}/${month}/${year}/${number}/${subnumber}`;
         setFormattedId(generatedPolishingId);
 
         // Construct the endpoint based on the API structure
         let endpoint;
         if (isGrinding) {
-          endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/grinding/GRIND/${date}/${month}/${year}/${number}/pouches`;
+          endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/grinding/GRIND/${date}/${month}/${year}/${number}/${subnumber}/pouches`;
         } else if (fromSetting) {
-          endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/setting/SETTING/${date}/${month}/${year}/${number}/pouches`;
+          endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/setting/SETTING/${date}/${month}/${year}/${number}/${subnumber}/pouches`;
         } else {
-          endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/setting/${prefix}/${date}/${month}/${year}/${number}/pouches`;
+          endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/setting/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`;
         }
 
         console.log('[AddPolishing] Endpoint details:', {
@@ -113,12 +117,16 @@ export default function AddPolishingDetails() {
         );
         setTotalReceivedFromSetting(totalReceived);
 
-        // Initialize pouch weights
+        // Initialize pouch weights and quantities
         const weights: { [key: string]: number } = {};
+        const quantities: { [key: string]: number } = {};
         result.data.pouches.forEach((pouch: Pouch) => {
           weights[pouch.Id] = 0;
+          quantities[pouch.Id] = pouch.Quantity__c || 0;
+          setOrderId(pouch.Order_Id__c || '');
         });
         setPouchWeights(weights);
+        setPouchQuantities(quantities);
 
       } catch (error) {
         console.error('[AddPolishing] Error details:', {
@@ -144,6 +152,13 @@ export default function AddPolishingDetails() {
     });
   };
 
+  const handleQuantityChange = (pouchId: string, quantity: number) => {
+    setPouchQuantities(prev => ({
+      ...prev,
+      [pouchId]: quantity
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -157,7 +172,9 @@ export default function AddPolishingDetails() {
       // Prepare pouch data
       const pouchData = pouches.map(pouch => ({
         pouchId: pouch.Id,
-        polishingWeight: pouchWeights[pouch.Id] || 0
+        polishingWeight: pouchWeights[pouch.Id] || 0,
+        quantity: pouchQuantities[pouch.Id] || 0,
+        product: pouch.Product__c || 'N/A'
       }));
 
       // Validate that all pouches have weights
@@ -172,7 +189,10 @@ export default function AddPolishingDetails() {
         issuedDate: combinedDateTime, // Use combined date and time
         pouches: pouchData,
         totalWeight: totalWeight,
-        status: 'Pending'
+        status: 'Pending',
+        product: pouches[0]?.Product__c || 'N/A',
+        quantity: pouchQuantities[pouches[0]?.Id] || 0,
+        orderId: orderId
       };
 
       console.log('[AddPolishing] Submitting data:', polishingData);
@@ -192,6 +212,7 @@ export default function AddPolishingDetails() {
         // Reset form
         setPouches([]);
         setPouchWeights({});
+        setPouchQuantities({});
         setTotalWeight(0);
         setTotalReceivedFromSetting(0);
         setIssuedDate(new Date().toISOString().split('T')[0]);
@@ -259,10 +280,14 @@ export default function AddPolishingDetails() {
               <h3 className="font-medium">Pouch Details</h3>
               {pouches.map((pouch) => (
                 <div key={pouch.Id} className="p-4 border rounded-lg">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <div>
                       <Label>Pouch ID</Label>
                       <div className="h-10 flex items-center">{pouch.Name}</div>
+                    </div>
+                    <div>
+                      <Label>Product</Label>
+                      <div className="h-10 flex items-center">{pouch.Product__c || 'N/A'}</div>
                     </div>
                     <div>
                       <Label>
@@ -290,6 +315,15 @@ export default function AddPolishingDetails() {
                         className="h-10"
                       />
                     </div>
+                    <div>
+                      <Label>Quantity</Label>
+                      <Input
+                        type="number"
+                        value={pouchQuantities[pouch.Id] || ''}
+                        onChange={(e) => handleQuantityChange(pouch.Id, parseInt(e.target.value) || 0)}
+                        className="h-10"
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -311,6 +345,14 @@ export default function AddPolishingDetails() {
               </Button>
             </div>
           </form>
+          {orderId && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="text-sm font-medium flex items-center">
+                <span className="mr-2">Order ID:</span>
+                <span className="text-blue-600 font-bold">{orderId}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

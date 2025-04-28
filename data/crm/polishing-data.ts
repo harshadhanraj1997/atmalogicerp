@@ -22,6 +22,11 @@ export const fetchPolishingData = async (): Promise<IPolishing[]> => {
             receivedWeight: polishing.Received_Weight__c || 0, // Updated to match server field
             receivedDate: polishing.Received_Date__c || '-',  // Updated to match server field
             status: polishing.status__c,           // Updated to match server field
+            product: polishing.Product__c || 'N/A',
+            orderId: polishing.
+            Order_Id__c
+             || '',
+            quantity: polishing.Quantity__c || 0,
             polishingLoss: polishing.Polishing_loss__c || 0 // Calculate loss
           };
         });

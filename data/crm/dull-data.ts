@@ -21,7 +21,10 @@ export const fetchDullData = async (): Promise<IDull[]> => {
             issuedDate: dull.Issued_Date__c || '-',    // Updated to match server field
             receivedWeight: dull.Returned_weight__c || 0, // Updated to match server field
             receivedDate: dull.Received_Date__c || '-',  // Updated to match server field
-            status: dull.status__c,           // Updated to match server field
+            status: dull.status__c, 
+            orderId:dull.Order_Id__c, 
+            Quantity : dull.Quantity__c,
+            Product : dull.Product__c,         // Updated to match server field
             dullLoss: dull.Dull_loss__c || 0 // Calculate loss
           };
         });

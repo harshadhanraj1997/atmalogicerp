@@ -94,9 +94,9 @@ export default function CreateFilingFromDepartment() {
 
       try {
         setLoading(true);
-        const [prefix, date, month, year, number] = selectedRecord.split('/');
+        const [prefix, date, month, year, number,subnumber] = selectedRecord.split('/');
         // Use the standard API pattern for pouches
-        const endpoint = `${apiBaseUrl}/api/${selectedDepartment.toLowerCase()}/${prefix}/${date}/${month}/${year}/${number}/pouches`;
+        const endpoint = `${apiBaseUrl}/api/${selectedDepartment.toLowerCase()}/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`;
         console.log('Fetching pouches from:', endpoint);
         
         const response = await fetch(endpoint);
@@ -136,7 +136,7 @@ export default function CreateFilingFromDepartment() {
         'Dull': 'FD'
       }[selectedDepartment] || 'F';
       
-      const newFilingId = `${deptPrefix}/${date}/${month}/${year}/${number}`;
+      const newFilingId = `${deptPrefix}/${date}/${month}/${year}/${number}/${subnumber}`;
       setFilingId(newFilingId);
     }
   }, [selectedRecord, selectedDepartment]);

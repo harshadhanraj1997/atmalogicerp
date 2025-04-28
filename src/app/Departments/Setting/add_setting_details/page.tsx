@@ -13,6 +13,8 @@ interface Pouch {
   Isssued_Weight_Grinding__c: number;
   Received_Weight_Grinding__c: number;
   Issued_Pouch_weight__c?: number;
+  Product__c: string;
+  Quantity__c: number;
 }
 
 export default function AddSettingDetails() {
@@ -23,6 +25,7 @@ export default function AddSettingDetails() {
   const [formattedId, setFormattedId] = useState<string>('');
   const [pouches, setPouches] = useState<Pouch[]>([]);
   const [pouchWeights, setPouchWeights] = useState<{ [key: string]: number }>({});
+  const [pouchQuantities, setPouchQuantities] = useState<{ [key: string]: number }>({});
   const [issuedDate, setIssuedDate] = useState(new Date().toISOString().split('T')[0]);
   const [issuedTime, setIssuedTime] = useState<string>(() => {
     const now = new Date();
@@ -30,6 +33,7 @@ export default function AddSettingDetails() {
   });
   const [totalWeight, setTotalWeight] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderId, setOrderId] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
@@ -40,20 +44,20 @@ export default function AddSettingDetails() {
       }
 
       try {
-        let prefix, date, month, year, number;
+        let prefix, date, month, year, number,subnumber ;
         let apiEndpoint;
 
         if (filingId) {
-          [prefix, date, month, year, number] = filingId.split('/');
-          apiEndpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/grinding/GRIND/${date}/${month}/${year}/${number}/pouches`;
+          [prefix, date, month, year, number, subnumber  ] = filingId.split('/');
+          apiEndpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/grinding/GRIND/${date}/${month}/${year}/${number}/${subnumber}/pouches`;
         } else if (grindingId) {
-          [prefix, date, month, year, number] = grindingId.split('/');
+          [prefix, date, month, year, number, subnumber] = grindingId.split('/');
           apiEndpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/grinding/${grindingId}/pouches`;
         }
 
-        console.log('[AddSetting] ID parts:', { prefix, date, month, year, number });
+        console.log('[AddSetting] ID parts:', { prefix, date, month, year, number, subnumber });
 
-        const generatedSettingId = `SETTING/${date}/${month}/${year}/${number}`;
+        const generatedSettingId = `SETTING/${date}/${month}/${year}/${number}/${subnumber}`;
         setFormattedId(generatedSettingId);
 
         const pouchResponse = await fetch(apiEndpoint);
@@ -73,10 +77,14 @@ export default function AddSettingDetails() {
         setPouches(formattedPouches);
         
         const weights: { [key: string]: number } = {};
+        const quantities: { [key: string]: number } = {};
         formattedPouches.forEach((pouch: Pouch) => {
           weights[pouch.Id] = 0;
+          quantities[pouch.Id] = pouch.Quantity__c;
+          setOrderId(pouch.Order_Id__c || '');
         });
         setPouchWeights(weights);
+        setPouchQuantities(quantities);
         
         setTotalWeight(0);
 
@@ -100,6 +108,13 @@ export default function AddSettingDetails() {
     });
   };
 
+  const handleQuantityChange = (pouchId: string, quantity: number) => {
+    setPouchQuantities(prev => ({
+      ...prev,
+      [pouchId]: quantity
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -112,7 +127,9 @@ export default function AddSettingDetails() {
       // Prepare pouch data
       const pouchData = pouches.map(pouch => ({
         pouchId: pouch.Id,
-        settingWeight: pouchWeights[pouch.Id] || 0
+        settingWeight: pouchWeights[pouch.Id] || 0,
+        quantity: pouchQuantities[pouch.Id] || 0,
+        product: pouch.Product__c || 'N/A'
       }));
 
       // Prepare setting data
@@ -121,7 +138,10 @@ export default function AddSettingDetails() {
         issuedDate: combinedDateTime, // Use combined date and time
         pouches: pouchData,
         totalWeight: totalWeight,
-        status: 'Pending'
+        status: 'Pending',
+        product: pouches[0]?.Product__c || 'N/A',
+        quantity: pouchQuantities[pouches[0]?.Id] || 0,
+        orderId: orderId
       };
 
       console.log('[AddSetting] Submitting data:', settingData);
@@ -142,6 +162,7 @@ export default function AddSettingDetails() {
         // Reset form
         setPouches([]);
         setPouchWeights({});
+        setPouchQuantities({});
         setTotalWeight(0);
         setIssuedDate(new Date().toISOString().split('T')[0]);
         setIssuedTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }));
@@ -214,10 +235,14 @@ export default function AddSettingDetails() {
               <h3 className="font-medium">Pouch Details</h3>
               {pouches.map((pouch) => (
                 <div key={pouch.Id} className="p-4 border rounded-lg">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <div>
                       <Label>Pouch ID</Label>
                       <div className="h-10 flex items-center">{pouch.Name}</div>
+                    </div>
+                    <div>
+                      <Label>Product</Label>
+                      <div className="h-10 flex items-center">{pouch.Product__c || 'N/A'}</div>
                     </div>
                     <div>
                       <Label>Received Weight from Grinding (g)</Label>
@@ -232,6 +257,15 @@ export default function AddSettingDetails() {
                         step="0.00001"
                         value={pouchWeights[pouch.Id] || ''}
                         onChange={(e) => handleWeightChange(pouch.Id, parseFloat(e.target.value) || 0)}
+                        className="h-10"
+                      />
+                    </div>
+                    <div>
+                      <Label>Quantity</Label>
+                      <Input
+                        type="number"
+                        value={pouchQuantities[pouch.Id] || ''}
+                        onChange={(e) => handleQuantityChange(pouch.Id, parseInt(e.target.value) || 0)}
                         className="h-10"
                       />
                     </div>
@@ -254,9 +288,16 @@ export default function AddSettingDetails() {
               </Button>
             </div>
           </form>
+          {orderId && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="text-sm font-medium flex items-center">
+                <span className="mr-2">Order ID:</span>
+                <span className="text-blue-600 font-bold">{orderId}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
-

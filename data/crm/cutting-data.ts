@@ -21,7 +21,11 @@ export const fetchcuttingData = async (): Promise<ICutting[]> => {
             issuedDate: cutting.Issued_Date__c || '-',    // Updated to match server field
             returnedWeight: cutting.Returned_Weight__c || 0, // Updated to match server field
             receivedDate: cutting.Received_Date__c || '-',  // Updated to match server field
-            status: cutting.status__c,           // Updated to match server field
+            status: cutting.status__c,   
+            product: cutting.Product__c || 'N/A',
+            quantity: cutting.Quantity__c || 0,
+            OrderId : cutting.Order_Id__c || 'N/A',
+            
             CuttinfLoss: cutting.Cutting_loss__c || 0 // Calculate loss
           };
         });

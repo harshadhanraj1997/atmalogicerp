@@ -174,13 +174,13 @@ const SettingDetailsPage = () => {
       }
 
       try {
-        const [prefix, date, month, year, number] = settingId.split('/');
+        const [prefix, date, month, year, number, subnumber] = settingId.split('/');
         
-        if (!prefix || !date || !month || !year || !number) {
+        if (!prefix || !date || !month || !year || !number || !subnumber  ) {
           throw new Error('Invalid setting ID format');
         }
 
-        const url = `${apiBaseUrl}/api/setting/${prefix}/${date}/${month}/${year}/${number}`;
+        const url = `${apiBaseUrl}/api/setting/${prefix}/${date}/${month}/${year}/${number}/${subnumber}`;
         console.log('Fetching from URL:', url);
 
         const response = await fetch(url);
@@ -279,10 +279,10 @@ const SettingDetailsPage = () => {
 
       const combinedReceivedDateTime = `${receivedDate}T${receivedTime}:00.000Z`;
 
-      const [prefix, date, month, year, number] = data.setting.Name.split('/');
+      const [prefix, date, month, year, number, subnumber] = data.setting.Name.split('/');
 
       const response = await fetch(
-        `${apiBaseUrl}/api/setting/update/${prefix}/${date}/${month}/${year}/${number}`,
+        `${apiBaseUrl}/api/setting/update/${prefix}/${date}/${month}/${year}/${number}/${subnumber}`,
         {
           method: 'POST',
           headers: {
@@ -309,7 +309,10 @@ const SettingDetailsPage = () => {
 
       if (result.success) {
         toast.success('Setting details updated successfully');
-        window.location.reload();
+        // Add a short delay before redirecting to allow the toast to be seen
+        setTimeout(() => {
+          window.location.href = '/Departments/Setting/Setting_Table';
+        }, 1500);
       } else {
         throw new Error(result.message || 'Failed to update setting details');
       }
