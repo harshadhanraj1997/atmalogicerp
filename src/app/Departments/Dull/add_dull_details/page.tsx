@@ -20,6 +20,10 @@ interface Pouch {
 export default function AddDullDetails() {
   const searchParams = useSearchParams();
   const polishingId = searchParams.get('polishingId');
+  const grindingId = searchParams.get('grindingId');
+  const sourceId = polishingId || grindingId || '';
+  const sourceType = polishingId ? 'polishing' : grindingId ? 'grinding' : '';
+  
   const [loading, setLoading] = useState(true);
   const [formattedId, setFormattedId] = useState<string>('');
   const [pouches, setPouches] = useState<Pouch[]>([]);
@@ -37,28 +41,35 @@ export default function AddDullDetails() {
 
   useEffect(() => {
     const initializeDull = async () => {
-      if (!polishingId) {
-        console.log('[Add Dull] No polishing ID provided');
-        toast.error('No polishing ID provided');
+      if (!sourceId) {
+        console.log('[Add Dull] No source ID provided');
+        toast.error('No source ID provided');
         setLoading(false);
         return;
       }
 
       try {
-        const [prefix, date, month, year, number, subnumber] = polishingId.split('/');
-        console.log('[Add Dull] Polishing ID parts:', { prefix, date, month, year, number, subnumber });
+        const [prefix, date, month, year, number, subnumber] = sourceId.split('/');
+        console.log(`[Add Dull] ${sourceType} ID parts:`, { prefix, date, month, year, number, subnumber });
 
         const generatedDullId = `DULL/${date}/${month}/${year}/${number}/${subnumber}`;
         setFormattedId(generatedDullId);
 
-        console.log('[Add Dull] Fetching pouches from:', {
-          url: `${process.env.NEXT_PUBLIC_API_URL}/api/polish/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
+        // Determine the API endpoint based on source type
+        let apiEndpoint;
+        if (sourceType === 'polishing') {
+          apiEndpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/polish/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`;
+        } else if (sourceType === 'grinding') {
+          apiEndpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/grinding/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`;
+        } else {
+          throw new Error('Invalid source type');
+        }
+
+        console.log(`[Add Dull] Fetching pouches from ${sourceType}:`, {
+          url: apiEndpoint
         });
 
-        const pouchResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/polish/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
-        );
-
+        const pouchResponse = await fetch(apiEndpoint);
         const pouchResult = await pouchResponse.json();
         console.log('[Add Dull] Pouch API Response:', pouchResult);
 
@@ -66,14 +77,28 @@ export default function AddDullDetails() {
           throw new Error(pouchResult.message || 'Failed to fetch pouches');
         }
 
-        const formattedPouches = pouchResult.data.pouches.map((pouch: Pouch) => ({
-          ...pouch,
-          Name: pouch.Name,
-          Issued_Pouch_weight__c: pouch.Issued_Weight_Polishing__c || 0,
-          Received_Weight_Grinding__c: pouch.Received_Weight_Polishing__c || 0,
-          Product__c: pouch.Product__c || '',
-          Quantity__c: pouch.Quantity__c || 0
-        }));
+        // Format pouches differently based on source type
+        const formattedPouches = pouchResult.data.pouches.map((pouch: Pouch) => {
+          if (sourceType === 'polishing') {
+            return {
+              ...pouch,
+              Name: pouch.Name,
+              Issued_Pouch_weight__c: pouch.Issued_Weight_Polishing__c || 0,
+              Received_Weight_Grinding__c: pouch.Received_Weight_Polishing__c || 0,
+              Product__c: pouch.Product__c || '',
+              Quantity__c: pouch.Quantity__c || 0
+            };
+          } else { // grinding
+            return {
+              ...pouch,
+              Name: pouch.Name,
+              Issued_Pouch_weight__c: pouch.Issued_Weight_Grinding__c || 0,
+              Received_Weight_Grinding__c: pouch.Received_Weight_Grinding__c || 0,
+              Product__c: pouch.Product__c || '',
+              Quantity__c: pouch.Quantity__c || 0
+            };
+          }
+        });
 
         console.log('[Add Dull] Formatted pouches:', formattedPouches);
 
@@ -109,9 +134,8 @@ export default function AddDullDetails() {
       }
     };
 
-    console.log('[Add Dull] Component mounted with polishingId:', polishingId);
     initializeDull();
-  }, [polishingId]);
+  }, [sourceId, sourceType]);
 
   const handleWeightChange = (pouchId: string, weight: number) => {
     setPouchWeights((prev) => {
@@ -231,7 +255,7 @@ export default function AddDullDetails() {
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold">Add Dull Details</h2>
             <div className="text-sm font-medium">
-              Polishing ID: <span className="text-gray-600">{polishingId}</span>
+              Source: {sourceType ? sourceType.charAt(0).toUpperCase() + sourceType.slice(1) : 'None'} ({sourceId})
             </div>
           </div>
 
@@ -276,7 +300,7 @@ export default function AddDullDetails() {
                       <div className="h-10 flex items-center">{pouch.Name}</div>
                     </div>
                     <div>
-                      <Label>Received Weight from Polishing (g)</Label>
+                      <Label>Received Weight from {sourceType.charAt(0).toUpperCase() + sourceType.slice(1)} (g)</Label>
                       <div className="h-10 flex items-center text-gray-600">
                         {pouch.Received_Weight_Grinding__c?.toFixed(4) || '0.0000'}
                       </div>

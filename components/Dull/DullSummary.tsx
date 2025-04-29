@@ -15,20 +15,19 @@ const DullSummary: React.FC = () => {
   const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
   const [showCustomDatePicker, setShowCustomDatePicker] = useState<boolean>(false);
 
-  // Add helper function for Indian timezone date formatting
-  const formatIndianDateTime = (date: Date, isEndDate: boolean = false) => {
-    // Add 5 hours and 30 minutes to convert to Indian time
-    const indianDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+  // Format date to the required database format without timezone conversion
+  const formatDateTime = (date: Date, isEndDate: boolean = false) => {
+    const formattedDate = new Date(date);
     
     // Set appropriate time
     if (isEndDate) {
-      indianDate.setHours(23, 59, 59, 999);
+      formattedDate.setHours(23, 59, 59, 999);
     } else {
-      indianDate.setHours(0, 0, 0, 0);
+      formattedDate.setHours(0, 0, 0, 0);
     }
     
     // Format as YYYY-MM-DDTHH:mm:ss.000+0000
-    return indianDate.toISOString().replace(/Z$/, '+0000');
+    return formattedDate.toISOString().replace(/Z$/, '+0000');
   };
 
   // Update the useEffect for data fetching
@@ -62,9 +61,9 @@ const DullSummary: React.FC = () => {
             break;
         }
 
-        // Format dates with Indian timezone
-        const formattedStartDate = formatIndianDateTime(startDate);
-        const formattedEndDate = formatIndianDateTime(endDate, true);
+        // Format dates without timezone conversion
+        const formattedStartDate = formatDateTime(startDate);
+        const formattedEndDate = formatDateTime(endDate, true);
 
         console.log("Date Range:", {
           startDate: formattedStartDate,
@@ -140,14 +139,41 @@ const DullSummary: React.FC = () => {
   const filterByDateRange = (data: IDull[], start: Date, end: Date) => {
     console.log("=== FILTERING DULL DATA ===");
     console.log("Filter Range:", {
-      start: formatIndianDateTime(start),
-      end: formatIndianDateTime(end, true)
+      start: formatDateTime(start),
+      end: formatDateTime(end, true),
+      totalRecordsBeforeFiltering: data.length
+    });
+    
+    // Make a copy of the data array before filtering to avoid accidental side effects
+    const allRecords = [...data];
+    
+    // Set the time components appropriately for comparison
+    const startCompare = new Date(start);
+    startCompare.setHours(0, 0, 0, 0);
+    
+    const endCompare = new Date(end);
+    endCompare.setHours(23, 59, 59, 999);
+    
+    console.log("Using comparison dates:", {
+      adjustedStart: startCompare.toISOString(),
+      adjustedEnd: endCompare.toISOString()
     });
 
-    const filtered = data.filter((item) => {
+    // For troubleshooting, output a few example records
+    if (allRecords.length > 0) {
+      console.log("Sample record before filtering:", allRecords[0]);
+    }
+
+    const filtered = allRecords.filter((item) => {
       try {
         // Handle the format "2025-04-27T22:00:00.000+0000"
         const issuedDateStr = item.issuedDate;
+        
+        // Skip if no issued date
+        if (!issuedDateStr || issuedDateStr === '-') {
+          console.warn("Missing issued date for record:", item.id);
+          return false;
+        }
         
         // Convert to standard ISO format by replacing +0000 with Z
         const standardIsoDate = issuedDateStr.replace(/\+0000$/, 'Z');
@@ -159,14 +185,19 @@ const DullSummary: React.FC = () => {
           return false;
         }
         
-        // Convert to Indian timezone for comparison
-        const indianIssuedDate = new Date(issuedDate.getTime() + (5.5 * 60 * 60 * 1000));
+        // Check if the record should be included
+        const shouldInclude = issuedDate >= startCompare && issuedDate <= endCompare;
         
-        // Convert filter dates to Indian timezone
-        const indianStart = new Date(start.getTime() + (5.5 * 60 * 60 * 1000));
-        const indianEnd = new Date(end.getTime() + (5.5 * 60 * 60 * 1000));
+        // Log details about this comparison for a sample of records
+        if (Math.random() < 0.1) { // Log ~10% of records to avoid console flood
+          console.log(`Record ${item.id} date comparison:`, {
+            recordDateString: issuedDateStr,
+            recordDate: issuedDate.toISOString(),
+            isWithinRange: shouldInclude
+          });
+        }
         
-        return indianIssuedDate >= indianStart && indianIssuedDate <= indianEnd;
+        return shouldInclude;
       } catch (error) {
         console.error("Error parsing date:", error, item.issuedDate);
         return false;
@@ -183,6 +214,16 @@ const DullSummary: React.FC = () => {
 
   // Calculate summary statistics
   const calculateSummary = () => {
+    // Log the records being used for summary calculations
+    console.log('=== RECORDS USED FOR SUMMARY CALCULATION ===');
+    console.log('Total Records:', filteredData.length);
+    console.log('Sample Records:', filteredData.slice(0, 3));
+    console.log('Date Range:', dateRange);
+    console.log('Custom Date Range:', {
+      startDate: customStartDate ? formatDateTime(customStartDate) : 'N/A',
+      endDate: customEndDate ? formatDateTime(customEndDate, true) : 'N/A'
+    });
+    
     const totalCastings = filteredData.length;
     const totalIssuedWeight = filteredData.reduce(
       (sum, item) => sum + Number(item.issuedWeight || 0),

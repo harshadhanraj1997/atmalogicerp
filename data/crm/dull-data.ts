@@ -2,10 +2,17 @@ import { IDull } from "@/interface/table.interface";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
-// Function to fetch grinding data from the server
-export const fetchDullData = async (): Promise<IDull[]> => {
+// Function to fetch dull data from the server with date range filtering
+export const fetchDullData = async (startDate?: string, endDate?: string): Promise<IDull[]> => {
   try {
-    const response = await fetch(`${apiUrl}/api/dull`);
+    // Build URL with query parameters if provided
+    let url = `${apiUrl}/api/dull`;
+    if (startDate && endDate) {
+      url += `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+    }
+    
+    console.log("Fetching dull data with URL:", url);
+    const response = await fetch(url);
     const result = await response.json();
     console.log("Raw API Response:", result);
 
