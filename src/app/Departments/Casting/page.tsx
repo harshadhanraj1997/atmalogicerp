@@ -460,7 +460,8 @@ const CastingForm = () => {
       const combinedDateTime = `${issuedDate}T${issuedTime}`;
 
       // Calculate total issued weight
-      const totalIssued = inventoryItems.reduce((sum, item) => sum + Number(item.issueWeight), 0);
+      const totalIssuedFromInventory = inventoryItems.reduce((sum, item) => sum + Number(item.issueWeight), 0);
+      const totalIssued = totalIssuedFromInventory + (stoneWeight || 0);
 
       // Calculate required metals
       const requiredMetals = calculateRequiredMetals();
@@ -491,9 +492,9 @@ const CastingForm = () => {
           issuedGold: Number(item.issueWeight) * (parseFloat(item.purity.replace(/[^0-9.]/g, '')) / 100),
           issuedAlloy: Number(item.issueWeight) * (1 - parseFloat(item.purity.replace(/[^0-9.]/g, '')) / 100)
         })),
-        totalIssued: totalIssued,
+        totalIssued: totalIssued, // Now includes both inventory items and stone weight
         stoneWeight: stoneWeight,
-        issuedWeight: totalWeightWithStones,
+        issuedWeight: totalWeightWithStones, // Also includes stone weight
       };
 
       console.log("Making casting API call with data:", castingData);
