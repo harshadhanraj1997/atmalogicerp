@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { z } from 'zod';
 import { Label } from "@/components/ui/label";
 
-const apiBaseUrl = "https://needha-erp-server-xrdp.onrender.com";
+const apiBaseUrl = "https://needha-erp-server-jmjf.onrender.com";
 
 interface Plating {
   Id: string;
