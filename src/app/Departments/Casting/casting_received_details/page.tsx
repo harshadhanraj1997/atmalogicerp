@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { z } from 'zod';
 
-const apiBaseUrl = "https://needha-erp-server-xrdp.onrender.com";
+const apiBaseUrl = "https://needha-erp-server-jmjf.onrender.com";
 
 interface CastingDetails {
   Name: string;
