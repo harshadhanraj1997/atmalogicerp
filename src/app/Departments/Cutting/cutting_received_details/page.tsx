@@ -118,15 +118,15 @@ const CuttingDetailsPage = () => {
       }
 
       try {
-        const [prefix, date, month, year, number] = cuttingId.split('/');
+        const [prefix, date, month, year, number,subnumber] = cuttingId.split('/');
         
         // Use the correct API endpoint
         const response = await fetch(
-          `${apiBaseUrl}/api/cutting/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          `${apiBaseUrl}/api/cutting/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
         );
 
         console.log('[Cutting Details] Fetching from:', 
-          `${apiBaseUrl}/api/cutting/${prefix}/${date}/${month}/${year}/${number}/pouches`
+          `${apiBaseUrl}/api/cutting/${prefix}/${date}/${month}/${year}/${number}/${subnumber}/pouches`
         );
 
         const result = await response.json();
