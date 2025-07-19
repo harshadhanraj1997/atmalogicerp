@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
-const apiBaseUrl = "https://needha-erp-server-xrdp.onrender.com";
+const apiBaseUrl = "https://needha-erp-server-jmjf.onrender.com";
 
 interface Details {
   Name: string;
