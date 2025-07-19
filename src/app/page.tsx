@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import "@/styles/loginpage.css";
+import "@/styles/loginpage.css"; // ✅ Ensure your custom CSS is loaded
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -9,29 +9,43 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  // API base URL (Uses `.env.local` for flexibility)
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    // ✅ Client-side validation before credential check
+    // ✅ Client-side validation before sending request
     if (!username.trim() || !password.trim()) {
       setError("Username and password are required.");
       setLoading(false);
       return;
     }
 
-    // ✅ Dummy credentials check
-    if (username === "harsha123" && password === "google1234") {
-      console.log("✅ Login successful!");
-      localStorage.setItem("userId", "dummyUserId"); // Optionally store a dummy user ID
-      router.push("/Orders"); // Redirect to Orders page
-    } else {
-      setError("Invalid username or password.");
-    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
 
-    setLoading(false);
+      const data = await response.json();
+      setLoading(false);
+
+      if (response.ok && data.success) {
+        console.log("✅ Login successful!", data);
+        localStorage.setItem("userId", data.userId); // Store user ID if needed
+        router.push("/Orders"); // Redirect user to dashboard
+      } else {
+        setError(data.error || "Invalid login credentials.");
+      }
+    } catch (error) {
+      console.error("❌ Login error:", error);
+      setError("An error occurred. Please try again.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -73,13 +87,12 @@ export default function Login() {
               <a href="#">Forgot Password?</a>
             </div>
 
-            {error && <p style={{ color: "red" }}>{error}</p>}
-
             <button type="submit" className="btn btn-signin" disabled={loading}>
               {loading ? "Logging in..." : "Submit"}
             </button>
           </form>
 
+          {/* ✅ Terms & Conditions and Privacy Policy Links */}
           <div className="links">
             <a href="/terms-and-conditions">Terms & Conditions</a>
             <a href="/privacy-policy">Privacy Policy</a>
